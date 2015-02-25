@@ -1,7 +1,7 @@
 package chisel
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Version string
 	Auth    string
+	Server  string
 	Remotes []*Remote
 }
 
@@ -20,9 +21,9 @@ func DecodeConfig(s string) (*Config, error) {
 		return nil, fmt.Errorf("Invalid config")
 	}
 	s = strings.TrimPrefix(s, pre)
-	b, err := hex.DecodeString(s)
+	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid hex config")
+		return nil, fmt.Errorf("Invalid base64 config")
 	}
 	c := &Config{}
 	err = json.Unmarshal(b, c)
@@ -37,5 +38,5 @@ func EncodeConfig(c *Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return pre + hex.EncodeToString(b), nil
+	return pre + base64.StdEncoding.EncodeToString(b), nil
 }

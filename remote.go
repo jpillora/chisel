@@ -49,10 +49,6 @@ func DecodeRemote(s string) (*Remote, error) {
 			return nil, errors.New("Missing ports")
 		}
 
-		if !isHTTP.MatchString(p) {
-			p = "http://" + p
-		}
-
 		if !isHost(p) {
 			return nil, errors.New("Invalid host")
 		}
@@ -64,10 +60,10 @@ func DecodeRemote(s string) (*Remote, error) {
 		}
 	}
 	if r.LocalHost == "" {
-		r.LocalHost = "http://0.0.0.0"
+		r.LocalHost = "0.0.0.0"
 	}
 	if r.RemoteHost == "" {
-		return nil, errors.New("Missing remote host")
+		r.RemoteHost = "0.0.0.0"
 	}
 	return r, nil
 }

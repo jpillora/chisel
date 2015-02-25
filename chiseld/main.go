@@ -1,68 +1,61 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"os"
 
-	"github.com/jpillora/chisel"
-	"golang.org/x/net/websocket"
+	"github.com/jpillora/chisel/chiseld/server"
 )
+
+const help = `
+	Usage: chiseld [--host 0.0.0.0] [--port 8080] [--auth str]
+
+	host defines the HTTP listening host – the
+	network interface (defaults to 0.0.0.0). You
+	may also set the HOST environment variable.
+
+	port defines the HTTP listening port (defaults
+	to 8080). You may also set the PORT environment
+	variable.
+
+	auth specifies the exact authentication string
+	the client must provide to attain access. You
+	may also set the AUTH environment variable.
+
+`
 
 func main() {
 
-	auth := os.Getenv("AUTH")
+	hostf := flag.String("host", "", "")
+	portf := flag.String("port", "", "")
+	authf := flag.String("auth", "", "")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, help)
+		os.Exit(1)
+	}
+	flag.Parse()
 
-	handshakeWS := func(h string) (*chisel.Config, error) {
-		c, err := chisel.DecodeConfig(h)
-		if err != nil {
-			return nil, err
-		}
-		if chisel.Version != c.Version {
-			return nil, fmt.Errorf("Version mismatch")
-		}
-		if auth != "" {
-			if auth != c.Auth {
-				return nil, fmt.Errorf("Authentication failed")
-			}
-		}
-		return c, nil
+	host := *hostf
+	if host == "" {
+		host = os.Getenv("HOST")
+	}
+	if host == "" {
+		host = "0.0.0.0"
 	}
 
-	handleWS := websocket.Handler(func(ws *websocket.Conn) {
-		protos := ws.Config().Protocol
-		if len(protos) != 1 {
-			ws.Write([]byte("Handshake invalid"))
-			ws.Close()
-			return
-		}
-		config, err := handshakeWS(protos[0])
-		if err != nil {
-			ws.Write([]byte("Handshake denied: " + err.Error()))
-			ws.Close()
-			return
-		}
-		fmt.Printf("%+v\n", config)
-		io.Copy(ws, ws)
-	})
-
-	handleHTTP := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Upgrade") == "websocket" {
-			handleWS.ServeHTTP(w, r)
-		} else {
-			w.WriteHeader(200)
-			w.Write([]byte("hello world\n"))
-		}
-	})
-
-	//get port
-	port := os.Getenv("PORT")
+	port := *portf
+	if port == "" {
+		port = os.Getenv("PORT")
+	}
 	if port == "" {
 		port = "8080"
 	}
-	//listen
-	log.Println("listening on " + port)
-	log.Fatal(http.ListenAndServe(":"+port, handleHTTP))
+
+	auth := *authf
+	if auth == "" {
+		auth = os.Getenv("AUTH")
+	}
+
+	server.NewServer(auth).Start(host, port)
 }
