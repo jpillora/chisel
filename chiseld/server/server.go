@@ -13,9 +13,8 @@ import (
 )
 
 type Server struct {
-	auth      string
-	wsServer  websocket.Server
-	endpoints []*Endpoint
+	auth     string
+	wsServer websocket.Server
 }
 
 func NewServer(auth string) *Server {
@@ -89,13 +88,15 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 		log.Fatalf("Yamux server: %s", err)
 	}
 
+	endpoints := make([]*Endpoint, len(config.Remotes))
+
 	// Create an endpoint for each required
 	for id, r := range config.Remotes {
 		addr := r.RemoteHost + ":" + r.RemotePort
 		e := NewEndpoint(id, addr)
 		go e.start()
 		log.Printf("Activate remote #%d %s", id, r)
-		s.endpoints = append(s.endpoints, e)
+		endpoints[id] = e
 	}
 
 	for {
@@ -108,11 +109,11 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 			log.Printf("Session accept: %s", err)
 			continue
 		}
-		go s.handleStream(stream)
+		go s.handleStream(stream, endpoints)
 	}
 }
 
-func (s *Server) handleStream(stream net.Conn) {
+func (s *Server) handleStream(stream net.Conn, endpoints []*Endpoint) {
 	// extract endpoint id
 	b := make([]byte, 2)
 	n, err := stream.Read(b)
@@ -127,6 +128,6 @@ func (s *Server) handleStream(stream net.Conn) {
 	id := binary.BigEndian.Uint16(b)
 
 	//then pipe
-	e := s.endpoints[id]
+	e := endpoints[id]
 	e.session <- stream
 }

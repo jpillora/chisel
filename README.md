@@ -2,6 +2,8 @@
 
 Chisel is TCP proxy tunnelled over HTTP and Websockets
 
+![how it works](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+
 ### Install
 
 Server
