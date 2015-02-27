@@ -6,18 +6,34 @@ import (
 	"log"
 	"os"
 
+	"github.com/jpillora/chisel"
 	"github.com/jpillora/chisel/chisel-forward/client"
 )
 
 const help = `
 
-	Usage: chisel-forward [--auth str] server remote [remote] [remote] ...
+	Usage: chisel-forward [--auth AUTH] server remote [remote] [remote] ...
 
-	where 'server' is the URL to the chiseld server
+	auth specifies the optional authenication string
+	used by the server.
 
-	where 'remote' is a remote connection via the server, in the form
-		example.com:3000 (which means http://0.0.0.0:3000 => http://example.com:3000)
-		3000:google.com:80 (which means http://0.0.0.0:3000 => http://google.com:80)
+	server is the URL to the chiseld server.
+
+	remote is a remote connection via the server, which
+	comes in the form:
+		<local-host>:<local-port>:<remote-host>:<remote-port>
+
+		* Only remote-port is required.
+		* local-port defaults to remote-port.
+		* local-host defaults to 0.0.0.0 (all interfaces).
+		* remote-host defaults to localhost.
+
+		example remotes
+
+			3000
+			example.com:3000
+			3000:google.com:80
+			192.168.0.5:3000:google.com:80
 
 	Read more:
 	https://github.com/jpillora/chisel
@@ -37,6 +53,8 @@ func main() {
 
 	server := args[0]
 	remotes := args[1:]
+
+	chisel.Debug = true
 
 	c, err := client.NewClient(*auth, server, remotes)
 	if err != nil {

@@ -1,47 +1,65 @@
 package server
 
 import (
-	"encoding/binary"
 	"fmt"
-	"log"
-	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 
-	"github.com/hashicorp/yamux"
 	"github.com/jpillora/chisel"
 	"golang.org/x/net/websocket"
 )
 
 type Server struct {
 	auth     string
+	wsCount  int
 	wsServer websocket.Server
+	proxy    *httputil.ReverseProxy
 }
 
-func NewServer(auth string) *Server {
+func NewServer(auth, proxy string) (*Server, error) {
 	s := &Server{
 		auth:     auth,
 		wsServer: websocket.Server{},
 	}
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
-	return s
+
+	if proxy != "" {
+		u, err := url.Parse(proxy)
+		if err != nil {
+			return nil, err
+		}
+		s.proxy = httputil.NewSingleHostReverseProxy(u)
+	}
+
+	return s, nil
 }
 
-func (s *Server) Start(host, port string) {
+func (s *Server) Start(host, port string) error {
 	if s.auth != "" {
-		log.Println("Authenication activated")
+		fmt.Printf("Authenication enabled\n")
 	}
-	log.Println("Listening on " + port)
-	log.Fatal(http.ListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP)))
+	if s.proxy != nil {
+		fmt.Printf("Default proxy enabled\n")
+	}
+	fmt.Printf("Listening on %s...\n", port)
+	return http.ListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
-	//route by header
-	if r.Header.Get("Upgrade") == "websocket" {
+	//websockets upgrade AND has chisel prefix
+	if r.Header.Get("Upgrade") == "websocket" &&
+		strings.HasPrefix(r.Header.Get("Sec-WebSocket-Protocol"), chisel.ConfigPrefix) {
 		s.wsServer.ServeHTTP(w, r)
-	} else {
-		w.WriteHeader(200)
-		w.Write([]byte("hello world\n"))
+		return
 	}
+	if s.proxy != nil {
+		s.proxy.ServeHTTP(w, r)
+		return
+	}
+	//missing :O
+	w.WriteHeader(404)
 }
 
 func (s *Server) handshake(h string) (*chisel.Config, error) {
@@ -73,61 +91,15 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 
 	config, err := s.handshake(p)
 	if err != nil {
-		msg := "Handshake denied: " + err.Error()
+		msg := err.Error()
 		ws.Write([]byte(msg))
 		ws.Close()
 		return
 	}
 
-	log.Printf("success %+v\n", config)
+	// chisel.Printf("success %+v\n", config)
 	ws.Write([]byte("handshake-success"))
+	s.wsCount++
 
-	// Setup server side of yamux
-	session, err := yamux.Server(ws, nil)
-	if err != nil {
-		log.Fatalf("Yamux server: %s", err)
-	}
-
-	endpoints := make([]*Endpoint, len(config.Remotes))
-
-	// Create an endpoint for each required
-	for id, r := range config.Remotes {
-		addr := r.RemoteHost + ":" + r.RemotePort
-		e := NewEndpoint(id, addr)
-		go e.start()
-		log.Printf("Activate remote #%d %s", id, r)
-		endpoints[id] = e
-	}
-
-	for {
-		stream, err := session.Accept()
-		if err != nil {
-			if session.IsClosed() {
-				log.Printf("Websocket closed")
-				break
-			}
-			log.Printf("Session accept: %s", err)
-			continue
-		}
-		go s.handleStream(stream, endpoints)
-	}
-}
-
-func (s *Server) handleStream(stream net.Conn, endpoints []*Endpoint) {
-	// extract endpoint id
-	b := make([]byte, 2)
-	n, err := stream.Read(b)
-	if err != nil {
-		log.Fatalf("Stream initial read: %s", err)
-		return
-	}
-	if n != 2 {
-		log.Println("Should read 2 bytes...")
-		return
-	}
-	id := binary.BigEndian.Uint16(b)
-
-	//then pipe
-	e := endpoints[id]
-	e.session <- stream
+	NewWebSocket(s.wsCount, config, ws).handle()
 }

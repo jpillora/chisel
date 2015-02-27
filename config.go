@@ -14,13 +14,13 @@ type Config struct {
 	Remotes []*Remote
 }
 
-const pre = "chisel-"
+const ConfigPrefix = "chisel-"
 
 func DecodeConfig(s string) (*Config, error) {
-	if !strings.HasPrefix(s, pre) {
+	if !strings.HasPrefix(s, ConfigPrefix) {
 		return nil, fmt.Errorf("Invalid config")
 	}
-	s = strings.TrimPrefix(s, pre)
+	s = strings.TrimPrefix(s, ConfigPrefix)
 	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid base64 config")
@@ -38,5 +38,5 @@ func EncodeConfig(c *Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return pre + base64.StdEncoding.EncodeToString(b), nil
+	return ConfigPrefix + base64.StdEncoding.EncodeToString(b), nil
 }

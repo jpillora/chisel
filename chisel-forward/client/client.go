@@ -3,11 +3,12 @@ package client
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/chisel"
@@ -79,16 +80,27 @@ func (c *Client) Start() error {
 		return err
 	}
 
+	//closed state
 	markClosed := make(chan bool)
-	isClosed := false
+	var o sync.Once
+	closed := func() {
+		close(markClosed)
+	}
+	go func() {
+		for {
+			if session.IsClosed() {
+				o.Do(closed)
+				break
+			}
+			time.Sleep(time.Second)
+		}
+	}()
 
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
 		stream, err := session.Open()
 		if err != nil {
-			if !isClosed {
-				close(markClosed)
-			}
+			o.Do(closed)
 			return nil, err
 		}
 		return stream, nil
@@ -101,9 +113,8 @@ func (c *Client) Start() error {
 		c.proxies = append(c.proxies, proxy)
 	}
 
-	log.Printf("Connected to %s\n", c.config.Server)
+	fmt.Printf("Connected to %s\n", c.config.Server)
 	<-markClosed
-	isClosed = true
-	log.Printf("Disconnected\n")
+	fmt.Printf("Disconnected\n")
 	return nil
 }

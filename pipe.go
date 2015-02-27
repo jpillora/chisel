@@ -6,8 +6,9 @@ import (
 	"sync"
 )
 
-func Pipe(src net.Conn, dst net.Conn) {
+func Pipe(src net.Conn, dst net.Conn) (int64, int64) {
 
+	var sent, received int64
 	var c = make(chan bool)
 	var o sync.Once
 
@@ -18,14 +19,15 @@ func Pipe(src net.Conn, dst net.Conn) {
 	}
 
 	go func() {
-		io.Copy(src, dst)
+		received, _ = io.Copy(src, dst)
 		o.Do(close)
 	}()
 
 	go func() {
-		io.Copy(dst, src)
+		sent, _ = io.Copy(dst, src)
 		o.Do(close)
 	}()
 
 	<-c
+	return sent, received
 }

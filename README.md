@@ -1,8 +1,6 @@
 # chisel
 
-Chisel is TCP proxy tunnelled over HTTP and Websockets
-
-![how it works](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+Chisel is TCP proxy tunnelled over HTTP WebSockets. Similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#Performance). **Warning** this is beta software.
 
 ### Install
 
@@ -11,46 +9,43 @@ Server
 ```
 $ go get -v github.com/jpillora/chisel/chiseld
 $ chiseld --help
-
-	Usage: chiseld [--host 0.0.0.0] [--port 8080] [--auth str]
-
-	host defines the HTTP listening host – the
-	network interface (defaults to 0.0.0.0). You
-	may also set the HOST environment variable.
-
-	port defines the HTTP listening port (defaults
-	to 8080). You may also set the PORT environment
-	variable.
-
-	auth specifies the exact authentication string
-	the client must provide to attain access. You
-	may also set the AUTH environment variable.
 ```
 
 Forwarder
 
 ```
 $ go get -v github.com/jpillora/chisel/chisel-forward
-$ chisel-forward --help
-
-	Usage: chisel-forward [--auth str] server remote [remote] [remote] ...
-
-	where 'server' is the URL to the chiseld server
-
-	where 'remote' is a remote connection via the server, in the form
-		example.com:3000 (which means http://0.0.0.0:3000 => http://example.com:3000)
-		3000:google.com:80 (which means http://0.0.0.0:3000 => http://google.com:80)
 ```
+
+### Demo
+
+A Heroku app is running `chiseld` on the public HTTP port. This app
+is also running a file server on 3000 (which is normally inaccessible
+due to Heroku's firewall). However, if we tunnel in with:
+
+```
+$ chisel-forward --auth foobar https://chisel-demo.herokuapp.com/ 3000
+```
+
+Then open [http://localhost:3000/](http://localhost:3000/), we should
+see a directory listing of this app's root.
 
 ### Usage
 
+Both command-line programs have useful help text, see `chiseld --help` and `chisel-forward --help`.
+
+Eventually, a programmatic API will be documented and available.
+
+### Security
+
+Currently, secure communications are attained by hosting your HTTP server behind a TLS proxy. Thereby upgrading your server to HTTPS. In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
 
 ### Performance
 
 With crowbar, I was getting extremely slow transfer times
 
 ```
-#tab 1 (basic file server)
+#tab 1 (local file server)
 $ serve -p 4000
 
 #tab 2 (tunnel server)
@@ -65,9 +60,9 @@ $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
        74.74 real         2.37 user         6.74 sys
 ```
 
-Here, `largefile.bin` (~200MB) is transferred in 1m14s over localhost (also has high CPU utilisation).
+Here, `largefile.bin` (~200MB) is transferred in 1m14s (along with high CPU utilisation).
 
-Enter `chisel`, lets swap in `chiseld` and `chisel-forward`:
+Enter `chisel`, lets swap in `chiseld` and `chisel-forward`
 
 ```
 #tab 2 (tunnel server)
@@ -77,13 +72,28 @@ $ chiseld --auth foo
 $ chisel-forward --auth foo http://localhost:8080 3000:4000
 2015/02/27 16:13:43 Connected to http://localhost:8080
 2015/02/27 16:13:43 Proxy 0.0.0.0:3000 => 0.0.0.0:4000 enabled
+```
 
+And now we'll run the test again
+
+```
 #tab 4 (transfer test)
 $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
        0.60 real         0.05 user         0.14 sys
 ```
 
 Here, the same file was transferred in 0.6s
+
+### Overview
+
+![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+
+### Todo
+
+* User file with list of whitelisted remotes
+* TLS server configuration
+* Expose a stats page for proxy throughput
+* Tests along with benchmarks
 
 #### MIT License
 

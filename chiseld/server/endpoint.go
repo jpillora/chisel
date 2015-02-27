@@ -1,30 +1,32 @@
 package server
 
 import (
-	"log"
 	"net"
 
 	"github.com/jpillora/chisel"
 )
 
 type Endpoint struct {
-	id      int
-	count   int
-	addr    string
-	session chan net.Conn
+	w        *WebSocket
+	id       int
+	count    int
+	addr     string
+	sessions chan net.Conn
 }
 
-func NewEndpoint(id int, addr string) *Endpoint {
+func NewEndpoint(w *WebSocket, id int, addr string) *Endpoint {
 	return &Endpoint{
-		id:      id,
-		addr:    addr,
-		session: make(chan net.Conn),
+		w:        w,
+		id:       id,
+		addr:     addr,
+		sessions: make(chan net.Conn),
 	}
 }
 
 func (e *Endpoint) start() {
+	chisel.Printf("Websocket [%d] Proxy [%d] Activate (%s)", e.w.id, e.id, e.addr)
 	//waiting for incoming streams
-	for stream := range e.session {
+	for stream := range e.sessions {
 		go e.pipe(stream)
 	}
 }
@@ -32,14 +34,14 @@ func (e *Endpoint) start() {
 func (e *Endpoint) pipe(src net.Conn) {
 	dst, err := net.Dial("tcp", e.addr)
 	if err != nil {
-		log.Println(err)
+		chisel.Printf("%s", err)
 		src.Close()
 		return
 	}
 
 	e.count++
 	c := e.count
-	log.Printf("[#%d] openned connection %d", e.id, c)
+	chisel.Printf("Websocket [%d] Proxy [%d] Connection [%d] Open", e.w.id, e.id, c)
 	chisel.Pipe(src, dst)
-	log.Printf("[#%d] closed connection %d", e.id, c)
+	chisel.Printf("Websocket [%d] Proxy [%d] Connection [%d] Closed", e.w.id, e.id, c)
 }

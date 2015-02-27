@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/binary"
-	"log"
 	"net"
 
 	"github.com/jpillora/chisel"
@@ -27,15 +26,15 @@ func (p *Proxy) start() {
 
 	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
 	if err != nil {
-		log.Printf("Proxy %s failed: %s", p.remote, err)
+		chisel.Printf("Proxy [%d] Failed to start: %s", p.id, err)
 		return
 	}
 
-	log.Printf("Proxy %s enabled", p.remote)
+	chisel.Printf("Proxy [%d] Enabled (%s)", p.id, p.remote)
 	for {
 		src, err := l.Accept()
 		if err != nil {
-			log.Println(err)
+			chisel.Printf("%s", err)
 			return
 		}
 		go p.accept(src)
@@ -46,11 +45,11 @@ func (p *Proxy) accept(src net.Conn) {
 	p.count++
 	c := p.count
 
-	log.Printf("[#%d] accept conn %d", p.id, c)
+	chisel.Printf("Proxy [%d] Connection [%d] Open", p.id, c)
 
 	dst, err := p.openStream()
 	if err != nil {
-		log.Println(err)
+		chisel.Printf("%s", err)
 		return
 	}
 
@@ -60,7 +59,7 @@ func (p *Proxy) accept(src net.Conn) {
 	dst.Write(b)
 
 	//then pipe
-	chisel.Pipe(src, dst)
+	s, r := chisel.Pipe(src, dst)
 
-	log.Printf("[#%d] close conn %d", p.id, c)
+	chisel.Printf("Proxy [%d] Connection [%d] Closed (sent %d received %d)", p.id, c, s, r)
 }
