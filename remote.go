@@ -36,11 +36,11 @@ func DecodeRemote(s string) (*Remote, error) {
 		p := parts[i]
 
 		if isPort(p) {
-			if r.LocalPort == "" {
+			if r.RemotePort == "" {
+				r.RemotePort = p
 				r.LocalPort = p
-				r.RemotePort = p
 			} else {
-				r.RemotePort = p
+				r.LocalPort = p
 			}
 			continue
 		}
@@ -87,27 +87,8 @@ func isHost(s string) bool {
 	return true
 }
 
-// func EncodeRemote(r *Remote) (string, error) {
-// 	s := ""
-// 	n := 0
-// 	if r.RemotePort != "" {
-// 		s = r.RemotePort
-// 		n++
-// 	}
-// 	if r.RemoteHost != "" {
-// 		s = r.RemoteHost + ":" + s
-// 		n++
-// 	}
-// 	if r.LocalPort != "" {
-// 		s = r.LocalPort + ":" + s
-// 		n++
-// 	}
-// 	if r.LocalHost != "" {
-// 		s = r.LocalHost + ":" + s
-// 		n++
-// 	}
-// 	if n == 0 {
-// 		return "", errors.New("Invalid remote")
-// 	}
-// 	return s, nil
-// }
+//implement Stringer
+func (r *Remote) String() string {
+	return r.LocalHost + ":" + r.LocalPort + " => " +
+		r.RemoteHost + ":" + r.RemotePort
+}

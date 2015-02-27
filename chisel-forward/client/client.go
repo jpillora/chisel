@@ -1,8 +1,8 @@
 package client
 
 import (
-	"fmt"
 	"log"
+	"net"
 	"strings"
 
 	"github.com/hashicorp/yamux"
@@ -12,12 +12,10 @@ import (
 
 type Client struct {
 	config  *chisel.Config
-	proxies []*ProxyServer
-	ws      *websocket.Conn
-	session *yamux.Session
+	proxies []*Proxy
 }
 
-func NewClient(auth, server string, args []string) *Client {
+func NewClient(auth, server string, remotes []string) *Client {
 
 	c := &chisel.Config{
 		Version: chisel.Version,
@@ -25,10 +23,10 @@ func NewClient(auth, server string, args []string) *Client {
 		Server:  server,
 	}
 
-	for _, a := range args {
-		r, err := chisel.DecodeRemote(a)
+	for _, s := range remotes {
+		r, err := chisel.DecodeRemote(s)
 		if err != nil {
-			log.Fatalf("Remote decode failed: %s", err)
+			log.Fatalf("Failed to decode remote '%s': %s", s, err)
 		}
 		c.Remotes = append(c.Remotes, r)
 	}
@@ -37,70 +35,53 @@ func NewClient(auth, server string, args []string) *Client {
 }
 
 func (c *Client) Start() {
-	s, err := chisel.EncodeConfig(c.config)
+	encconfig, err := chisel.EncodeConfig(c.config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	url := strings.Replace(c.config.Server, "http:", "ws:", 1)
-	c.ws, err = websocket.Dial(url, s, "http://localhost/")
+	ws, err := websocket.Dial(url, encconfig, "http://localhost/")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	b := make([]byte, 0xff)
+	n, _ := ws.Read(b)
+	if msg := string(b[:n]); msg != "handshake-success" {
+		log.Fatal(msg)
+	}
+
 	// Setup client side of yamux
-	c.session, err = yamux.Client(c.ws, nil)
+	session, err := yamux.Client(ws, nil)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	markClosed := make(chan bool)
+	isClosed := false
+
+	//proxies all use this function
+	openStream := func() (net.Conn, error) {
+		stream, err := session.Open()
+		if err != nil {
+			if !isClosed {
+				close(markClosed)
+			}
+			return nil, err
+		}
+		return stream, nil
 	}
 
 	//prepare proxies
 	for id, r := range c.config.Remotes {
-		if err := c.setupProxy(id, r, c.session); err != nil {
-			log.Fatal(err)
-		}
+		proxy := NewProxy(id, r, openStream)
+		go proxy.start()
+		c.proxies = append(c.proxies, proxy)
 	}
 
-	// ws.Write([]byte("hello!"))
-
-	fmt.Printf("Connected to %s\n", c.config.Server)
-	c.handleData()
-	fmt.Printf("Disconnected\n")
-}
-
-func (c *Client) setupProxy(id int, r *chisel.Remote, session *yamux.Session) error {
-
-	addr := r.LocalHost + ":" + r.LocalPort
-
-	proxy := NewProxyServer(id, addr, session)
-	//watch conn for writes
-	// go func() {
-	// 	for b := range conn.out {
-	// 		//encode
-	// 		c.ws.Write(b)
-	// 	}
-	// }()
-
-	go proxy.start()
-	c.proxies = append(c.proxies, proxy)
-	return nil
-}
-
-func (c *Client) handleData() {
-
-	buff := make([]byte, 0xffff)
-	for {
-		n, err := c.ws.Read(buff)
-
-		if err != nil {
-			break
-		}
-
-		b := buff[:n]
-
-		fmt.Printf("%s\n", b)
-
-		//decode
-		//place on proxy's read queue
-	}
+	log.Printf("Connected to %s\n", c.config.Server)
+	<-markClosed
+	isClosed = true
+	log.Printf("Disconnected\n")
 }

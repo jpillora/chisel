@@ -9,6 +9,7 @@ import (
 
 type Endpoint struct {
 	id      int
+	count   int
 	addr    string
 	session chan net.Conn
 }
@@ -22,23 +23,23 @@ func NewEndpoint(id int, addr string) *Endpoint {
 }
 
 func (e *Endpoint) start() {
+	//waiting for incoming streams
+	for stream := range e.session {
+		go e.pipe(stream)
+	}
+}
 
-	laddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1")
-	raddr, err := net.ResolveTCPAddr("tcp4", e.addr)
+func (e *Endpoint) pipe(src net.Conn) {
+	dst, err := net.Dial("tcp", e.addr)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		src.Close()
 		return
 	}
 
-	for src := range e.session {
-
-		dst, err := net.DialTCP("tcp4", laddr, raddr)
-		if err != nil {
-			log.Println(err)
-			src.Close()
-			continue
-		}
-
-		chisel.Pipe(src, dst)
-	}
+	e.count++
+	c := e.count
+	log.Printf("[#%d] openned connection %d", e.id, c)
+	chisel.Pipe(src, dst)
+	log.Printf("[#%d] closed connection %d", e.id, c)
 }

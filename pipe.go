@@ -8,11 +8,13 @@ import (
 
 func Pipe(src net.Conn, dst net.Conn) {
 
+	var c = make(chan bool)
 	var o sync.Once
 
 	close := func() {
 		src.Close()
 		dst.Close()
+		close(c)
 	}
 
 	go func() {
@@ -24,4 +26,6 @@ func Pipe(src net.Conn, dst net.Conn) {
 		io.Copy(dst, src)
 		o.Do(close)
 	}()
+
+	<-c
 }

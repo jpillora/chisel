@@ -23,6 +23,9 @@ const help = `
 	the client must provide to attain access. You
 	may also set the AUTH environment variable.
 
+	Read more:
+	https://github.com/jpillora/chisel
+
 `
 
 func main() {
