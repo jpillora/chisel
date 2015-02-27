@@ -27,7 +27,7 @@ const help = `
 func main() {
 	auth := flag.String("auth", "", "Optional authentication")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, help, chisel.Versio)
+		fmt.Fprintf(os.Stderr, help)
 	}
 	flag.Parse()
 	args := flag.Args()
@@ -38,5 +38,12 @@ func main() {
 	server := args[0]
 	remotes := args[1:]
 
-	client.NewClient(*auth, server, remotes).Start()
+	c, err := client.NewClient(*auth, server, remotes)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = c.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

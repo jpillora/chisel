@@ -94,6 +94,7 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 		addr := r.RemoteHost + ":" + r.RemotePort
 		e := NewEndpoint(id, addr)
 		go e.start()
+		log.Printf("Activate remote #%d %s", id, r)
 		s.endpoints = append(s.endpoints, e)
 	}
 

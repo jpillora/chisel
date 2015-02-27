@@ -1,8 +1,12 @@
 package client
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/yamux"
@@ -15,47 +19,64 @@ type Client struct {
 	proxies []*Proxy
 }
 
-func NewClient(auth, server string, remotes []string) *Client {
+func NewClient(auth, server string, remotes []string) (*Client, error) {
+
+	u, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	//apply default port
+	if !regexp.MustCompile(`:\d+$`).MatchString(u.Host) {
+		if u.Scheme == "https" {
+			u.Host = u.Host + ":443"
+		} else {
+			u.Host = u.Host + ":80"
+		}
+	}
+
+	//use websockets scheme
+	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
 	c := &chisel.Config{
 		Version: chisel.Version,
 		Auth:    auth,
-		Server:  server,
+		Server:  u.String(),
 	}
 
 	for _, s := range remotes {
 		r, err := chisel.DecodeRemote(s)
 		if err != nil {
-			log.Fatalf("Failed to decode remote '%s': %s", s, err)
+			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
 		c.Remotes = append(c.Remotes, r)
 	}
 
-	return &Client{config: c}
+	return &Client{config: c}, nil
 }
 
-func (c *Client) Start() {
+func (c *Client) Start() error {
 	encconfig, err := chisel.EncodeConfig(c.config)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	url := strings.Replace(c.config.Server, "http:", "ws:", 1)
+	url := strings.Replace(c.config.Server, "http", "ws", 1)
 	ws, err := websocket.Dial(url, encconfig, "http://localhost/")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	b := make([]byte, 0xff)
 	n, _ := ws.Read(b)
 	if msg := string(b[:n]); msg != "handshake-success" {
-		log.Fatal(msg)
+		return errors.New(msg)
 	}
 
 	// Setup client side of yamux
 	session, err := yamux.Client(ws, nil)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	markClosed := make(chan bool)
@@ -84,4 +105,5 @@ func (c *Client) Start() {
 	<-markClosed
 	isClosed = true
 	log.Printf("Disconnected\n")
+	return nil
 }
