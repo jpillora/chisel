@@ -1,6 +1,6 @@
 # chisel
 
-Chisel is TCP proxy tunnelled over HTTP WebSockets. Similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#Performance). **Warning** this is beta software.
+Chisel is TCP proxy though tunnelled over HTTP WebSockets to get through firewalls. Similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** this is beta software.
 
 ### Install
 
