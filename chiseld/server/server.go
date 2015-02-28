@@ -38,12 +38,12 @@ func NewServer(auth, proxy string) (*Server, error) {
 
 func (s *Server) Start(host, port string) error {
 	if s.auth != "" {
-		fmt.Printf("Authenication enabled\n")
+		chisel.Printf("Authenication enabled\n")
 	}
 	if s.proxy != nil {
-		fmt.Printf("Default proxy enabled\n")
+		chisel.Printf("Default proxy enabled\n")
 	}
-	fmt.Printf("Listening on %s...\n", port)
+	chisel.Printf("Listening on %s...\n", port)
 	return http.ListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
 }
 

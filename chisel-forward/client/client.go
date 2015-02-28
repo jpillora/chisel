@@ -96,7 +96,7 @@ func (c *Client) Start() error {
 		if connerr != nil {
 			connerr = nil
 			d := b.Duration()
-			fmt.Printf("Retrying in %s...\n", d)
+			chisel.Printf("Retrying in %s...\n", d)
 			time.Sleep(d)
 		}
 
@@ -124,11 +124,11 @@ func (c *Client) Start() error {
 		markClosed := make(chan bool)
 		var o sync.Once
 		closed := func() {
-			fmt.Printf("Disconnected\n")
+			chisel.Printf("Disconnected\n")
 			close(markClosed)
 		}
 
-		fmt.Printf("Connected to %s\n", c.config.Server)
+		chisel.Printf("Connected to %s\n", c.config.Server)
 
 		//poll state
 		go func() {
