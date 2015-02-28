@@ -134,6 +134,7 @@ func (c *Client) Start() error {
 		go func() {
 			for {
 				if session.IsClosed() {
+					connerr = errors.New("disconnected")
 					o.Do(closed)
 					break
 				}
