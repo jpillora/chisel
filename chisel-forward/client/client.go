@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
+	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel"
 	"golang.org/x/net/websocket"
 )
@@ -18,6 +19,7 @@ import (
 type Client struct {
 	config  *chisel.Config
 	proxies []*Proxy
+	session *yamux.Session
 }
 
 func NewClient(auth, server string, remotes []string) (*Client, error) {
@@ -63,44 +65,16 @@ func (c *Client) Start() error {
 	}
 
 	url := strings.Replace(c.config.Server, "http", "ws", 1)
-	ws, err := websocket.Dial(url, encconfig, "http://localhost/")
-	if err != nil {
-		return err
-	}
 
-	b := make([]byte, 0xff)
-	n, _ := ws.Read(b)
-	if msg := string(b[:n]); msg != "handshake-success" {
-		return errors.New(msg)
-	}
-
-	// Setup client side of yamux
-	session, err := yamux.Client(ws, nil)
-	if err != nil {
-		return err
-	}
-
-	//closed state
-	markClosed := make(chan bool)
-	var o sync.Once
-	closed := func() {
-		close(markClosed)
-	}
-	go func() {
-		for {
-			if session.IsClosed() {
-				o.Do(closed)
-				break
-			}
-			time.Sleep(time.Second)
-		}
-	}()
+	var session *yamux.Session
 
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
+		if session == nil || session.IsClosed() {
+			return nil, errors.New("no session")
+		}
 		stream, err := session.Open()
 		if err != nil {
-			o.Do(closed)
 			return nil, err
 		}
 		return stream, nil
@@ -113,8 +87,63 @@ func (c *Client) Start() error {
 		c.proxies = append(c.proxies, proxy)
 	}
 
-	fmt.Printf("Connected to %s\n", c.config.Server)
-	<-markClosed
-	fmt.Printf("Disconnected\n")
+	var connerr error
+	b := &backoff.Backoff{Max: 5 * time.Minute}
+
+	//connection loop!
+	for {
+
+		if connerr != nil {
+			connerr = nil
+			d := b.Duration()
+			fmt.Printf("Retrying in %s...\n", d)
+			time.Sleep(d)
+		}
+
+		ws, err := websocket.Dial(url, encconfig, "http://localhost/")
+		if err != nil {
+			connerr = err
+			continue
+		}
+
+		buff := make([]byte, 0xff)
+		n, _ := ws.Read(buff)
+		if msg := string(buff[:n]); msg != "handshake-success" {
+			return errors.New(msg) //no point in retrying
+		}
+
+		// Setup client side of yamux
+		session, err = yamux.Client(ws, nil)
+		if err != nil {
+			connerr = err
+			continue
+		}
+		b.Reset()
+
+		//closed state
+		markClosed := make(chan bool)
+		var o sync.Once
+		closed := func() {
+			fmt.Printf("Disconnected\n")
+			close(markClosed)
+		}
+
+		fmt.Printf("Connected to %s\n", c.config.Server)
+
+		//poll state
+		go func() {
+			for {
+				if session.IsClosed() {
+					o.Do(closed)
+					break
+				}
+				time.Sleep(time.Second)
+			}
+		}()
+
+		//block!
+		<-markClosed
+	}
+
 	return nil
 }

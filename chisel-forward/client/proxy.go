@@ -50,6 +50,7 @@ func (p *Proxy) accept(src net.Conn) {
 	dst, err := p.openStream()
 	if err != nil {
 		chisel.Printf("%s", err)
+		src.Close()
 		return
 	}
 

@@ -94,6 +94,7 @@ Here, the same file was transferred in 0.6s
 * TLS server configuration
 * Expose a stats page for proxy throughput
 * Tests along with benchmarks
+* Configurable connection retry times
 
 #### MIT License
 
