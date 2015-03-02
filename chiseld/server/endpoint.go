@@ -6,16 +6,16 @@ import (
 	"github.com/jpillora/chisel"
 )
 
-type Endpoint struct {
-	w        *WebSocket
+type endpoint struct {
+	w        *webSocket
 	id       int
 	count    int
 	addr     string
 	sessions chan net.Conn
 }
 
-func NewEndpoint(w *WebSocket, id int, addr string) *Endpoint {
-	return &Endpoint{
+func newEndpoint(w *webSocket, id int, addr string) *endpoint {
+	return &endpoint{
 		w:        w,
 		id:       id,
 		addr:     addr,
@@ -23,7 +23,7 @@ func NewEndpoint(w *WebSocket, id int, addr string) *Endpoint {
 	}
 }
 
-func (e *Endpoint) start() {
+func (e *endpoint) start() {
 	chisel.Printf("Websocket [%d] Proxy [%d] Activate (%s)", e.w.id, e.id, e.addr)
 	//waiting for incoming streams
 	for stream := range e.sessions {
@@ -31,7 +31,7 @@ func (e *Endpoint) start() {
 	}
 }
 
-func (e *Endpoint) pipe(src net.Conn) {
+func (e *endpoint) pipe(src net.Conn) {
 	dst, err := net.Dial("tcp", e.addr)
 	if err != nil {
 		chisel.Printf("%s", err)

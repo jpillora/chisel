@@ -50,10 +50,11 @@ func (s *Server) Start(host, port string) error {
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	if r.Header.Get("Upgrade") == "websocket" &&
-		strings.HasPrefix(r.Header.Get("Sec-WebSocket-Protocol"), chisel.ConfigPrefix) {
+		strings.HasPrefix(r.Header.Get("Sec-webSocket-Protocol"), chisel.ConfigPrefix) {
 		s.wsServer.ServeHTTP(w, r)
 		return
 	}
+	//proxy target was provided
 	if s.proxy != nil {
 		s.proxy.ServeHTTP(w, r)
 		return
@@ -101,5 +102,5 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	ws.Write([]byte("handshake-success"))
 	s.wsCount++
 
-	NewWebSocket(s.wsCount, config, ws).handle()
+	newWebSocket(s.wsCount, config, ws).handle()
 }

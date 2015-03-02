@@ -1,6 +1,6 @@
 # chisel
 
-Chisel is TCP proxy though tunnelled over HTTP WebSockets to get through firewalls. Similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** this is beta software.
+Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – a corporate firewall. Chisel is similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
 
 ### Install
 
@@ -8,7 +8,6 @@ Server
 
 ```
 $ go get -v github.com/jpillora/chisel/chiseld
-$ chiseld --help
 ```
 
 Forwarder
@@ -16,6 +15,13 @@ Forwarder
 ```
 $ go get -v github.com/jpillora/chisel/chisel-forward
 ```
+
+### Features
+
+* Simple
+* Reasonably performant
+* Client Auto-reconnects with backoff
+* Server fallback proxy
 
 ### Demo
 
@@ -34,7 +40,7 @@ see a directory listing of this app's root.
 
 Both command-line programs have useful help text, see `chiseld --help` and `chisel-forward --help`.
 
-Eventually, a programmatic API will be documented and available.
+Eventually, a programmatic API will be documented and available, if you're keen see the `main.go` files in each sub-package.
 
 ### Security
 
@@ -42,33 +48,54 @@ Currently, secure communications are attained by hosting your HTTP server behind
 
 ### Performance
 
-With crowbar, I was getting extremely slow transfer times
+With crowbar, a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [Yamux](https://github.com/hashicorp/yamux) to create SDPY/HTTP2 like logical connections, therefore, each client will only need 1 TCP connection.
+
+In this test, we have:
 
 ```
-#tab 1 (local file server)
-$ serve -p 4000
+curl -> http tunnel client -> http tunnel server -> file server
+```
 
-#tab 2 (tunnel server)
+*Tab 1 (local file server)*
+
+```
+$ npm i -g serve
+$ serve -p 4000
+```
+
+*Tab 2 (tunnel server)*
+
+```
 $ echo -ne "foo:bar" > userfile
 $ crowbard -listen="0.0.0.0:8080" -userfile=./userfile
+```
 
-#tab 3 (tunnel client)
+*Tab 3 (tunnel client)*
+
+```
 $ crowbar-forward -local=0.0.0.0:3000 -server http://localhost:8080 -remote localhost:4000 -username foo -password bar
+```
 
-#tab 4 (transfer test)
+*Tab 4 (transfer test)*
+
+```
 $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
        74.74 real         2.37 user         6.74 sys
 ```
 
-Here, `largefile.bin` (~200MB) is transferred in 1m14s (along with high CPU utilisation).
+Here, we see `largefile.bin` (~200MB) is transferred in 1m14s (along with high CPU utilisation).
 
 Enter `chisel`, lets swap in `chiseld` and `chisel-forward`
 
-```
-#tab 2 (tunnel server)
-$ chiseld --auth foo
+*Tab 2 (tunnel server)*
 
-#tab 3 (tunnel client)
+```
+$ chiseld --auth foo
+```
+
+*Tab 3 (tunnel client)*
+
+```
 $ chisel-forward --auth foo http://localhost:8080 3000:4000
 2015/02/27 16:13:43 Connected to http://localhost:8080
 2015/02/27 16:13:43 Proxy 0.0.0.0:3000 => 0.0.0.0:4000 enabled
@@ -77,23 +104,31 @@ $ chisel-forward --auth foo http://localhost:8080 3000:4000
 And now we'll run the test again
 
 ```
-#tab 4 (transfer test)
 $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
        0.60 real         0.05 user         0.14 sys
 ```
 
-Here, the same file was transferred in 0.6s
+Here, the same file was transferred in **0.6s**
 
 ### Overview
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
+### Contributing
+
+* http://golang.org/doc/code.html
+* http://golang.org/doc/effective_go.html
+* `github.com/jpillora/chisel` contains the shared package
+* `github.com/jpillora/chisel/chiseld` contains the server package
+* `github.com/jpillora/chisel/chisel-forward` contains the client package
+
 ### Todo
 
+* Add tests (Bonus: Add benchmarks)
 * User file with list of whitelisted remotes
 * TLS server configuration
+* Encrypt data with `auth` as the secret (Poor man's TLS)
 * Expose a stats page for proxy throughput
-* Tests along with benchmarks
 * Configurable connection retry times
 
 #### MIT License

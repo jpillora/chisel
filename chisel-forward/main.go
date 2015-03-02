@@ -26,7 +26,7 @@ const help = `
 		* Only remote-port is required.
 		* local-port defaults to remote-port.
 		* local-host defaults to 0.0.0.0 (all interfaces).
-		* remote-host defaults to localhost.
+		* remote-host defaults to 0.0.0.0 (server localhost).
 
 		example remotes
 

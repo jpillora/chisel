@@ -8,21 +8,21 @@ import (
 	"github.com/jpillora/chisel"
 )
 
-type WebSocket struct {
+type webSocket struct {
 	id     int
 	config *chisel.Config
 	conn   net.Conn
 }
 
-func NewWebSocket(id int, config *chisel.Config, conn net.Conn) *WebSocket {
-	return &WebSocket{
+func newWebSocket(id int, config *chisel.Config, conn net.Conn) *webSocket {
+	return &webSocket{
 		id:     id,
 		config: config,
 		conn:   conn,
 	}
 }
 
-func (w *WebSocket) handle() {
+func (w *webSocket) handle() {
 
 	chisel.Printf("Websocket [%d] Open", w.id)
 
@@ -33,12 +33,12 @@ func (w *WebSocket) handle() {
 		return
 	}
 
-	endpoints := make([]*Endpoint, len(w.config.Remotes))
+	endpoints := make([]*endpoint, len(w.config.Remotes))
 
 	// Create an endpoint for each required
 	for id, r := range w.config.Remotes {
 		addr := r.RemoteHost + ":" + r.RemotePort
-		e := NewEndpoint(w, id, addr)
+		e := newEndpoint(w, id, addr)
 		go e.start()
 		endpoints[id] = e
 	}
@@ -57,7 +57,7 @@ func (w *WebSocket) handle() {
 	}
 }
 
-func (w *WebSocket) handleStream(stream net.Conn, endpoints []*Endpoint) {
+func (w *webSocket) handleStream(stream net.Conn, endpoints []*endpoint) {
 	// extract endpoint id
 	b := make([]byte, 2)
 	n, err := stream.Read(b)
@@ -76,6 +76,6 @@ func (w *WebSocket) handleStream(stream net.Conn, endpoints []*Endpoint) {
 	e.sessions <- stream
 }
 
-func (w *WebSocket) teardown() {
+func (w *webSocket) teardown() {
 	chisel.Printf("Websocket [%d] Closed", w.id)
 }

@@ -24,6 +24,11 @@ type Client struct {
 
 func NewClient(auth, server string, remotes []string) (*Client, error) {
 
+	//apply default scheme
+	if !strings.HasPrefix(server, "http") {
+		server = "http://" + server
+	}
+
 	u, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -31,14 +36,14 @@ func NewClient(auth, server string, remotes []string) (*Client, error) {
 
 	//apply default port
 	if !regexp.MustCompile(`:\d+$`).MatchString(u.Host) {
-		if u.Scheme == "https" {
+		if u.Scheme == "https" || u.Scheme == "wss" {
 			u.Host = u.Host + ":443"
 		} else {
 			u.Host = u.Host + ":80"
 		}
 	}
 
-	//use websockets scheme
+	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
 	c := &chisel.Config{
@@ -64,7 +69,7 @@ func (c *Client) Start() error {
 		return err
 	}
 
-	url := strings.Replace(c.config.Server, "http", "ws", 1)
+	chisel.Printf("Connecting to %s\n", c.config.Server)
 
 	var session *yamux.Session
 
@@ -100,7 +105,7 @@ func (c *Client) Start() error {
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(url, encconfig, "http://localhost/")
+		ws, err := websocket.Dial(c.config.Server, encconfig, "http://localhost/")
 		if err != nil {
 			connerr = err
 			continue
@@ -128,7 +133,7 @@ func (c *Client) Start() error {
 			close(markClosed)
 		}
 
-		chisel.Printf("Connected to %s\n", c.config.Server)
+		chisel.Printf("Connected\n")
 
 		//poll state
 		go func() {
