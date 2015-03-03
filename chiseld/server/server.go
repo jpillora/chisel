@@ -71,7 +71,7 @@ func (s *Server) handshake(h string) (*chisel.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if chisel.Version != c.Version {
+	if chisel.ProtocolVersion != c.Version {
 		return nil, fmt.Errorf("Version mismatch")
 	}
 	if s.auth != "" {

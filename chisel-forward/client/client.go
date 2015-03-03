@@ -47,7 +47,7 @@ func NewClient(auth, server string, remotes []string) (*Client, error) {
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
 	c := &chisel.Config{
-		Version: chisel.Version,
+		Version: chisel.ProtocolVersion,
 		Auth:    auth,
 		Server:  u.String(),
 	}

@@ -4,4 +4,4 @@ package chisel
 //incompatible changes are made, this will
 //be incremented to prevent different versions
 //from communicating.
-const Version = "1"
+const ProtocolVersion = "1"
