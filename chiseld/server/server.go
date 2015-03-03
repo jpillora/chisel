@@ -30,7 +30,16 @@ func NewServer(auth, proxy string) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		if u.Host == "" {
+			return nil, fmt.Errorf("Missing protocol (%s)", u)
+		}
 		s.proxy = httputil.NewSingleHostReverseProxy(u)
+		//always use proxy host
+		s.proxy.Director = func(r *http.Request) {
+			r.URL.Scheme = u.Scheme
+			r.URL.Host = u.Host
+			r.Host = u.Host
+		}
 	}
 
 	return s, nil

@@ -18,7 +18,7 @@ const ConfigPrefix = "chisel-"
 
 func DecodeConfig(s string) (*Config, error) {
 	if !strings.HasPrefix(s, ConfigPrefix) {
-		return nil, fmt.Errorf("Invalid config")
+		return nil, fmt.Errorf("Invalid chisel config")
 	}
 	s = strings.TrimPrefix(s, ConfigPrefix)
 	b, err := base64.StdEncoding.DecodeString(s)

@@ -1,6 +1,6 @@
 # chisel
 
-Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – a corporate firewall. Chisel is similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
+Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
 
 ### Install
 
@@ -19,32 +19,40 @@ $ go get -v github.com/jpillora/chisel/chisel-forward
 ### Features
 
 * Simple
-* Reasonably performant
-* Client Auto-reconnects with backoff
-* Server fallback proxy
+* Performant
+* Client auto-reconnects with exponential backoff
+* Client can have multiple tunnel endpoints over one TCP connection
+* Server default proxy
 
 ### Demo
 
-A Heroku app is running `chiseld` on the public HTTP port. This app
-is also running a file server on 3000 (which is normally inaccessible
+A demo app on Heroku is running `chiseld`:
+
+```
+$ chiseld --auth foobar --port $PORT --proxy http://example.com
+```
+
+This app is also running a file server on 3000 (which is normally inaccessible
 due to Heroku's firewall). However, if we tunnel in with:
 
 ```
-$ chisel-forward --auth foobar https://chisel-demo.herokuapp.com/ 3000
+$ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
 ```
 
-Then open [http://localhost:3000/](http://localhost:3000/), we should
-see a directory listing of this app's root.
+Then open [localhost:3000/](http://localhost:3000/), we should
+see a directory listing of this app's root. Also, if we visit
+https://chisel-demo.herokuapp.com we should see that the server's
+default proxy is pointing at http://example.com.
 
 ### Usage
 
-Both command-line programs have useful help text, see `chiseld --help` and `chisel-forward --help`.
+See `chiseld --help` and `chisel-forward --help`.
 
 Eventually, a programmatic API will be documented and available, if you're keen see the `main.go` files in each sub-package.
 
 ### Security
 
-Currently, secure communications are attained by hosting your HTTP server behind a TLS proxy. Thereby upgrading your server to HTTPS. In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
+Currently, you can only secure your traffic by using HTTPS, which can only be done by hosting your HTTP server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
 
 ### Performance
 
@@ -83,7 +91,7 @@ $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
        74.74 real         2.37 user         6.74 sys
 ```
 
-Here, we see `largefile.bin` (~200MB) is transferred in 1m14s (along with high CPU utilisation).
+Here, we see `largefile.bin` (~200MB) is transferred in **1m14s** (along with high CPU utilisation).
 
 Enter `chisel`, lets swap in `chiseld` and `chisel-forward`
 
@@ -96,7 +104,7 @@ $ chiseld --auth foo
 *Tab 3 (tunnel client)*
 
 ```
-$ chisel-forward --auth foo http://localhost:8080 3000:4000
+$ chisel-forward --auth foo localhost:8080 3000:4000
 2015/02/27 16:13:43 Connected to http://localhost:8080
 2015/02/27 16:13:43 Proxy 0.0.0.0:3000 => 0.0.0.0:4000 enabled
 ```
@@ -126,8 +134,8 @@ Here, the same file was transferred in **0.6s**
 
 * Add tests (Bonus: Add benchmarks)
 * User file with list of whitelisted remotes
-* TLS server configuration
-* Encrypt data with `auth` as the secret (Poor man's TLS)
+* Pass in TLS server configuration
+* Encrypt data with `auth` as the symmetric key
 * Expose a stats page for proxy throughput
 * Configurable connection retry times
 
