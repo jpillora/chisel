@@ -1,7 +1,6 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -17,6 +16,7 @@ import (
 )
 
 type Client struct {
+	*chisel.Logger
 	config  *chisel.Config
 	proxies []*Proxy
 	session *yamux.Session
@@ -60,23 +60,26 @@ func NewClient(auth, server string, remotes []string) (*Client, error) {
 		c.Remotes = append(c.Remotes, r)
 	}
 
-	return &Client{config: c}, nil
+	return &Client{
+		Logger: chisel.NewLogger("client"),
+		config: c,
+	}, nil
 }
 
 func (c *Client) Start() error {
 	encconfig, err := chisel.EncodeConfig(c.config)
 	if err != nil {
-		return err
+		return c.Errorf("%s", err)
 	}
 
-	chisel.Printf("Connecting to %s\n", c.config.Server)
+	c.Infof("Connecting to %s\n", c.config.Server)
 
 	var session *yamux.Session
 
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
 		if session == nil || session.IsClosed() {
-			return nil, errors.New("no session")
+			return nil, c.Errorf("no session")
 		}
 		stream, err := session.Open()
 		if err != nil {
@@ -87,7 +90,7 @@ func (c *Client) Start() error {
 
 	//prepare proxies
 	for id, r := range c.config.Remotes {
-		proxy := NewProxy(id, r, openStream)
+		proxy := NewProxy(c, id+1, r, openStream)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
 	}
@@ -101,7 +104,7 @@ func (c *Client) Start() error {
 		if connerr != nil {
 			connerr = nil
 			d := b.Duration()
-			chisel.Printf("Retrying in %s...\n", d)
+			c.Debugf("Retrying in %s...\n", d)
 			time.Sleep(d)
 		}
 
@@ -114,7 +117,7 @@ func (c *Client) Start() error {
 		buff := make([]byte, 0xff)
 		n, _ := ws.Read(buff)
 		if msg := string(buff[:n]); msg != "handshake-success" {
-			return errors.New(msg) //no point in retrying
+			return c.Errorf("%s", msg) //no point in retrying
 		}
 
 		// Setup client side of yamux
@@ -129,17 +132,17 @@ func (c *Client) Start() error {
 		markClosed := make(chan bool)
 		var o sync.Once
 		closed := func() {
-			chisel.Printf("Disconnected\n")
+			c.Infof("Disconnected\n")
 			close(markClosed)
 		}
 
-		chisel.Printf("Connected\n")
+		c.Infof("Connected\n")
 
 		//poll state
 		go func() {
 			for {
 				if session.IsClosed() {
-					connerr = errors.New("disconnected")
+					connerr = c.Errorf("disconnected")
 					o.Do(closed)
 					break
 				}

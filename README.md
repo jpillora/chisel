@@ -18,47 +18,103 @@ $ go get -v github.com/jpillora/chisel/chisel-forward
 
 ### Features
 
-* Simple
+* Easy to use
 * Performant
-* Client auto-reconnects with exponential backoff
-* Client can have multiple tunnel endpoints over one TCP connection
-* Server default proxy
+* Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
+* Client can create multiple tunnel endpoints over one TCP connection
+* Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 
 ### Demo
 
-A demo app on Heroku is running `chiseld`:
+A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chiseld` server:
 
-```
+``` sh
+# listen on $PORT, require password 'foobar', proxy web requests to 'http://example.com'
 $ chiseld --auth foobar --port $PORT --proxy http://example.com
 ```
 
-This app is also running a file server on 3000 (which is normally inaccessible
+This demo app is also running a file server on 0.0.0.0:3000 (which is normally inaccessible
 due to Heroku's firewall). However, if we tunnel in with:
 
-```
+``` sh
+# connect to 'https://chisel-demo.herokuapp.com', using password 'foobar',
+# tunnel your localhost:3000 to the server's localhost:3000
 $ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
 ```
 
 Then open [localhost:3000/](http://localhost:3000/), we should
-see a directory listing of this app's root. Also, if we visit
+see a directory listing of the demo app's root. Also, if we visit
 https://chisel-demo.herokuapp.com we should see that the server's
 default proxy is pointing at http://example.com.
 
 ### Usage
 
-See `chiseld --help` and `chisel-forward --help`.
+```
+$ chiseld --help
+
+	Usage: chiseld [--host 0.0.0.0] [--port 8080] [--auth AUTH] [--proxy PROXY]
+
+	host defines the HTTP listening host – the
+	network interface (defaults to 0.0.0.0). You
+	may also set the HOST environment variable.
+
+	port defines the HTTP listening port (defaults
+	to 8080). This option falls back to the PORT
+	environment	variable.
+
+	auth specifies the authentication string
+	the client must provide to attain access. This
+	option falls back to the AUTH environment variable.
+
+	proxy specifies the default proxy target to use
+	when chiseld receives a normal HTTP request. This
+	option falls back to the PROXY environment variable.
+
+	Read more:
+	https://github.com/jpillora/chisel
+```
+
+```
+$ chisel-forward --help
+
+	Usage: chisel-forward [--auth AUTH] server remote [remote] [remote] ...
+
+	auth specifies the optional authentication string
+	used by the server.
+
+	server is the URL of the chiseld server.
+
+	remote is a remote connection via the server, which
+	comes in the form:
+		<local-host>:<local-port>:<remote-host>:<remote-port>
+
+		* Only remote-port is required.
+		* local-port defaults to remote-port.
+		* local-host defaults to 0.0.0.0 (all interfaces).
+		* remote-host defaults to 0.0.0.0 (server localhost).
+
+		example remotes
+
+			3000
+			example.com:3000
+			3000:google.com:80
+			192.168.0.5:3000:google.com:80
+
+	Read more:
+	https://github.com/jpillora/chisel
+```
 
 Eventually, a programmatic API will be documented and available, if you're keen see the `main.go` files in each sub-package.
 
 ### Security
 
-Currently, you can only secure your traffic by using HTTPS, which can only be done by hosting your HTTP server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
+Currently, you can secure your traffic by using HTTPS, which can only be done by hosting your HTTP server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
 
 ### Performance
 
-With crowbar, a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [Yamux](https://github.com/hashicorp/yamux) to create SDPY/HTTP2 like logical connections, therefore, each client will only need 1 TCP connection.
+With [crowbar](https://github.com/q3k/crowbar), a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [Yamux](https://github.com/hashicorp/yamux) to create hundreds of SDPY/HTTP2 like logical connections, resulting in **one** TCP connection per client.
 
-In this test, we have:
+In this unscientific test, we have:
 
 ```
 curl -> http tunnel client -> http tunnel server -> file server
@@ -118,9 +174,22 @@ $ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
 
 Here, the same file was transferred in **0.6s**
 
+*Note: Real benchmarks are on the Todo*
+
 ### Overview
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+
+### Known Issues
+
+* **WebSockets support is required**
+	* IaaS providers all will support WebSockets
+		* Unless they run a HTTP only proxy in front of your servers, in which case I'd argue that you've been downgraded to PaaS.
+	* PaaS providers vary in their support for WebSockets
+		* Heroku has full support
+		* Openshift has full support though connections are only accepted on ports 8443 and 8080
+		* Google App Engine has **no** support
+
 
 ### Contributing
 
@@ -133,11 +202,12 @@ Here, the same file was transferred in **0.6s**
 ### Todo
 
 * Add tests (Bonus: Add benchmarks)
-* User file with list of whitelisted remotes
+* Users file with white-listed remotes
 * Pass in TLS server configuration
 * Encrypt data with `auth` as the symmetric key
 * Expose a stats page for proxy throughput
 * Configurable connection retry times
+* Treat forwarder stdin/stdout as a socket
 
 #### MIT License
 

@@ -8,14 +8,16 @@ import (
 )
 
 type Proxy struct {
+	*chisel.Logger
 	id         int
 	count      int
 	remote     *chisel.Remote
 	openStream func() (net.Conn, error)
 }
 
-func NewProxy(id int, remote *chisel.Remote, openStream func() (net.Conn, error)) *Proxy {
+func NewProxy(c *Client, id int, remote *chisel.Remote, openStream func() (net.Conn, error)) *Proxy {
 	return &Proxy{
+		Logger:     c.Logger.Fork("proxy #%d %s", id, remote),
 		id:         id,
 		remote:     remote,
 		openStream: openStream,
@@ -26,15 +28,15 @@ func (p *Proxy) start() {
 
 	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
 	if err != nil {
-		chisel.Printf("Proxy [%d] Failed to start: %s", p.id, err)
+		p.Infof("%s", err)
 		return
 	}
 
-	chisel.Printf("Proxy [%d] Enabled (%s)", p.id, p.remote)
+	p.Debugf("Enabled")
 	for {
 		src, err := l.Accept()
 		if err != nil {
-			chisel.Printf("%s", err)
+			p.Infof("Accept error: %s", err)
 			return
 		}
 		go p.accept(src)
@@ -43,13 +45,14 @@ func (p *Proxy) start() {
 
 func (p *Proxy) accept(src net.Conn) {
 	p.count++
-	c := p.count
+	cid := p.count
+	clog := p.Fork("connection %d", cid)
 
-	chisel.Printf("Proxy [%d] Connection [%d] Open", p.id, c)
+	clog.Debugf("Open")
 
 	dst, err := p.openStream()
 	if err != nil {
-		chisel.Printf("%s", err)
+		clog.Debugf("Stream error: %s", err)
 		src.Close()
 		return
 	}
@@ -62,5 +65,5 @@ func (p *Proxy) accept(src net.Conn) {
 	//then pipe
 	s, r := chisel.Pipe(src, dst)
 
-	chisel.Printf("Proxy [%d] Connection [%d] Closed (sent %d received %d)", p.id, c, s, r)
+	clog.Debugf("Closed (sent %d received %d)", s, r)
 }

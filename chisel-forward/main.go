@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/jpillora/chisel"
 	"github.com/jpillora/chisel/chisel-forward/client"
 )
 
@@ -14,7 +13,7 @@ const help = `
 
 	Usage: chisel-forward [--auth AUTH] server remote [remote] [remote] ...
 
-	auth specifies the optional authenication string
+	auth specifies the optional authentication string
 	used by the server.
 
 	server is the URL to the chiseld server.
@@ -54,12 +53,14 @@ func main() {
 	server := args[0]
 	remotes := args[1:]
 
-	chisel.Debug = true
-
 	c, err := client.NewClient(*auth, server, remotes)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	c.Info = true
+	c.Debug = true
+
 	err = c.Start()
 	if err != nil {
 		log.Fatal(err)

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 )
 
 type Server struct {
+	*chisel.Logger
 	auth     string
 	wsCount  int
 	wsServer websocket.Server
@@ -20,6 +20,7 @@ type Server struct {
 
 func NewServer(auth, proxy string) (*Server, error) {
 	s := &Server{
+		Logger:   chisel.NewLogger("server"),
 		auth:     auth,
 		wsServer: websocket.Server{},
 	}
@@ -31,7 +32,7 @@ func NewServer(auth, proxy string) (*Server, error) {
 			return nil, err
 		}
 		if u.Host == "" {
-			return nil, fmt.Errorf("Missing protocol (%s)", u)
+			return nil, s.Errorf("Missing protocol (%s)", u)
 		}
 		s.proxy = httputil.NewSingleHostReverseProxy(u)
 		//always use proxy host
@@ -47,12 +48,12 @@ func NewServer(auth, proxy string) (*Server, error) {
 
 func (s *Server) Start(host, port string) error {
 	if s.auth != "" {
-		chisel.Printf("Authenication enabled\n")
+		s.Infof("Authenication enabled")
 	}
 	if s.proxy != nil {
-		chisel.Printf("Default proxy enabled\n")
+		s.Infof("Default proxy enabled")
 	}
-	chisel.Printf("Listening on %s...\n", port)
+	s.Infof("Listening on %s...", port)
 	return http.ListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
 }
 
@@ -74,18 +75,18 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(h string) (*chisel.Config, error) {
 	if h == "" {
-		return nil, fmt.Errorf("Handshake missing")
+		return nil, s.Errorf("Handshake missing")
 	}
 	c, err := chisel.DecodeConfig(h)
 	if err != nil {
 		return nil, err
 	}
 	if chisel.ProtocolVersion != c.Version {
-		return nil, fmt.Errorf("Version mismatch")
+		return nil, s.Errorf("Version mismatch")
 	}
 	if s.auth != "" {
 		if s.auth != c.Auth {
-			return nil, fmt.Errorf("Authentication failed")
+			return nil, s.Errorf("Authentication failed")
 		}
 	}
 	return c, nil
@@ -107,9 +108,9 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 		return
 	}
 
-	// chisel.Printf("success %+v\n", config)
+	// s.Infof("success %+v\n", config)
 	ws.Write([]byte("handshake-success"))
 	s.wsCount++
 
-	newWebSocket(s.wsCount, config, ws).handle()
+	newWebSocket(s, config, ws).handle()
 }

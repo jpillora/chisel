@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/jpillora/chisel"
 	"github.com/jpillora/chisel/chiseld/server"
 )
 
@@ -72,12 +71,14 @@ func main() {
 		proxy = os.Getenv("PROXY")
 	}
 
-	chisel.Debug = true
-
 	s, err := server.NewServer(auth, proxy)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	s.Info = true
+	s.Debug = true
+
 	err = s.Start(host, port)
 	if err != nil {
 		log.Fatal(err)

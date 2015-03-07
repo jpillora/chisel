@@ -7,7 +7,7 @@ import (
 )
 
 type endpoint struct {
-	w        *webSocket
+	*chisel.Logger
 	id       int
 	count    int
 	addr     string
@@ -16,7 +16,7 @@ type endpoint struct {
 
 func newEndpoint(w *webSocket, id int, addr string) *endpoint {
 	return &endpoint{
-		w:        w,
+		Logger:   w.Logger.Fork("#%d %s", id, addr),
 		id:       id,
 		addr:     addr,
 		sessions: make(chan net.Conn),
@@ -24,8 +24,8 @@ func newEndpoint(w *webSocket, id int, addr string) *endpoint {
 }
 
 func (e *endpoint) start() {
-	chisel.Printf("Websocket [%d] Proxy [%d] Activate (%s)", e.w.id, e.id, e.addr)
-	//waiting for incoming streams
+	e.Infof("Activate")
+	//service incoming streams
 	for stream := range e.sessions {
 		go e.pipe(stream)
 	}
@@ -34,14 +34,14 @@ func (e *endpoint) start() {
 func (e *endpoint) pipe(src net.Conn) {
 	dst, err := net.Dial("tcp", e.addr)
 	if err != nil {
-		chisel.Printf("%s", err)
+		e.Infof("%s", err)
 		src.Close()
 		return
 	}
 
 	e.count++
-	c := e.count
-	chisel.Printf("Websocket [%d] Proxy [%d] Connection [%d] Open", e.w.id, e.id, c)
+	eid := e.count
+	e.Infof("Open #%d", eid)
 	chisel.Pipe(src, dst)
-	chisel.Printf("Websocket [%d] Proxy [%d] Connection [%d] Closed", e.w.id, e.id, c)
+	e.Infof("Closed #%d", eid)
 }
