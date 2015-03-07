@@ -18,7 +18,7 @@ type webSocket struct {
 func newWebSocket(s *Server, config *chisel.Config, conn net.Conn) *webSocket {
 	id := s.wsCount
 	return &webSocket{
-		Logger: s.Logger.Fork("websocket %d", id),
+		Logger: s.Logger.Fork("conn#%d", id),
 		id:     id,
 		config: config,
 		conn:   conn,
@@ -27,12 +27,15 @@ func newWebSocket(s *Server, config *chisel.Config, conn net.Conn) *webSocket {
 
 func (w *webSocket) handle() {
 
-	w.Infof("Open")
+	w.Debugf("Open")
+
+	// queue teardown
+	defer w.teardown()
 
 	// Setup server side of yamux
 	session, err := yamux.Server(w.conn, nil)
 	if err != nil {
-		w.Infof("Yamux server: %s", err)
+		w.Debugf("Yamux server: %s", err)
 		return
 	}
 
@@ -50,10 +53,9 @@ func (w *webSocket) handle() {
 		stream, err := session.Accept()
 		if err != nil {
 			if session.IsClosed() {
-				w.teardown()
 				break
 			}
-			w.Infof("Session accept: %s", err)
+			w.Debugf("Session accept: %s", err)
 			continue
 		}
 		go w.handleStream(stream, endpoints)
@@ -65,25 +67,29 @@ func (w *webSocket) handleStream(stream net.Conn, endpoints []*endpoint) {
 	b := make([]byte, 2)
 	n, err := stream.Read(b)
 	if err != nil {
-		w.Infof("Stream initial read: %s", err)
+		stream.Close()
+		w.Debugf("Stream initial read: %s", err)
 		return
 	}
 	if n != 2 {
-		w.Infof("Should read 2 bytes...")
+		stream.Close()
+		w.Debugf("Should read 2 bytes...")
 		return
 	}
 	id := binary.BigEndian.Uint16(b)
 
 	if int(id) >= len(endpoints) {
-		w.Infof("Invalid endpoint id")
+		stream.Close()
+		w.Debugf("Invalid endpoint index: %d [total endpoints %d]", id, len(endpoints))
 		return
 	}
 
-	//then pipe
+	// pass this stream to the
+	// desired endpoint
 	e := endpoints[id]
 	e.sessions <- stream
 }
 
 func (w *webSocket) teardown() {
-	w.Infof("Closed")
+	w.Debugf("Closed")
 }

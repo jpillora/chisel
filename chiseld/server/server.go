@@ -12,17 +12,19 @@ import (
 
 type Server struct {
 	*chisel.Logger
-	auth     string
-	wsCount  int
-	wsServer websocket.Server
-	proxy    *httputil.ReverseProxy
+	auth       string
+	wsCount    int
+	wsServer   websocket.Server
+	httpServer *chisel.HTTPServer
+	proxy      *httputil.ReverseProxy
 }
 
 func NewServer(auth, proxy string) (*Server, error) {
 	s := &Server{
-		Logger:   chisel.NewLogger("server"),
-		auth:     auth,
-		wsServer: websocket.Server{},
+		Logger:     chisel.NewLogger("server"),
+		auth:       auth,
+		wsServer:   websocket.Server{},
+		httpServer: chisel.NewHTTPServer(),
 	}
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
 
@@ -46,6 +48,13 @@ func NewServer(auth, proxy string) (*Server, error) {
 	return s, nil
 }
 
+func (s *Server) Run(host, port string) error {
+	if err := s.Start(host, port); err != nil {
+		return err
+	}
+	return s.Wait()
+}
+
 func (s *Server) Start(host, port string) error {
 	if s.auth != "" {
 		s.Infof("Authenication enabled")
@@ -54,7 +63,17 @@ func (s *Server) Start(host, port string) error {
 		s.Infof("Default proxy enabled")
 	}
 	s.Infof("Listening on %s...", port)
-	return http.ListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
+
+	return s.httpServer.GoListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
+}
+
+func (s *Server) Wait() error {
+	return s.httpServer.Wait()
+}
+
+func (s *Server) Close() error {
+	//this should cause an error in the open websockets
+	return s.httpServer.Close()
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {

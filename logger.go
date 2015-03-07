@@ -40,7 +40,7 @@ func (l *Logger) Debugf(f string, args ...interface{}) {
 }
 
 func (l *Logger) Errorf(f string, args ...interface{}) error {
-	return fmt.Errorf(l.prefix+": "+f, args)
+	return fmt.Errorf(l.prefix+": "+f, args...)
 }
 
 func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {

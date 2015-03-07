@@ -1,5 +1,7 @@
 # chisel
 
+![chisel](https://cloud.githubusercontent.com/assets/633843/6539989/7ec2d6ac-c4db-11e4-8648-6d2a462ded81.jpg) 
+
 Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
 
 ### Install

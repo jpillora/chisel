@@ -17,7 +17,7 @@ type Proxy struct {
 
 func NewProxy(c *Client, id int, remote *chisel.Remote, openStream func() (net.Conn, error)) *Proxy {
 	return &Proxy{
-		Logger:     c.Logger.Fork("proxy #%d %s", id, remote),
+		Logger:     c.Logger.Fork("%s:%s#%d", remote.RemoteHost, remote.RemotePort, id+1),
 		id:         id,
 		remote:     remote,
 		openStream: openStream,
@@ -46,7 +46,7 @@ func (p *Proxy) start() {
 func (p *Proxy) accept(src net.Conn) {
 	p.count++
 	cid := p.count
-	clog := p.Fork("connection %d", cid)
+	clog := p.Fork("conn#%d", cid)
 
 	clog.Debugf("Open")
 
@@ -65,5 +65,5 @@ func (p *Proxy) accept(src net.Conn) {
 	//then pipe
 	s, r := chisel.Pipe(src, dst)
 
-	clog.Debugf("Closed (sent %d received %d)", s, r)
+	clog.Debugf("Close (sent %d received %d)", s, r)
 }

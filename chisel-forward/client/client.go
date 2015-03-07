@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -17,9 +18,12 @@ import (
 
 type Client struct {
 	*chisel.Logger
-	config  *chisel.Config
-	proxies []*Proxy
-	session *yamux.Session
+	config    *chisel.Config
+	encconfig string
+	proxies   []*Proxy
+	session   *yamux.Session
+	running   bool
+	runningc  chan error
 }
 
 func NewClient(auth, server string, remotes []string) (*Client, error) {
@@ -46,7 +50,7 @@ func NewClient(auth, server string, remotes []string) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
-	c := &chisel.Config{
+	config := &chisel.Config{
 		Version: chisel.ProtocolVersion,
 		Auth:    auth,
 		Server:  u.String(),
@@ -57,31 +61,43 @@ func NewClient(auth, server string, remotes []string) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
-		c.Remotes = append(c.Remotes, r)
+		config.Remotes = append(config.Remotes, r)
+	}
+
+	encconfig, err := chisel.EncodeConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to encode config: %s", err)
 	}
 
 	return &Client{
-		Logger: chisel.NewLogger("client"),
-		config: c,
+		Logger:    chisel.NewLogger("client"),
+		config:    config,
+		encconfig: encconfig,
+		running:   true,
+		runningc:  make(chan error, 1),
 	}, nil
 }
 
-func (c *Client) Start() error {
-	encconfig, err := chisel.EncodeConfig(c.config)
-	if err != nil {
-		return c.Errorf("%s", err)
-	}
+//Start then Wait
+func (c *Client) Run() error {
+	go c.start()
+	return c.Wait()
+}
 
+//Starts the client
+func (c *Client) Start() {
+	go c.start()
+}
+
+func (c *Client) start() {
 	c.Infof("Connecting to %s\n", c.config.Server)
-
-	var session *yamux.Session
 
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
-		if session == nil || session.IsClosed() {
-			return nil, c.Errorf("no session")
+		if c.session == nil || c.session.IsClosed() {
+			return nil, c.Errorf("no c.session")
 		}
-		stream, err := session.Open()
+		stream, err := c.session.Open()
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +106,7 @@ func (c *Client) Start() error {
 
 	//prepare proxies
 	for id, r := range c.config.Remotes {
-		proxy := NewProxy(c, id+1, r, openStream)
+		proxy := NewProxy(c, id, r, openStream)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
 	}
@@ -100,15 +116,17 @@ func (c *Client) Start() error {
 
 	//connection loop!
 	for {
-
+		if !c.running {
+			break
+		}
 		if connerr != nil {
 			connerr = nil
 			d := b.Duration()
-			c.Debugf("Retrying in %s...\n", d)
+			c.Infof("Retrying in %s...\n", d)
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.config.Server, encconfig, "http://localhost/")
+		ws, err := websocket.Dial(c.config.Server, c.encconfig, "http://localhost/")
 		if err != nil {
 			connerr = err
 			continue
@@ -117,11 +135,14 @@ func (c *Client) Start() error {
 		buff := make([]byte, 0xff)
 		n, _ := ws.Read(buff)
 		if msg := string(buff[:n]); msg != "handshake-success" {
-			return c.Errorf("%s", msg) //no point in retrying
+			//no point in retrying
+			c.runningc <- errors.New(msg)
+			ws.Close()
+			break
 		}
 
 		// Setup client side of yamux
-		session, err = yamux.Client(ws, nil)
+		c.session, err = yamux.Client(ws, nil)
 		if err != nil {
 			connerr = err
 			continue
@@ -129,30 +150,39 @@ func (c *Client) Start() error {
 		b.Reset()
 
 		//closed state
-		markClosed := make(chan bool)
+		connected := make(chan bool)
 		var o sync.Once
 		closed := func() {
 			c.Infof("Disconnected\n")
-			close(markClosed)
+			close(connected)
 		}
 
 		c.Infof("Connected\n")
 
-		//poll state
+		//poll websocket state
 		go func() {
 			for {
-				if session.IsClosed() {
+				if c.session.IsClosed() {
 					connerr = c.Errorf("disconnected")
 					o.Do(closed)
 					break
 				}
-				time.Sleep(time.Second)
+				time.Sleep(100 * time.Millisecond)
 			}
 		}()
-
 		//block!
-		<-markClosed
+		<-connected
 	}
+	close(c.runningc)
+}
 
-	return nil
+//Wait blocks while the client is running
+func (c *Client) Wait() error {
+	return <-c.runningc
+}
+
+//Close manual stops the client
+func (c *Client) Close() error {
+	c.running = false
+	return c.session.Close()
 }

@@ -11,15 +11,12 @@ import (
 
 const help = `
 
-	Usage: chisel-forward [--auth AUTH] server remote [remote] [remote] ...
-
-	auth specifies the optional authentication string
-	used by the server.
+	Usage: chisel-forward [options] server remote [remote] [remote] ...
 
 	server is the URL to the chiseld server.
 
-	remote is a remote connection via the server, which
-	comes in the form:
+	remotes are remote connections tunneled through the server, each 
+	of which come in the form:
 		<local-host>:<local-port>:<remote-host>:<remote-port>
 
 		* Only remote-port is required.
@@ -34,13 +31,21 @@ const help = `
 			3000:google.com:80
 			192.168.0.5:3000:google.com:80
 
+	Options:
+
+	--auth AUTH - auth specifies the optional authentication string
+	used by the server.
+
+	-v enable verbose logging
+
 	Read more:
 	https://github.com/jpillora/chisel
 
 `
 
 func main() {
-	auth := flag.String("auth", "", "Optional authentication")
+	auth := flag.String("auth", "", "")
+	verbose := flag.Bool("v", false, "")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, help)
 	}
@@ -59,10 +64,11 @@ func main() {
 	}
 
 	c.Info = true
-	c.Debug = true
+	c.Debug = *verbose
 
-	err = c.Start()
-	if err != nil {
+	c.Start()
+
+	if err = c.Wait(); err != nil {
 		log.Fatal(err)
 	}
 }
