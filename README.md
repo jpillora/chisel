@@ -1,9 +1,5 @@
 # chisel
 
-<!-- 
-![chisel](https://cloud.githubusercontent.com/assets/633843/6539989/7ec2d6ac-c4db-11e4-8648-6d2a462ded81.jpg) 
- -->
-
 Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
@@ -12,14 +8,14 @@ Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in 
 
 **Binaries**
 
-See [Releases](releases/)
+See [Releases](https://github.com/jpillora/chisel/releases)
 
 **Source**
 
-```
-# Server
+``` sh
+# chisel server
 $ go get -v github.com/jpillora/chisel/chiseld
-# Client
+# chisel client
 $ go get -v github.com/jpillora/chisel/chisel-forward
 ```
 
@@ -36,23 +32,23 @@ $ go get -v github.com/jpillora/chisel/chisel-forward
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chiseld` server:
 
 ``` sh
-# listen on $PORT, require password 'foobar', proxy web requests to 'http://example.com'
 $ chiseld --auth foobar --port $PORT --proxy http://example.com
+# listens on $PORT, requires password 'foobar', proxy web requests to 'http://example.com'
 ```
 
 This demo app is also running a file server on 0.0.0.0:3000 (which is normally inaccessible
 due to Heroku's firewall). However, if we tunnel in with:
 
 ``` sh
-# connect to 'https://chisel-demo.herokuapp.com', using password 'foobar',
-# tunnel your localhost:3000 to the server's localhost:3000
 $ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
+# connects to 'https://chisel-demo.herokuapp.com', using password 'foobar',
+# tunnels your localhost:3000 to the server's localhost:3000
 ```
 
 Then open [localhost:3000/](http://localhost:3000/), we should
 see a directory listing of the demo app's root. Also, if we visit
-https://chisel-demo.herokuapp.com we should see that the server's
-default proxy is pointing at http://example.com.
+[the demo](https://chisel-demo.herokuapp.com) in the browser we should see that the server's
+default proxy is pointing at [example.com](http://example.com).
 
 ### Usage
 
@@ -188,13 +184,13 @@ Note, we're using an in-memory "file" server on localhost for these tests
 :4001 => 100000000 bytes in 36.332395213s
 ```
 
-See [test/](tree/master/test/)
+See [test/](test/)
 
 ### Known Issues
 
 * **WebSockets support is required**
 	* IaaS providers all will support WebSockets
-		* Unless they run a HTTP only proxy in front of your servers, in which case I'd argue that you've been downgraded to PaaS.
+		* Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
 	* PaaS providers vary in their support for WebSockets
 		* Heroku has full support
 		* Openshift has full support though connections are only accepted on ports 8443 and 8080
@@ -211,7 +207,6 @@ See [test/](tree/master/test/)
 
 ### Todo
 
-* Add tests (Bonus: Add benchmarks)
 * Users file with white-listed remotes
 * Pass in TLS server configuration
 * Encrypt data with `auth` as the symmetric key

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/yamux"
@@ -149,14 +148,8 @@ func (c *Client) start() {
 		}
 		b.Reset()
 
-		//closed state
+		//signal is connected
 		connected := make(chan bool)
-		var o sync.Once
-		closed := func() {
-			c.Infof("Disconnected\n")
-			close(connected)
-		}
-
 		c.Infof("Connected\n")
 
 		//poll websocket state
@@ -164,7 +157,8 @@ func (c *Client) start() {
 			for {
 				if c.session.IsClosed() {
 					connerr = c.Errorf("disconnected")
-					o.Do(closed)
+					c.Infof("Disconnected\n")
+					close(connected)
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
