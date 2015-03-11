@@ -7,7 +7,8 @@ import (
 	"sync"
 )
 
-//HTTPServer is adds graceful shutdowns
+//HTTPServer extends net/http Server and
+//adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server
 	listener  net.Listener

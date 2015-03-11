@@ -1,20 +1,25 @@
 # chisel
 
+<!-- 
 ![chisel](https://cloud.githubusercontent.com/assets/633843/6539989/7ec2d6ac-c4db-11e4-8648-6d2a462ded81.jpg) 
+ -->
 
 Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
 
+![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+
 ### Install
 
-Server
+**Binaries**
+
+See [Releases](releases/)
+
+**Source**
 
 ```
+# Server
 $ go get -v github.com/jpillora/chisel/chiseld
-```
-
-Forwarder
-
-```
+# Client
 $ go get -v github.com/jpillora/chisel/chisel-forward
 ```
 
@@ -54,23 +59,27 @@ default proxy is pointing at http://example.com.
 ```
 $ chiseld --help
 
-	Usage: chiseld [--host 0.0.0.0] [--port 8080] [--auth AUTH] [--proxy PROXY]
+	Usage: chiseld [options]
 
-	host defines the HTTP listening host – the
-	network interface (defaults to 0.0.0.0). You
-	may also set the HOST environment variable.
+	Options:
 
-	port defines the HTTP listening port (defaults
-	to 8080). This option falls back to the PORT
-	environment	variable.
+	--host, Defines the HTTP listening host – the network interface
+	(defaults to 0.0.0.0). You may also set the HOST environment
+	variable.
 
-	auth specifies the authentication string
-	the client must provide to attain access. This
-	option falls back to the AUTH environment variable.
+	--port, Defines the HTTP listening port (defaults to 8080). You
+	may also set the PORT environment variable.
 
-	proxy specifies the default proxy target to use
-	when chiseld receives a normal HTTP request. This
-	option falls back to the PROXY environment variable.
+	--auth, Specifies the exact authentication string the client must
+	provide to attain access. You may also set the AUTH environment
+	variable.
+
+	--proxy, Specifies the default proxy target to use when chiseld
+	receives a normal HTTP request.
+
+	-v, Enable verbose logging
+
+	--version, Display version
 
 	Read more:
 	https://github.com/jpillora/chisel
@@ -79,18 +88,16 @@ $ chiseld --help
 ```
 $ chisel-forward --help
 
-	Usage: chisel-forward [--auth AUTH] server remote [remote] [remote] ...
+	Usage: chisel-forward [options] server remote [remote] [remote] ...
 
-	auth specifies the optional authentication string
-	used by the server.
+	server is the URL to the chiseld server.
 
-	server is the URL of the chiseld server.
+	remotes are remote connections tunneled through the server, each of
+	which come in the form:
 
-	remote is a remote connection via the server, which
-	comes in the form:
 		<local-host>:<local-port>:<remote-host>:<remote-port>
 
-		* Only remote-port is required.
+		* remote-port is required.
 		* local-port defaults to remote-port.
 		* local-host defaults to 0.0.0.0 (all interfaces).
 		* remote-host defaults to 0.0.0.0 (server localhost).
@@ -102,11 +109,20 @@ $ chisel-forward --help
 			3000:google.com:80
 			192.168.0.5:3000:google.com:80
 
+	Options:
+
+	--auth AUTH, Specifies the optional authentication string used by
+	the server.
+
+	-v, Enable verbose logging
+
+	--version, Display version
+
 	Read more:
 	https://github.com/jpillora/chisel
 ```
 
-Eventually, a programmatic API will be documented and available, if you're keen see the `main.go` files in each sub-package.
+See also: [programmatic API](https://github.com/jpillora/chisel/wiki/Programmatic-Usage).
 
 ### Security
 
@@ -116,71 +132,63 @@ Currently, you can secure your traffic by using HTTPS, which can only be done by
 
 With [crowbar](https://github.com/q3k/crowbar), a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [Yamux](https://github.com/hashicorp/yamux) to create hundreds of SDPY/HTTP2 like logical connections, resulting in **one** TCP connection per client.
 
-In this unscientific test, we have:
+In this simple benchmark, we have:
 
 ```
-curl -> http tunnel client -> http tunnel server -> file server
+					(direct)
+        .--------------->----------------.
+       /    chisel         chisel         \
+request--->client:2001--->server:2002---->fileserver:3000
+       \                                  /
+        '--> crowbar:4001--->crowbar:4002'
+             client           server
 ```
 
-*Tab 1 (local file server)*
+Note, we're using an in-memory "file" server on localhost for these tests
+
+*direct*
 
 ```
-$ npm i -g serve
-$ serve -p 4000
+:3000 => 1 bytes in 1.008883ms
+:3000 => 10 bytes in 543.198µs
+:3000 => 100 bytes in 675.957µs
+:3000 => 1000 bytes in 584.13µs
+:3000 => 10000 bytes in 580.56µs
+:3000 => 100000 bytes in 743.902µs
+:3000 => 1000000 bytes in 1.962673ms
+:3000 => 10000000 bytes in 19.192986ms
+:3000 => 100000000 bytes in 158.428239ms
 ```
 
-*Tab 2 (tunnel server)*
+`chisel`
 
 ```
-$ echo -ne "foo:bar" > userfile
-$ crowbard -listen="0.0.0.0:8080" -userfile=./userfile
+:2001 => 1 bytes in 1.334661ms
+:2001 => 10 bytes in 807.797µs
+:2001 => 100 bytes in 763.728µs
+:2001 => 1000 bytes in 1.029811ms
+:2001 => 10000 bytes in 840.247µs
+:2001 => 100000 bytes in 1.647748ms
+:2001 => 1000000 bytes in 3.495904ms
+:2001 => 10000000 bytes in 22.298904ms
+:2001 => 100000000 bytes in 255.410448ms
 ```
 
-*Tab 3 (tunnel client)*
+`crowbar`
 
 ```
-$ crowbar-forward -local=0.0.0.0:3000 -server http://localhost:8080 -remote localhost:4000 -username foo -password bar
+:4001 => 1 bytes in 3.335797ms
+:4001 => 10 bytes in 1.453007ms
+:4001 => 100 bytes in 1.811727ms
+:4001 => 1000 bytes in 1.621525ms
+:4001 => 10000 bytes in 5.20729ms
+:4001 => 100000 bytes in 38.461926ms
+:4001 => 1000000 bytes in 358.784864ms
+:4001 => 10000000 bytes in 3.603206487s
+:4001 => 100000000 bytes in 36.332395213s
 ```
 
-*Tab 4 (transfer test)*
-
-```
-$ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
-       74.74 real         2.37 user         6.74 sys
-```
-
-Here, we see `largefile.bin` (~200MB) is transferred in **1m14s** (along with high CPU utilisation).
-
-Enter `chisel`, lets swap in `chiseld` and `chisel-forward`
-
-*Tab 2 (tunnel server)*
-
-```
-$ chiseld --auth foo
-```
-
-*Tab 3 (tunnel client)*
-
-```
-$ chisel-forward --auth foo localhost:8080 3000:4000
-2015/02/27 16:13:43 Connected to http://localhost:8080
-2015/02/27 16:13:43 Proxy 0.0.0.0:3000 => 0.0.0.0:4000 enabled
-```
-
-And now we'll run the test again
-
-```
-$ time curl -s "127.0.0.1:3000/largefile.bin" > /dev/null
-       0.60 real         0.05 user         0.14 sys
-```
-
-Here, the same file was transferred in **0.6s**
-
-*Note: Real benchmarks are on the Todo*
-
-### Overview
-
-![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
+See [test/](tree/master/test/)
 
 ### Known Issues
 
@@ -213,7 +221,7 @@ Here, the same file was transferred in **0.6s**
 
 #### MIT License
 
-Copyright © 2014 Jaime Pillora &lt;dev@jpillora.com&gt;
+Copyright © 2015 Jaime Pillora &lt;dev@jpillora.com&gt;
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the

@@ -1,4 +1,4 @@
-package client
+package chiselclient
 
 import (
 	"encoding/binary"

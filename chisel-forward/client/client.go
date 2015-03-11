@@ -1,4 +1,4 @@
-package client
+package chiselclient
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ type Client struct {
 	runningc  chan error
 }
 
-func NewClient(auth, server string, remotes []string) (*Client, error) {
+func NewClient(auth, server string, remotes ...string) (*Client, error) {
 
 	//apply default scheme
 	if !strings.HasPrefix(server, "http") {
@@ -95,7 +95,7 @@ func (c *Client) start() {
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
 		if c.session == nil || c.session.IsClosed() {
-			return nil, c.Errorf("no c.session")
+			return nil, c.Errorf("no session available")
 		}
 		stream, err := c.session.Open()
 		if err != nil {
@@ -184,5 +184,8 @@ func (c *Client) Wait() error {
 //Close manual stops the client
 func (c *Client) Close() error {
 	c.running = false
+	if c.session == nil {
+		return nil
+	}
 	return c.session.Close()
 }

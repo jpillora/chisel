@@ -1,4 +1,4 @@
-package server
+package chiselserver
 
 import (
 	"net/http"
