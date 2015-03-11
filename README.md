@@ -1,6 +1,6 @@
 # chisel
 
-Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** This is beta software.
+Chisel is an HTTP client and server which acts as a TCP proxy. Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** Chisel is currently beta software.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
@@ -36,8 +36,7 @@ $ chiseld --auth foobar --port $PORT --proxy http://example.com
 # listens on $PORT, requires password 'foobar', proxy web requests to 'http://example.com'
 ```
 
-This demo app is also running a file server on 0.0.0.0:3000 (which is normally inaccessible
-due to Heroku's firewall). However, if we tunnel in with:
+This demo app is also running a [simple file server](https://www.npmjs.com/package/serve) on `:3000`, which is normally inaccessible due to Heroku's firewall. However, if we tunnel in with:
 
 ``` sh
 $ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
@@ -45,10 +44,10 @@ $ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
 # tunnels your localhost:3000 to the server's localhost:3000
 ```
 
-Then open [localhost:3000/](http://localhost:3000/), we should
+and then visit [localhost:3000](http://localhost:3000/), we should
 see a directory listing of the demo app's root. Also, if we visit
-[the demo](https://chisel-demo.herokuapp.com) in the browser we should see that the server's
-default proxy is pointing at [example.com](http://example.com).
+[the demo app](https://chisel-demo.herokuapp.com) itself in the browser we should hit the server's
+default proxy and see a copy of [example.com](http://example.com).
 
 ### Usage
 
@@ -170,6 +169,8 @@ Note, we're using an in-memory "file" server on localhost for these tests
 :2001 => 100000000 bytes in 255.410448ms
 ```
 
+~100MB in **a quarter of a second**
+
 `crowbar`
 
 ```
@@ -184,7 +185,9 @@ Note, we're using an in-memory "file" server on localhost for these tests
 :4001 => 100000000 bytes in 36.332395213s
 ```
 
-See [test/](test/)
+~100MB in **36 seconds**
+
+See more [test/](test/)
 
 ### Known Issues
 

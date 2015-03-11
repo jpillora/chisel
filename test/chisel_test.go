@@ -13,6 +13,8 @@
 //
 // tests use
 //		go test -test.run=Request
+//
+// crowbar and chisel binaries should be in your PATH
 
 package test
 
