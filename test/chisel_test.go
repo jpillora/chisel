@@ -51,7 +51,7 @@ func TestBenchChisel(t *testing.T) {
 	benchSizes("2001", t)
 }
 func TestBenchrowbar(t *testing.T) {
-	benchSizes("4001", t)
+	// benchSizes("4001", t)
 }
 
 func benchSizes(port string, t *testing.T) {

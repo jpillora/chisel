@@ -17,12 +17,13 @@ import (
 
 type Client struct {
 	*chisel.Logger
-	config    *chisel.Config
-	encconfig string
-	proxies   []*Proxy
-	session   *yamux.Session
-	running   bool
-	runningc  chan error
+	config       *chisel.Config
+	encconfig    []byte
+	auth, server string
+	proxies      []*Proxy
+	session      *yamux.Session
+	running      bool
+	runningc     chan error
 }
 
 func NewClient(auth, server string, remotes ...string) (*Client, error) {
@@ -49,12 +50,7 @@ func NewClient(auth, server string, remotes ...string) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
-	config := &chisel.Config{
-		Version: chisel.ProtocolVersion,
-		Auth:    auth,
-		Server:  u.String(),
-	}
-
+	config := &chisel.Config{}
 	for _, s := range remotes {
 		r, err := chisel.DecodeRemote(s)
 		if err != nil {
@@ -72,6 +68,8 @@ func NewClient(auth, server string, remotes ...string) (*Client, error) {
 		Logger:    chisel.NewLogger("client"),
 		config:    config,
 		encconfig: encconfig,
+		auth:      auth,
+		server:    u.String(),
 		running:   true,
 		runningc:  make(chan error, 1),
 	}, nil
@@ -89,7 +87,7 @@ func (c *Client) Start() {
 }
 
 func (c *Client) start() {
-	c.Infof("Connecting to %s\n", c.config.Server)
+	c.Infof("Connecting to %s\n", c.server)
 
 	//proxies all use this function
 	openStream := func() (net.Conn, error) {
@@ -111,7 +109,7 @@ func (c *Client) start() {
 	}
 
 	var connerr error
-	b := &backoff.Backoff{Max: 5 * time.Minute}
+	b := &backoff.Backoff{Max: 15 * time.Second}
 
 	//connection loop!
 	for {
@@ -119,34 +117,46 @@ func (c *Client) start() {
 			break
 		}
 		if connerr != nil {
-			connerr = nil
 			d := b.Duration()
-			c.Infof("Retrying in %s...\n", d)
+			c.Infof("Connerr: %v", connerr)
+			c.Infof("Retrying in %s...", d)
+			connerr = nil
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.config.Server, c.encconfig, "http://localhost/")
+		ws, err := websocket.Dial(c.server, chisel.ProtocolVersion, "http://localhost/")
 		if err != nil {
 			connerr = err
 			continue
 		}
 
-		buff := make([]byte, 0xff)
-		n, _ := ws.Read(buff)
-		if msg := string(buff[:n]); msg != "handshake-success" {
+		conn := chisel.NewCryptoConn(c.auth, ws)
+
+		//write config, read result
+		chisel.SizeWrite(conn, c.encconfig)
+
+		resp := chisel.SizeRead(conn)
+		if string(resp) != "Handshake Success" {
 			//no point in retrying
-			c.runningc <- errors.New(msg)
-			ws.Close()
+			c.runningc <- errors.New("Handshake failed")
+			conn.Close()
 			break
 		}
 
 		// Setup client side of yamux
-		c.session, err = yamux.Client(ws, nil)
+		c.session, err = yamux.Client(conn, nil)
 		if err != nil {
 			connerr = err
 			continue
 		}
 		b.Reset()
+
+		go func() {
+			d, err := c.session.Ping()
+			if err == nil {
+				c.Infof("Server latency: %s\n", d)
+			}
+		}()
 
 		//signal is connected
 		connected := make(chan bool)

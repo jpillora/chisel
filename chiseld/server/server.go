@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	"github.com/jpillora/chisel"
 	"golang.org/x/net/websocket"
@@ -79,7 +78,7 @@ func (s *Server) Close() error {
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	if r.Header.Get("Upgrade") == "websocket" &&
-		strings.HasPrefix(r.Header.Get("Sec-webSocket-Protocol"), chisel.ConfigPrefix) {
+		r.Header.Get("Sec-WebSocket-Protocol") == chisel.ProtocolVersion {
 		s.wsServer.ServeHTTP(w, r)
 		return
 	}
@@ -92,44 +91,21 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(404)
 }
 
-func (s *Server) handshake(h string) (*chisel.Config, error) {
-	if h == "" {
-		return nil, s.Errorf("Handshake missing")
-	}
-	c, err := chisel.DecodeConfig(h)
-	if err != nil {
-		return nil, err
-	}
-	if chisel.ProtocolVersion != c.Version {
-		return nil, s.Errorf("Version mismatch")
-	}
-	if s.auth != "" {
-		if s.auth != c.Auth {
-			return nil, s.Errorf("Authentication failed")
-		}
-	}
-	return c, nil
-}
-
 func (s *Server) handleWS(ws *websocket.Conn) {
 
-	ps := ws.Config().Protocol
-	p := ""
-	if len(ps) == 1 {
-		p = ps[0]
-	}
+	conn := chisel.NewCryptoConn(s.auth, ws)
 
-	config, err := s.handshake(p)
+	configb := chisel.SizeRead(conn)
+	config, err := chisel.DecodeConfig(configb)
+
 	if err != nil {
-		msg := err.Error()
-		ws.Write([]byte(msg))
-		ws.Close()
+		s.Infof("Handshake failed: %s", err)
+		chisel.SizeWrite(conn, []byte("Handshake failed"))
 		return
 	}
-
+	chisel.SizeWrite(conn, []byte("Handshake Success"))
 	// s.Infof("success %+v\n", config)
-	ws.Write([]byte("handshake-success"))
 	s.wsCount++
 
-	newWebSocket(s, config, ws).handle()
+	newWebSocket(s, config, conn).handle()
 }
