@@ -1,7 +1,7 @@
 package chiselclient
 
 import (
-	"encoding/binary"
+	"io"
 	"net"
 
 	"github.com/jpillora/chisel"
@@ -9,18 +9,19 @@ import (
 
 type Proxy struct {
 	*chisel.Logger
-	id         int
-	count      int
-	remote     *chisel.Remote
-	openStream func() (net.Conn, error)
+	client *Client
+	id     int
+	count  int
+
+	remote *chisel.Remote
 }
 
-func NewProxy(c *Client, id int, remote *chisel.Remote, openStream func() (net.Conn, error)) *Proxy {
+func NewProxy(c *Client, id int, remote *chisel.Remote) *Proxy {
 	return &Proxy{
-		Logger:     c.Logger.Fork("%s:%s#%d", remote.RemoteHost, remote.RemotePort, id+1),
-		id:         id,
-		remote:     remote,
-		openStream: openStream,
+		Logger: c.Logger.Fork("%s:%s#%d", remote.RemoteHost, remote.RemotePort, id+1),
+		client: c,
+		id:     id,
+		remote: remote,
 	}
 }
 
@@ -43,27 +44,28 @@ func (p *Proxy) start() {
 	}
 }
 
-func (p *Proxy) accept(src net.Conn) {
+func (p *Proxy) accept(src io.ReadWriteCloser) {
 	p.count++
 	cid := p.count
-	clog := p.Fork("conn#%d", cid)
+	l := p.Fork("conn#%d", cid)
 
-	clog.Debugf("Open")
+	l.Debugf("Open")
 
-	dst, err := p.openStream()
-	if err != nil {
-		clog.Debugf("Stream error: %s", err)
+	if p.client.sshConn == nil {
+		l.Debugf("No server connection")
 		src.Close()
 		return
 	}
 
-	//write endpoint id
-	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, uint16(p.id))
-	dst.Write(b)
+	remoteAddr := p.remote.RemoteHost + ":" + p.remote.RemotePort
+	dst, err := chisel.OpenStream(p.client.sshConn, remoteAddr)
+	if err != nil {
+		l.Debugf("Stream error: %s", err)
+		src.Close()
+		return
+	}
 
 	//then pipe
 	s, r := chisel.Pipe(src, dst)
-
-	clog.Debugf("Close (sent %d received %d)", s, r)
+	l.Debugf("Close (sent %d received %d)", s, r)
 }

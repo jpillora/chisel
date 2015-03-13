@@ -1,25 +1,30 @@
 package chiselserver
 
 import (
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 
 	"github.com/jpillora/chisel"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 )
 
 type Server struct {
 	*chisel.Logger
-	auth       string
-	wsCount    int
-	wsServer   websocket.Server
-	httpServer *chisel.HTTPServer
-	proxy      *httputil.ReverseProxy
+	auth        string
+	fingerprint string
+	wsCount     int
+	wsServer    websocket.Server
+	httpServer  *chisel.HTTPServer
+	proxy       *httputil.ReverseProxy
+	sshConfig   *ssh.ServerConfig
 }
 
 func NewServer(auth, proxy string) (*Server, error) {
+
 	s := &Server{
 		Logger:     chisel.NewLogger("server"),
 		auth:       auth,
@@ -27,6 +32,23 @@ func NewServer(auth, proxy string) (*Server, error) {
 		httpServer: chisel.NewHTTPServer(),
 	}
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
+
+	key, _ := chisel.GenerateKey()
+
+	config := &ssh.ServerConfig{
+		ServerVersion: "chisel-server-" + chisel.ProtocolVersion,
+		NoClientAuth:  true,
+	}
+	private, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatal("Failed to parse key")
+	}
+
+	s.fingerprint = chisel.FingerprintKey(private.PublicKey())
+
+	config.AddHostKey(private)
+
+	s.sshConfig = config
 
 	if proxy != "" {
 		u, err := url.Parse(proxy)
@@ -62,6 +84,8 @@ func (s *Server) Start(host, port string) error {
 	if s.proxy != nil {
 		s.Infof("Default proxy enabled")
 	}
+	s.Infof("Fingerprint %s", s.fingerprint)
+
 	s.Infof("Listening on %s...", port)
 
 	return s.httpServer.GoListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
@@ -92,44 +116,23 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(404)
 }
 
-func (s *Server) handshake(h string) (*chisel.Config, error) {
-	if h == "" {
-		return nil, s.Errorf("Handshake missing")
-	}
-	c, err := chisel.DecodeConfig(h)
-	if err != nil {
-		return nil, err
-	}
-	if chisel.ProtocolVersion != c.Version {
-		return nil, s.Errorf("Version mismatch")
-	}
-	if s.auth != "" {
-		if s.auth != c.Auth {
-			return nil, s.Errorf("Authentication failed")
-		}
-	}
-	return c, nil
-}
-
 func (s *Server) handleWS(ws *websocket.Conn) {
-
-	ps := ws.Config().Protocol
-	p := ""
-	if len(ps) == 1 {
-		p = ps[0]
-	}
-
-	config, err := s.handshake(p)
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sshConn, chans, reqs, err := ssh.NewServerConn(ws, s.sshConfig)
 	if err != nil {
-		msg := err.Error()
-		ws.Write([]byte(msg))
-		ws.Close()
+		log.Printf("Failed to handshake (%s)", err)
 		return
 	}
 
-	// s.Infof("success %+v\n", config)
-	ws.Write([]byte("handshake-success"))
 	s.wsCount++
+	id := s.wsCount
+	l := s.Fork("conn#%d", id)
 
-	newWebSocket(s, config, ws).handle()
+	l.Infof("Open")
+
+	go ssh.DiscardRequests(reqs)
+	go chisel.ConnectStreams(l, chans)
+
+	sshConn.Wait()
+	l.Infof("Close")
 }

@@ -1,28 +1,29 @@
 package chiselclient
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 )
 
 type Client struct {
 	*chisel.Logger
-	config    *chisel.Config
-	encconfig string
-	proxies   []*Proxy
-	session   *yamux.Session
-	running   bool
-	runningc  chan error
+	config      *chisel.Config
+	sshConfig   *ssh.ClientConfig
+	proxies     []*Proxy
+	sshConn     ssh.Conn
+	fingerprint string
+	running     bool
+	runningc    chan error
 }
 
 func NewClient(auth, server string, remotes ...string) (*Client, error) {
@@ -63,18 +64,24 @@ func NewClient(auth, server string, remotes ...string) (*Client, error) {
 		config.Remotes = append(config.Remotes, r)
 	}
 
-	encconfig, err := chisel.EncodeConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to encode config: %s", err)
+	c := &Client{
+		Logger:   chisel.NewLogger("client"),
+		config:   config,
+		running:  true,
+		runningc: make(chan error, 1),
 	}
 
-	return &Client{
-		Logger:    chisel.NewLogger("client"),
-		config:    config,
-		encconfig: encconfig,
-		running:   true,
-		runningc:  make(chan error, 1),
-	}, nil
+	c.sshConfig = &ssh.ClientConfig{
+		ClientVersion: "chisel-client-" + chisel.ProtocolVersion,
+		User:          "jpillora",
+		Auth:          []ssh.AuthMethod{ssh.Password("t0ps3cr3t")},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			c.fingerprint = chisel.FingerprintKey(key)
+			return nil
+		},
+	}
+
+	return c, nil
 }
 
 //Start then Wait
@@ -91,81 +98,54 @@ func (c *Client) Start() {
 func (c *Client) start() {
 	c.Infof("Connecting to %s\n", c.config.Server)
 
-	//proxies all use this function
-	openStream := func() (net.Conn, error) {
-		if c.session == nil || c.session.IsClosed() {
-			return nil, c.Errorf("no session available")
-		}
-		stream, err := c.session.Open()
-		if err != nil {
-			return nil, err
-		}
-		return stream, nil
-	}
-
 	//prepare proxies
 	for id, r := range c.config.Remotes {
-		proxy := NewProxy(c, id, r, openStream)
+		proxy := NewProxy(c, id, r)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
 	}
 
+	//connection loop!
 	var connerr error
 	b := &backoff.Backoff{Max: 5 * time.Minute}
-
-	//connection loop!
 	for {
 		if !c.running {
 			break
 		}
 		if connerr != nil {
-			connerr = nil
 			d := b.Duration()
 			c.Infof("Retrying in %s...\n", d)
+			connerr = nil
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.config.Server, c.encconfig, "http://localhost/")
+		ws, err := websocket.Dial(c.config.Server, chisel.ConfigPrefix, "localhost:80")
 		if err != nil {
 			connerr = err
 			continue
 		}
 
-		buff := make([]byte, 0xff)
-		n, _ := ws.Read(buff)
-		if msg := string(buff[:n]); msg != "handshake-success" {
-			//no point in retrying
-			c.runningc <- errors.New(msg)
-			ws.Close()
-			break
-		}
-
-		// Setup client side of yamux
-		c.session, err = yamux.Client(ws, nil)
+		sshConn, chans, reqs, err := ssh.NewClientConn(ws, "", c.sshConfig)
 		if err != nil {
 			connerr = err
+			c.Infof("Handshake failed: %s", err)
 			continue
 		}
+		c.Infof("Connected (%s)", c.fingerprint)
+		//connected
 		b.Reset()
-
-		//signal is connected
-		connected := make(chan bool)
-		c.Infof("Connected\n")
-
-		//poll websocket state
-		go func() {
-			for {
-				if c.session.IsClosed() {
-					connerr = c.Errorf("disconnected")
-					c.Infof("Disconnected\n")
-					close(connected)
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-		//block!
-		<-connected
+		c.sshConn = sshConn
+		go ssh.DiscardRequests(reqs)
+		go chisel.RejectStreams(chans)
+		err = sshConn.Wait()
+		//disconnected
+		c.sshConn = nil
+		if err != nil && err != io.EOF {
+			connerr = err
+			c.Infof("Disconnection error: %s", err)
+			continue
+		}
+		c.Infof("Disconnected\n")
 	}
 	close(c.runningc)
 }
@@ -178,8 +158,8 @@ func (c *Client) Wait() error {
 //Close manual stops the client
 func (c *Client) Close() error {
 	c.running = false
-	if c.session == nil {
+	if c.sshConn == nil {
 		return nil
 	}
-	return c.session.Close()
+	return c.sshConn.Close()
 }

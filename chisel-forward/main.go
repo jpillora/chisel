@@ -44,6 +44,7 @@ var help = `
 
 	Read more:
 	https://github.com/jpillora/chisel
+
 `
 
 func main() {

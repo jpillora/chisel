@@ -50,9 +50,10 @@ func TestBenchDirect(t *testing.T) {
 func TestBenchChisel(t *testing.T) {
 	benchSizes("2001", t)
 }
-func TestBenchrowbar(t *testing.T) {
-	benchSizes("4001", t)
-}
+
+// func TestBenchrowbar(t *testing.T) {
+// 	benchSizes("4001", t)
+// }
 
 func benchSizes(port string, t *testing.T) {
 	for size := 1; size < 100*MB; size *= 10 {
@@ -113,6 +114,7 @@ func TestMain(m *testing.M) {
 	time.Sleep(100 * time.Millisecond)
 
 	hd := exec.Command("chiseld", "--port", "2002", "--auth", "foobar")
+	// hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		log.Fatal(err)
 	}
@@ -120,12 +122,11 @@ func TestMain(m *testing.M) {
 		"--auth", "foobar",
 		"127.0.0.1:2002",
 		"2001:3000")
-
 	if err := hf.Start(); err != nil {
 		log.Fatal(err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	fmt.Println("Running!")
 	code := m.Run()
