@@ -1,6 +1,7 @@
 package chisel
 
 import (
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
@@ -26,8 +27,17 @@ func NewHTTPServer() *HTTPServer {
 	}
 }
 
-func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler) error {
-	l, err := net.Listen("tcp", addr)
+func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler, config *tls.Config) error {
+
+	var l net.Listener
+	var err error
+
+	if config == nil {
+		l, err = net.Listen("tcp", addr)
+	} else {
+		l, err = tls.Listen("tcp", addr, config)
+	}
+
 	if err != nil {
 		return err
 	}

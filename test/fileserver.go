@@ -1,16 +1,23 @@
 package test
 
 import (
+	"crypto/tls"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/jpillora/chisel"
 )
 
+var transport = &http.Transport{
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+}
+var client = &http.Client{Transport: transport}
+
 func requestFile(port string, size int) (*http.Response, error) {
-	url := "http://127.0.0.1:" + port + "/" + strconv.Itoa(size)
+	url := "https://127.0.0.1:" + port + "/" + strconv.Itoa(size)
 	// fmt.Println(url)
-	return http.Get(url)
+	return client.Get(url)
 }
 
 func makeFileServer() *chisel.HTTPServer {
@@ -31,6 +38,7 @@ func makeFileServer() *chisel.HTTPServer {
 		}
 		w.Write(bytes[:rsize])
 	})
-	s.GoListenAndServe("0.0.0.0:3000", handler)
+	s.GoListenAndServe("0.0.0.0:3000", handler, chisel.TLSConfig())
+	log.Println("listening on 3000...")
 	return s
 }

@@ -64,7 +64,7 @@ func (s *Server) Start(host, port string) error {
 	}
 	s.Infof("Listening on %s...", port)
 
-	return s.httpServer.GoListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
+	return s.httpServer.GoListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP), nil)
 }
 
 func (s *Server) Wait() error {
