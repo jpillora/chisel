@@ -4,4 +4,4 @@ package chisel
 //incompatible changes are made, this will
 //be incremented to signify a protocol
 //mismatch.
-const ProtocolVersion = "1"
+const ProtocolVersion = "chisel-v1"

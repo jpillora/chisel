@@ -17,15 +17,12 @@ var help = `
 	Options:
 
 	--host, Defines the HTTP listening host – the network interface
-	(defaults to 0.0.0.0). You may also set the HOST environment
-	variable.
+	(defaults to 0.0.0.0).
 
-	--port, Defines the HTTP listening port (defaults to 8080). You
-	may also set the PORT environment variable.
+	--port, Defines the HTTP listening port (defaults to 8080).
 
-	--auth, Specifies the exact authentication string the client must
-	provide to attain access. You may also set the AUTH environment
-	variable.
+	--auth, Enables AES256 encryption and specifies the string to
+	use to derive the key.
 
 	--proxy, Specifies the default proxy target to use when chiseld
 	receives a normal HTTP request.
