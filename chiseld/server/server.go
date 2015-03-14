@@ -1,11 +1,13 @@
 package chiselserver
 
 import (
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
 	"github.com/jpillora/chisel"
+	"github.com/jpillora/conncrypt"
 	"golang.org/x/net/websocket"
 )
 
@@ -93,7 +95,11 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleWS(ws *websocket.Conn) {
 
-	conn := chisel.NewCryptoConn(s.auth, ws)
+	conn := net.Conn(ws)
+
+	if s.auth != "" {
+		conn = conncrypt.New(conn, &conncrypt.Config{Password: s.auth})
+	}
 
 	configb := chisel.SizeRead(conn)
 	config, err := chisel.DecodeConfig(configb)

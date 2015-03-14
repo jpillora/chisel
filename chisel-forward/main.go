@@ -35,8 +35,8 @@ var help = `
 
 	Options:
 
-	--auth AUTH, Specifies the optional authentication string used by
-	the server.
+	--auth, Enables AES256 encryption and specifies the string to
+	use to derive the key.
 
 	-v, Enable verbose logging
 

@@ -112,15 +112,15 @@ func TestMain(m *testing.M) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hd := exec.Command("chiseld", "--port", "2002", "--auth", "foobar")
+	hd := exec.Command("chiseld", "--port", "2002" /*"--auth", "foobar",*/)
+	// hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	hf := exec.Command("chisel-forward",
-		"--auth", "foobar",
+	hf := exec.Command("chisel-forward", /*"--auth", "foobar",*/
 		"127.0.0.1:2002",
 		"2001:3000")
-
+	// hf.Stdout = os.Stdout
 	if err := hf.Start(); err != nil {
 		log.Fatal(err)
 	}

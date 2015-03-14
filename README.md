@@ -22,7 +22,8 @@ $ go get -v github.com/jpillora/chisel/chisel-forward
 ### Features
 
 * Easy to use
-* Performant
+* [Performant](#performance)*
+* [Encrypted connections](https://github.com/jpillora/conncrypt) with `auth` derived (PBKDF2) symmetric key
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
@@ -65,9 +66,6 @@ $ chiseld --help
 	--port, Defines the HTTP listening port (defaults to 8080). You
 	may also set the PORT environment variable.
 
-	--auth, Specifies the exact authentication string the client must
-	provide to attain access. You may also set the AUTH environment
-	variable.
 
 	--proxy, Specifies the default proxy target to use when chiseld
 	receives a normal HTTP request.
@@ -189,6 +187,9 @@ Note, we're using an in-memory "file" server on localhost for these tests
 
 See more [test/](test/)
 
+
+
+
 ### Known Issues
 
 * **WebSockets support is required**
@@ -198,7 +199,6 @@ See more [test/](test/)
 		* Heroku has full support
 		* Openshift has full support though connections are only accepted on ports 8443 and 8080
 		* Google App Engine has **no** support
-
 
 ### Contributing
 
@@ -212,7 +212,6 @@ See more [test/](test/)
 
 * Users file with white-listed remotes
 * Pass in TLS server configuration
-* Encrypt data with `auth` as the symmetric key
 * Expose a stats page for proxy throughput
 * Configurable connection retry times
 * Treat forwarder stdin/stdout as a socket

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel"
+	"github.com/jpillora/conncrypt"
 	"golang.org/x/net/websocket"
 )
 
@@ -130,7 +131,11 @@ func (c *Client) start() {
 			continue
 		}
 
-		conn := chisel.NewCryptoConn(c.auth, ws)
+		conn := net.Conn(ws)
+
+		if c.auth != "" {
+			conn = conncrypt.New(conn, &conncrypt.Config{Password: c.auth})
+		}
 
 		//write config, read result
 		chisel.SizeWrite(conn, c.encconfig)

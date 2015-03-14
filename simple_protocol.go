@@ -7,6 +7,7 @@ import (
 
 //simple protocol [2 bytes of size, size bytes of data]
 
+//TODO add length and error checks
 func SizeRead(c net.Conn) []byte {
 	sizeb := make([]byte, 2)
 	c.Read(sizeb)
