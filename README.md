@@ -20,67 +20,87 @@ $ go get -v github.com/jpillora/chisel
 
 * Easy to use
 * [Performant](#performance)*
-* [Encrypted connections](https://github.com/jpillora/conncrypt) with `auth` derived (PBKDF2) symmetric key
+* [Encrypted connections](https://github.com/jpillora/conncrypt) with `key` derived (PBKDF2) symmetric key
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 
 ### Demo
 
-A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chiseld` server:
+A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
 ``` sh
-$ chiseld --auth foobar --port $PORT --proxy http://example.com
+$ chisel server --key foobar --port $PORT --proxy http://example.com
 # listens on $PORT, requires password 'foobar', proxy web requests to 'http://example.com'
 ```
 
 This demo app is also running a [simple file server](https://www.npmjs.com/package/serve) on `:3000`, which is normally inaccessible due to Heroku's firewall. However, if we tunnel in with:
 
 ``` sh
-$ chisel-forward --auth foobar https://chisel-demo.herokuapp.com 3000
+$ chisel client --key foobar https://chisel-demo.herokuapp.com 3000
 # connects to 'https://chisel-demo.herokuapp.com', using password 'foobar',
 # tunnels your localhost:3000 to the server's localhost:3000
 ```
 
 and then visit [localhost:3000](http://localhost:3000/), we should
 see a directory listing of the demo app's root. Also, if we visit
-[the demo app](https://chisel-demo.herokuapp.com) itself in the browser we should hit the server's
+the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's
 default proxy and see a copy of [example.com](http://example.com).
 
 ### Usage
 
+<tmpl,code: chisel --help>
 ```
-$ chiseld --help
 
-	Usage: chiseld [options]
+	Usage: chisel [command] [--help]
+
+	Version: X.X.X
+
+	Commands:
+	  server - runs chisel in server mode
+	  client - runs chisel in client mode
+
+	Read more:
+	  https://github.com/jpillora/chisel
+
+```
+</tmpl>
+
+<tmpl,code: chisel server --help>
+```
+
+	Usage: chisel server [options]
 
 	Options:
 
-	--host, Defines the HTTP listening host – the network interface
-	(defaults to 0.0.0.0). You may also set the HOST environment
-	variable.
+	  --host, Defines the HTTP listening host – the network interface
+	  (defaults to 0.0.0.0).
 
-	--port, Defines the HTTP listening port (defaults to 8080). You
-	may also set the PORT environment variable.
+	  --port, Defines the HTTP listening port (defaults to 8080).
 
+	  --proxy, Specifies the default proxy target to use when chisel
+	  receives a normal HTTP request.
 
-	--proxy, Specifies the default proxy target to use when chiseld
-	receives a normal HTTP request.
+	  --key, Enables AES256 encryption and specify the string to
+	  use to derive the key (derivation is performed using PBKDF2
+	  with 2048 iterations of SHA256).
 
-	-v, Enable verbose logging
+	  -v, Enable verbose logging
 
-	--version, Display version
+	  --help, This help text
 
 	Read more:
-	https://github.com/jpillora/chisel
-```
+	  https://github.com/jpillora/chisel
 
 ```
-$ chisel-forward --help
+</tmpl>
 
-	Usage: chisel-forward [options] server remote [remote] [remote] ...
+<tmpl,code: chisel client --help>
+```
 
-	server is the URL to the chiseld server.
+	Usage: chisel client [options] <server> <remote> [remote] [remote] ...
+
+	server is the URL to the chisel server.
 
 	remotes are remote connections tunneled through the server, each of
 	which come in the form:
@@ -101,16 +121,19 @@ $ chisel-forward --help
 
 	Options:
 
-	--auth AUTH, Specifies the optional authentication string used by
-	the server.
+	  --key, Enables AES256 encryption and specify the string to
+	  use to derive the key (derivation is performed using PBKDF2
+	  with 2048 iterations of SHA256).
 
-	-v, Enable verbose logging
+	  -v, Enable verbose logging
 
-	--version, Display version
+	  --help, This help text
 
 	Read more:
-	https://github.com/jpillora/chisel
+	  https://github.com/jpillora/chisel
+
 ```
+</tmpl>
 
 See also: [programmatic API](https://github.com/jpillora/chisel/wiki/Programmatic-Usage).
 
@@ -186,7 +209,7 @@ See more [test/](test/)
 
 ### Known Issues
 
-* **WebSockets support is required**
+* WebSockets support is required
 	* IaaS providers all will support WebSockets
 		* Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
 	* PaaS providers vary in their support for WebSockets

@@ -13,17 +13,17 @@ import (
 
 type Server struct {
 	*chshare.Logger
-	auth       string
+	key        string
 	wsCount    int
 	wsServer   websocket.Server
 	httpServer *chshare.HTTPServer
 	proxy      *httputil.ReverseProxy
 }
 
-func NewServer(auth, proxy string) (*Server, error) {
+func NewServer(key, proxy string) (*Server, error) {
 	s := &Server{
 		Logger:     chshare.NewLogger("server"),
-		auth:       auth,
+		key:        key,
 		wsServer:   websocket.Server{},
 		httpServer: chshare.NewHTTPServer(),
 	}
@@ -57,7 +57,7 @@ func (s *Server) Run(host, port string) error {
 }
 
 func (s *Server) Start(host, port string) error {
-	if s.auth != "" {
+	if s.key != "" {
 		s.Infof("Authenication enabled")
 	}
 	if s.proxy != nil {
@@ -97,8 +97,8 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 
 	conn := net.Conn(ws)
 
-	if s.auth != "" {
-		conn = conncrypt.New(conn, &conncrypt.Config{Password: s.auth})
+	if s.key != "" {
+		conn = conncrypt.New(conn, &conncrypt.Config{Password: s.key})
 	}
 
 	configb := chshare.SizeRead(conn)

@@ -56,7 +56,7 @@ func TestBenchChisel(t *testing.T) {
 	benchSizes("2001", t)
 }
 func TestBenchrowbar(t *testing.T) {
-	// benchSizes("4001", t)
+	benchSizes("4001", t)
 }
 
 func benchSizes(port string, t *testing.T) {
@@ -147,12 +147,12 @@ func TestMain(m *testing.M) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hd := exec.Command("chisel", "server", "--port", "2002" /*"--auth", "foobar",*/)
+	hd := exec.Command("chisel", "server", "--port", "2002" /*"--key", "foobar",*/)
 	// hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	hf := exec.Command("chisel", "client", /*"--auth", "foobar",*/
+	hf := exec.Command("chisel", "client", /*"--key", "foobar",*/
 		"127.0.0.1:2002",
 		"2001:3000")
 	// hf.Stdout = os.Stdout

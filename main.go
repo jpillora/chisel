@@ -78,7 +78,7 @@ var serverHelp = `
 
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
-	  --proxy, Specifies the default proxy target to use when chiseld
+	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
 ` + commonHelp + `
 	Read more:
@@ -92,9 +92,10 @@ func server(args []string) {
 
 	hostf := flags.String("host", "", "")
 	portf := flags.String("port", "", "")
-	authf := flags.String("auth", "", "")
+	authf := flags.String("key", "", "")
 	proxyf := flags.String("proxy", "", "")
 	verbose := flags.Bool("v", false, "")
+
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, serverHelp)
 		os.Exit(1)
@@ -117,12 +118,12 @@ func server(args []string) {
 		port = "8080"
 	}
 
-	auth := *authf
-	if auth == "" {
-		auth = os.Getenv("AUTH")
+	key := *authf
+	if key == "" {
+		key = os.Getenv("key")
 	}
 
-	s, err := chserver.NewServer(auth, *proxyf)
+	s, err := chserver.NewServer(key, *proxyf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -138,7 +139,7 @@ func server(args []string) {
 var clientHelp = `
 	Usage: chisel client [options] <server> <remote> [remote] [remote] ...
 
-	server is the URL to the chiseld server.
+	server is the URL to the chisel server.
 
 	remotes are remote connections tunneled through the server, each of
 	which come in the form:
@@ -168,10 +169,11 @@ func client(args []string) {
 
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 
-	auth := flags.String("auth", "", "")
+	key := flags.String("key", "", "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
+		os.Exit(1)
 	}
 	flags.Parse(args)
 
@@ -183,7 +185,7 @@ func client(args []string) {
 	server := args[0]
 	remotes := args[1:]
 
-	c, err := chclient.NewClient(*auth, server, remotes...)
+	c, err := chclient.NewClient(*key, server, remotes...)
 	if err != nil {
 		log.Fatal(err)
 	}

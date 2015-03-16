@@ -18,16 +18,16 @@ import (
 
 type Client struct {
 	*chshare.Logger
-	config       *chshare.Config
-	encconfig    []byte
-	auth, server string
-	proxies      []*Proxy
-	session      *yamux.Session
-	running      bool
-	runningc     chan error
+	config      *chshare.Config
+	encconfig   []byte
+	key, server string
+	proxies     []*Proxy
+	session     *yamux.Session
+	running     bool
+	runningc    chan error
 }
 
-func NewClient(auth, server string, remotes ...string) (*Client, error) {
+func NewClient(key, server string, remotes ...string) (*Client, error) {
 
 	//apply default scheme
 	if !strings.HasPrefix(server, "http") {
@@ -69,7 +69,7 @@ func NewClient(auth, server string, remotes ...string) (*Client, error) {
 		Logger:    chshare.NewLogger("client"),
 		config:    config,
 		encconfig: encconfig,
-		auth:      auth,
+		key:       key,
 		server:    u.String(),
 		running:   true,
 		runningc:  make(chan error, 1),
@@ -133,8 +133,8 @@ func (c *Client) start() {
 
 		conn := net.Conn(ws)
 
-		if c.auth != "" {
-			conn = conncrypt.New(conn, &conncrypt.Config{Password: c.auth})
+		if c.key != "" {
+			conn = conncrypt.New(conn, &conncrypt.Config{Password: c.key})
 		}
 
 		//write config, read result
