@@ -1,21 +1,21 @@
-package chiselclient
+package chclient
 
 import (
 	"encoding/binary"
 	"net"
 
-	"github.com/jpillora/chisel"
+	"github.com/jpillora/chisel/share"
 )
 
 type Proxy struct {
-	*chisel.Logger
+	*chshare.Logger
 	id         int
 	count      int
-	remote     *chisel.Remote
+	remote     *chshare.Remote
 	openStream func() (net.Conn, error)
 }
 
-func NewProxy(c *Client, id int, remote *chisel.Remote, openStream func() (net.Conn, error)) *Proxy {
+func NewProxy(c *Client, id int, remote *chshare.Remote, openStream func() (net.Conn, error)) *Proxy {
 	return &Proxy{
 		Logger:     c.Logger.Fork("%s:%s#%d", remote.RemoteHost, remote.RemotePort, id+1),
 		id:         id,
@@ -63,7 +63,7 @@ func (p *Proxy) accept(src net.Conn) {
 	dst.Write(b)
 
 	//then pipe
-	s, r := chisel.Pipe(src, dst)
+	s, r := chshare.Pipe(src, dst)
 
 	clog.Debugf("Close (sent %d received %d)", s, r)
 }

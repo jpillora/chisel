@@ -1,21 +1,21 @@
-package chiselserver
+package chserver
 
 import (
 	"encoding/binary"
 	"net"
 
 	"github.com/hashicorp/yamux"
-	"github.com/jpillora/chisel"
+	"github.com/jpillora/chisel/share"
 )
 
 type webSocket struct {
-	*chisel.Logger
+	*chshare.Logger
 	id     int
-	config *chisel.Config
+	config *chshare.Config
 	conn   net.Conn
 }
 
-func newWebSocket(s *Server, config *chisel.Config, conn net.Conn) *webSocket {
+func newWebSocket(s *Server, config *chshare.Config, conn net.Conn) *webSocket {
 	id := s.wsCount
 	return &webSocket{
 		Logger: s.Logger.Fork("conn#%d", id),

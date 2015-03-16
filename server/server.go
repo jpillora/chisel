@@ -1,4 +1,4 @@
-package chiselserver
+package chserver
 
 import (
 	"net"
@@ -6,26 +6,26 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/jpillora/chisel"
+	"github.com/jpillora/chisel/share"
 	"github.com/jpillora/conncrypt"
 	"golang.org/x/net/websocket"
 )
 
 type Server struct {
-	*chisel.Logger
+	*chshare.Logger
 	auth       string
 	wsCount    int
 	wsServer   websocket.Server
-	httpServer *chisel.HTTPServer
+	httpServer *chshare.HTTPServer
 	proxy      *httputil.ReverseProxy
 }
 
 func NewServer(auth, proxy string) (*Server, error) {
 	s := &Server{
-		Logger:     chisel.NewLogger("server"),
+		Logger:     chshare.NewLogger("server"),
 		auth:       auth,
 		wsServer:   websocket.Server{},
-		httpServer: chisel.NewHTTPServer(),
+		httpServer: chshare.NewHTTPServer(),
 	}
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
 
@@ -80,7 +80,7 @@ func (s *Server) Close() error {
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	if r.Header.Get("Upgrade") == "websocket" &&
-		r.Header.Get("Sec-WebSocket-Protocol") == chisel.ProtocolVersion {
+		r.Header.Get("Sec-WebSocket-Protocol") == chshare.ProtocolVersion {
 		s.wsServer.ServeHTTP(w, r)
 		return
 	}
@@ -101,15 +101,15 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 		conn = conncrypt.New(conn, &conncrypt.Config{Password: s.auth})
 	}
 
-	configb := chisel.SizeRead(conn)
-	config, err := chisel.DecodeConfig(configb)
+	configb := chshare.SizeRead(conn)
+	config, err := chshare.DecodeConfig(configb)
 
 	if err != nil {
 		s.Infof("Handshake failed: %s", err)
-		chisel.SizeWrite(conn, []byte("Handshake failed"))
+		chshare.SizeWrite(conn, []byte("Handshake failed"))
 		return
 	}
-	chisel.SizeWrite(conn, []byte("Handshake Success"))
+	chshare.SizeWrite(conn, []byte("Handshake Success"))
 	// s.Infof("success %+v\n", config)
 	s.wsCount++
 

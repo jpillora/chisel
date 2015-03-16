@@ -1,4 +1,4 @@
-package chiselclient
+package chclient
 
 import (
 	"errors"
@@ -11,14 +11,14 @@ import (
 
 	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel"
+	"github.com/jpillora/chisel/share"
 	"github.com/jpillora/conncrypt"
 	"golang.org/x/net/websocket"
 )
 
 type Client struct {
-	*chisel.Logger
-	config       *chisel.Config
+	*chshare.Logger
+	config       *chshare.Config
 	encconfig    []byte
 	auth, server string
 	proxies      []*Proxy
@@ -51,22 +51,22 @@ func NewClient(auth, server string, remotes ...string) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
-	config := &chisel.Config{}
+	config := &chshare.Config{}
 	for _, s := range remotes {
-		r, err := chisel.DecodeRemote(s)
+		r, err := chshare.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
 		config.Remotes = append(config.Remotes, r)
 	}
 
-	encconfig, err := chisel.EncodeConfig(config)
+	encconfig, err := chshare.EncodeConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to encode config: %s", err)
 	}
 
 	return &Client{
-		Logger:    chisel.NewLogger("client"),
+		Logger:    chshare.NewLogger("client"),
 		config:    config,
 		encconfig: encconfig,
 		auth:      auth,
@@ -125,7 +125,7 @@ func (c *Client) start() {
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.server, chisel.ProtocolVersion, "http://localhost/")
+		ws, err := websocket.Dial(c.server, chshare.ProtocolVersion, "http://localhost/")
 		if err != nil {
 			connerr = err
 			continue
@@ -138,9 +138,9 @@ func (c *Client) start() {
 		}
 
 		//write config, read result
-		chisel.SizeWrite(conn, c.encconfig)
+		chshare.SizeWrite(conn, c.encconfig)
 
-		resp := chisel.SizeRead(conn)
+		resp := chshare.SizeRead(conn)
 		if string(resp) != "Handshake Success" {
 			//no point in retrying
 			c.runningc <- errors.New("Handshake failed")
@@ -156,16 +156,18 @@ func (c *Client) start() {
 		}
 		b.Reset()
 
+		//check latency
 		go func() {
 			d, err := c.session.Ping()
 			if err == nil {
-				c.Infof("Server latency: %s\n", d)
+				c.Infof("Connected (Latency: %s)\n", d)
+			} else {
+				c.Infof("Connected\n")
 			}
 		}()
 
 		//signal is connected
 		connected := make(chan bool)
-		c.Infof("Connected\n")
 
 		//poll websocket state
 		go func() {

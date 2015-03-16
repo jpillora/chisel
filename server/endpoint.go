@@ -1,13 +1,13 @@
-package chiselserver
+package chserver
 
 import (
 	"net"
 
-	"github.com/jpillora/chisel"
+	"github.com/jpillora/chisel/share"
 )
 
 type endpoint struct {
-	*chisel.Logger
+	*chshare.Logger
 	id       int
 	count    int
 	addr     string
@@ -42,6 +42,6 @@ func (e *endpoint) pipe(src net.Conn) {
 	e.count++
 	eid := e.count
 	e.Debugf("stream#%d: Open", eid)
-	s, r := chisel.Pipe(src, dst)
+	s, r := chshare.Pipe(src, dst)
 	e.Debugf("stream#%d: Close (sent %d received %d)", eid, s, r)
 }

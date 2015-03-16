@@ -13,10 +13,7 @@ See [Releases](https://github.com/jpillora/chisel/releases)
 **Source**
 
 ``` sh
-# chisel server
-$ go get -v github.com/jpillora/chisel/chiseld
-# chisel client
-$ go get -v github.com/jpillora/chisel/chisel-forward
+$ go get -v github.com/jpillora/chisel
 ```
 
 ### Features
@@ -187,9 +184,6 @@ Note, we're using an in-memory "file" server on localhost for these tests
 
 See more [test/](test/)
 
-
-
-
 ### Known Issues
 
 * **WebSockets support is required**
@@ -204,9 +198,9 @@ See more [test/](test/)
 
 * http://golang.org/doc/code.html
 * http://golang.org/doc/effective_go.html
-* `github.com/jpillora/chisel` contains the shared package
-* `github.com/jpillora/chisel/chiseld` contains the server package
-* `github.com/jpillora/chisel/chisel-forward` contains the client package
+* `github.com/jpillora/chisel/share` contains the shared package
+* `github.com/jpillora/chisel/server` contains the server package
+* `github.com/jpillora/chisel/client` contains the client package
 
 ### Todo
 

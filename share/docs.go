@@ -3,4 +3,4 @@
 // Read more here
 // https://github.com/jpillora/chisel
 
-package chisel
+package chshare

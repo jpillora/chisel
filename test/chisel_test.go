@@ -1,5 +1,6 @@
-//chisel tests
-//===================
+//chisel end-to-end test
+//======================
+//
 //                    (direct)
 //         .--------------->----------------.
 //        /    chisel         chisel         \
@@ -22,9 +23,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
+
+	"github.com/jpillora/chisel/share"
 
 	"testing"
 	"time"
@@ -85,7 +90,7 @@ func requestFile(port string, size int) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func makeFileServer() *chisel.HTTPServer {
+func makeFileServer() *chshare.HTTPServer {
 	bsize := 3 * MB
 	bytes := make([]byte, bsize)
 	//filling huge buffer
@@ -93,7 +98,7 @@ func makeFileServer() *chisel.HTTPServer {
 		bytes[i] = byte(i)
 	}
 
-	s := chisel.NewHTTPServer()
+	s := chshare.NewHTTPServer()
 	s.SetKeepAlivesEnabled(false)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rsize, _ := strconv.Atoi(r.URL.Path[1:])
@@ -142,12 +147,12 @@ func TestMain(m *testing.M) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hd := exec.Command("chiseld", "--port", "2002" /*"--auth", "foobar",*/)
+	hd := exec.Command("chisel", "server", "--port", "2002" /*"--auth", "foobar",*/)
 	// hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	hf := exec.Command("chisel-forward", /*"--auth", "foobar",*/
+	hf := exec.Command("chisel", "client", /*"--auth", "foobar",*/
 		"127.0.0.1:2002",
 		"2001:3000")
 	// hf.Stdout = os.Stdout

@@ -1,4 +1,4 @@
-package chisel
+package chshare
 
 import (
 	"encoding/json"
