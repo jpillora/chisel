@@ -160,12 +160,15 @@ func main() {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hd := exec.Command("chisel", "server", "--port", "2002" /*"--key", "foobar",*/)
+	hd := exec.Command("chisel", "server",
+		// "--key", "foobar",
+		"--port", "2002")
 	// hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		fatal(err)
 	}
-	hf := exec.Command("chisel", "client", /*"--key", "foobar",*/
+	hf := exec.Command("chisel", "client",
+		// "--key", "foobar",
 		"127.0.0.1:2002",
 		"2001:3000")
 	// hf.Stdout = os.Stdout

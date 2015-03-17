@@ -20,7 +20,7 @@ $ go get -v github.com/jpillora/chisel
 
 * Easy to use
 * [Performant](#performance)*
-* [Encrypted connections](https://github.com/jpillora/conncrypt) with `key` derived (PBKDF2) symmetric key
+* [Encrypted connections](https://github.com/jpillora/conncrypt) with `key` derived (PBKDF2) symmetric key[*](#security)
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
@@ -135,11 +135,13 @@ default proxy and see a copy of [example.com](http://example.com).
 ```
 </tmpl>
 
-See also: [programmatic API](https://github.com/jpillora/chisel/wiki/Programmatic-Usage).
+See also [programmatic usage](https://github.com/jpillora/chisel/wiki/Programmatic-Usage).
 
 ### Security
 
-Currently, you can secure your traffic by using HTTPS, which can only be done by hosting your HTTP server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
+**Beware** The `key` option derives the keys and initialization vectors and is currently susceptible to a sustained targeted attack, this risk will be lessened when the switch SSH is complete.
+
+It's recommended to use TLS to secure your traffic, which can only be done by hosting your chisel server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
 
 ### Performance
 
