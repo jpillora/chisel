@@ -163,20 +163,21 @@ var clientHelp = `
 
 	Options:
 
-	  --key, An optional fingerprint (server authentication) string to
-	  compare against the server's public key. You may provide just a
-	  prefix of the key or the entire string. Fingerprint mismatches
-	  will disallow the connection.
+	  --fingerprint, An optional fingerprint (server authentication)
+	  string to compare against the server's public key. You may provide
+	  just a prefix of the key or the entire string. Fingerprint 
+	  mismatches will close the connection.
 
 	  --auth, An optional username and password (client authentication)
-	  in the form: "<user>:<pass>".
+	  in the form: "<user>:<pass>". These credentials are compared to
+	  the credentials inside the server's --authfile.
 ` + commonHelp
 
 func client(args []string) {
 
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 
-	key := flags.String("key", "", "")
+	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
@@ -193,7 +194,7 @@ func client(args []string) {
 	server := args[0]
 	remotes := args[1:]
 
-	c, err := chclient.NewClient(*key, *auth, server, remotes...)
+	c, err := chclient.NewClient(*fingerprint, *auth, server, remotes...)
 	if err != nil {
 		log.Fatal(err)
 	}

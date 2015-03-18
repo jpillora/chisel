@@ -23,12 +23,11 @@ type Client struct {
 	sshConn     ssh.Conn
 	fingerprint string
 	server      string
-	keyPrefix   string
 	running     bool
 	runningc    chan error
 }
 
-func NewClient(keyPrefix, auth, server string, remotes ...string) (*Client, error) {
+func NewClient(fingerprint, auth, server string, remotes ...string) (*Client, error) {
 
 	//apply default scheme
 	if !strings.HasPrefix(server, "http") {
@@ -62,23 +61,21 @@ func NewClient(keyPrefix, auth, server string, remotes ...string) (*Client, erro
 	}
 
 	c := &Client{
-		Logger:    chshare.NewLogger("client"),
-		config:    config,
-		server:    u.String(),
-		keyPrefix: keyPrefix,
-		running:   true,
-		runningc:  make(chan error, 1),
-	}
-
-	c.sshConfig = &ssh.ClientConfig{
-		ClientVersion:   chshare.ProtocolVersion + "-client",
-		HostKeyCallback: c.verifyServer,
+		Logger:      chshare.NewLogger("client"),
+		config:      config,
+		server:      u.String(),
+		fingerprint: fingerprint,
+		running:     true,
+		runningc:    make(chan error, 1),
 	}
 
 	user, pass := chshare.ParseAuth(auth)
-	if user != "" {
-		c.sshConfig.User = user
-		c.sshConfig.Auth = []ssh.AuthMethod{ssh.Password(pass)}
+
+	c.sshConfig = &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
+		ClientVersion:   chshare.ProtocolVersion + "-client",
+		HostKeyCallback: c.verifyServer,
 	}
 
 	return c, nil
@@ -92,10 +89,11 @@ func (c *Client) Run() error {
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	f := chshare.FingerprintKey(key)
-	if c.keyPrefix != "" && !strings.HasPrefix(f, c.keyPrefix) {
+	if c.fingerprint != "" && !strings.HasPrefix(f, c.fingerprint) {
 		return fmt.Errorf("Invalid fingerprint (Got %s)", f)
 	}
-	c.fingerprint = f
+	//overwrite with complete fingerprint
+	c.Infof("Fingerprint %s", f)
 	return nil
 }
 
@@ -140,15 +138,17 @@ func (c *Client) start() {
 		if err != nil {
 			if strings.Contains(err.Error(), "unable to authenticate") {
 				c.Infof("Authentication failed")
+				c.Debugf(err.Error())
 			} else {
 				c.Infof(err.Error())
 			}
 			break
 		}
 		conf, _ := chshare.EncodeConfig(c.config)
+		c.Debugf("Sending configurating")
 		_, conerr, err := sshConn.SendRequest("config", true, conf)
 		if err != nil {
-			c.Infof("Config verification failed", c.fingerprint)
+			c.Infof("Config verification failed")
 			break
 		}
 		if len(conerr) > 0 {
@@ -156,13 +156,13 @@ func (c *Client) start() {
 			break
 		}
 
-		c.Infof("Connected (%s)", c.fingerprint)
+		c.Infof("Connected")
 		//connected
 		b.Reset()
 
 		c.sshConn = sshConn
 		go ssh.DiscardRequests(reqs)
-		go chshare.RejectStreams(chans)
+		go chshare.RejectStreams(chans) //TODO allow client to ConnectStreams
 		err = sshConn.Wait()
 		//disconnected
 		c.sshConn = nil

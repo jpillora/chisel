@@ -125,13 +125,15 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 //
 func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-	// no auth
+	// no auth - allow all
 	if len(s.Users) == 0 {
 		return nil, nil
 	}
 	// authenticate user
-	u, ok := s.Users[c.User()]
+	n := c.User()
+	u, ok := s.Users[n]
 	if !ok || u.Pass != string(pass) {
+		s.Debugf("Login failed: %s", n)
 		return nil, errors.New("Invalid auth")
 	}
 	//insert session
@@ -148,42 +150,41 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	}
 
 	//load user
-	sid := string(sshConn.SessionID())
 	var user *chshare.User
 	if len(s.Users) > 0 {
+		sid := string(sshConn.SessionID())
 		user = s.sessions[sid]
+		defer delete(s.sessions, sid)
 	}
 
 	//verify configuration
+	s.Debugf("Verifying configuration")
 	r := <-reqs
-	reply := func(err error) {
-		r.Reply(err == nil, []byte(err.Error()))
-		if err != nil {
-			sshConn.Close()
-		}
+	failed := func(err error) {
+		r.Reply(false, []byte(err.Error()))
 	}
 	if r.Type != "config" {
-		reply(s.Errorf("expecting config request"))
+		failed(s.Errorf("expecting config request"))
 		return
 	}
-
 	c, err := chshare.DecodeConfig(r.Payload)
 	if err != nil {
-		reply(s.Errorf("invalid config"))
+		failed(s.Errorf("invalid config"))
 		return
 	}
-
 	//if user is provided, ensure they have
-	//access to the desired remote
+	//access to the desired remotes
 	if user != nil {
 		for _, r := range c.Remotes {
 			addr := r.RemoteHost + ":" + r.RemotePort
 			if !user.HasAccess(addr) {
-				reply(s.Errorf("access to '%s' denied", addr))
+				failed(s.Errorf("access to '%s' denied", addr))
 				return
 			}
 		}
 	}
+	//success!
+	r.Reply(true, nil)
 
 	//prepare connection logger
 	s.wsCount++
@@ -195,8 +196,4 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	go chshare.ConnectStreams(l, chans)
 	sshConn.Wait()
 	l.Debugf("Close")
-
-	if user != nil {
-		delete(s.sessions, sid)
-	}
 }

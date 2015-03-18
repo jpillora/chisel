@@ -1,14 +1,14 @@
 package chshare
 
-// overview: only half the result is used as the output
-// next -> sha512(next) -> [output|next] ->
+// overview: half the result is used as the output
+// [a|...] -> sha512(a) -> [b|output] -> sha512(b)
 
 import (
 	"crypto/sha512"
 	"io"
 )
 
-const DetermRandIter = 1024
+const DetermRandIter = 2048
 
 func NewDetermRand(seed []byte) io.Reader {
 	var out []byte
@@ -38,7 +38,7 @@ func (d *DetermRand) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-func hash(input []byte) ([]byte, []byte) {
+func hash(input []byte) (next []byte, output []byte) {
 	nextout := sha512.Sum512(input)
 	return nextout[:sha512.Size/2], nextout[sha512.Size/2:]
 }

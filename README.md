@@ -8,7 +8,7 @@ Chisel is an HTTP client and server which acts as a TCP proxy, written in Go (Go
 
 **Binaries**
 
-See [Releases](https://github.com/jpillora/chisel/releases)
+See [Releases](https://github.com/jpillora/chisel/releases/latest)
 
 **Source**
 
@@ -20,7 +20,8 @@ $ go get -v github.com/jpillora/chisel
 
 * Easy to use
 * [Performant](#performance)*
-* [Encrypted connections](https://github.com/jpillora/conncrypt) with `key` derived (PBKDF2) symmetric key[*](#security)
+* [Encrypted connections](#security) using `crypto/ssh`
+* [Authenticated connections](#authentication) using a users config file
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
@@ -30,22 +31,19 @@ $ go get -v github.com/jpillora/chisel
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
 ``` sh
-$ chisel server --key foobar --port $PORT --proxy http://example.com
-# listens on $PORT, requires password 'foobar', proxy web requests to 'http://example.com'
+$ chisel server --port $PORT --proxy http://example.com
+# listens on $PORT, proxy web requests to 'http://example.com'
 ```
 
 This demo app is also running a [simple file server](https://www.npmjs.com/package/serve) on `:3000`, which is normally inaccessible due to Heroku's firewall. However, if we tunnel in with:
 
 ``` sh
-$ chisel client --key foobar https://chisel-demo.herokuapp.com 3000
-# connects to 'https://chisel-demo.herokuapp.com', using password 'foobar',
+$ chisel client https://chisel-demo.herokuapp.com 3000
+# connects to 'https://chisel-demo.herokuapp.com',
 # tunnels your localhost:3000 to the server's localhost:3000
 ```
 
-and then visit [localhost:3000](http://localhost:3000/), we should
-see a directory listing of the demo app's root. Also, if we visit
-the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's
-default proxy and see a copy of [example.com](http://example.com).
+and then visit [localhost:3000](http://localhost:3000/), we should see a directory listing of the demo app's root. Also, if we visit the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's default proxy and see a copy of [example.com](http://example.com).
 
 ### Usage
 
@@ -54,7 +52,7 @@ default proxy and see a copy of [example.com](http://example.com).
 
 	Usage: chisel [command] [--help]
 
-	Version: X.X.X
+	Version: 0.0.0-src
 
 	Commands:
 	  server - runs chisel in server mode
@@ -65,6 +63,8 @@ default proxy and see a copy of [example.com](http://example.com).
 
 ```
 </tmpl>
+
+`chisel server --help`
 
 <tmpl,code: chisel server --help>
 ```
@@ -78,12 +78,21 @@ default proxy and see a copy of [example.com](http://example.com).
 
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
+	  --key, An optional string to seed the generation of a ECC public
+	  and private key pair. All commications will be secured using this
+	  key pair. Share the resulting fingerprint with clients to prevent
+	  man-in-the-middle attacks.
+
+	  --authfile, An optional path to a users.json file. This file should
+	  be an object with users defined like:
+	    "<user:pass>": ["<addr-regex>","<addr-regex>"]
+	    when <user> connects, their <pass> will be verified and then
+	    each of the remote addresses will be compared against the list
+	    of address regular expressions for a match. Addresses will
+	    always come in the form "<host/ip>:<port>".
+
 	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
-
-	  --key, Enables AES256 encryption and specify the string to
-	  use to derive the key (derivation is performed using PBKDF2
-	  with 2048 iterations of SHA256).
 
 	  -v, Enable verbose logging
 
@@ -94,6 +103,8 @@ default proxy and see a copy of [example.com](http://example.com).
 
 ```
 </tmpl>
+
+`chisel client --help`
 
 <tmpl,code: chisel client --help>
 ```
@@ -121,9 +132,14 @@ default proxy and see a copy of [example.com](http://example.com).
 
 	Options:
 
-	  --key, Enables AES256 encryption and specify the string to
-	  use to derive the key (derivation is performed using PBKDF2
-	  with 2048 iterations of SHA256).
+	  --fingerprint, An optional fingerprint (server authentication)
+	  string to compare against the server's public key. You may provide
+	  just a prefix of the key or the entire string. Fingerprint 
+	  mismatches will close the connection.
+
+	  --auth, An optional username and password (client authentication)
+	  in the form: "<user>:<pass>". These credentials are compared to
+	  the credentials inside the server's --authfile.
 
 	  -v, Enable verbose logging
 
@@ -139,13 +155,17 @@ See also [programmatic usage](https://github.com/jpillora/chisel/wiki/Programmat
 
 ### Security
 
-**Beware** The `key` option derives the keys and initialization vectors and is currently susceptible to a sustained targeted attack, this risk will be lessened when the switch SSH is complete.
+Encryption is enabled by default, when you start up a chisel server, it will generate an in-memory ECC public/private key pair. The public key fingerprint will be displayed as the server starts. Instead of always generating a random key, the server may optionally specify a key seed, using the `--key`, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
 
-It's recommended to use TLS to secure your traffic, which can only be done by hosting your chisel server behind a TLS terminating proxy (like Heroku's router). In the future, the server will allow your to pass in TLS credentials and make use of Go's TLS (HTTPS) server.
+### Authentication
+
+Using the `--authfile` option, the server may optionally provide a `user.json` configuration file to create a list of accepted users. The client then authenticates using the `--auth` option. See [users.json](example/users.json) for an example authentication configuration file. See the `--help` above for more information.
+
+Internally, this is done using the *Password* authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
 
 ### Performance
 
-With [crowbar](https://github.com/q3k/crowbar), a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [Yamux](https://github.com/hashicorp/yamux) to create hundreds of SDPY/HTTP2 like logical connections, resulting in **one** TCP connection per client.
+With [crowbar](https://github.com/q3k/crowbar), a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [crypto/ssh](https://golang.org/x/crypto/ssh) to create hundreds of logical connections, resulting in **one** TCP connection per client.
 
 In this simple benchmark, we have:
 
@@ -178,18 +198,18 @@ Note, we're using an in-memory "file" server on localhost for these tests
 `chisel`
 
 ```
-:2001 => 1 bytes in 1.334661ms
-:2001 => 10 bytes in 807.797µs
-:2001 => 100 bytes in 763.728µs
-:2001 => 1000 bytes in 1.029811ms
-:2001 => 10000 bytes in 840.247µs
-:2001 => 100000 bytes in 1.647748ms
-:2001 => 1000000 bytes in 3.495904ms
-:2001 => 10000000 bytes in 22.298904ms
-:2001 => 100000000 bytes in 255.410448ms
+:2001 => 1 bytes in 1.190288ms
+:2001 => 10 bytes in 1.17237ms
+:2001 => 100 bytes in 821.369µs
+:2001 => 1000 bytes in 1.029366ms
+:2001 => 10000 bytes in 1.281065ms
+:2001 => 100000 bytes in 2.14094ms
+:2001 => 1000000 bytes in 9.538984ms
+:2001 => 10000000 bytes in 86.500426ms
+:2001 => 100000000 bytes in 814.630443ms
 ```
 
-~100MB in **a quarter of a second**
+~100MB in **0.8 seconds**
 
 `crowbar`
 
@@ -227,13 +247,16 @@ See more [test/](test/)
 * `github.com/jpillora/chisel/server` contains the server package
 * `github.com/jpillora/chisel/client` contains the client package
 
+### Changelog
+
+* `1.0.0` - Init
+* `1.1.0` - Swapped out simple symmetric encryption for ECC SSH
+
 ### Todo
 
-* Users file with white-listed remotes
-* Pass in TLS server configuration
+* Better, faster tests
 * Expose a stats page for proxy throughput
-* Configurable connection retry times
-* Treat forwarder stdin/stdout as a socket
+* Treat client stdin/stdout as a socket
 
 #### MIT License
 

@@ -29,6 +29,8 @@ import (
 	"time"
 )
 
+const ENABLE_CROWBAR = false
+
 const (
 	B  = 1
 	KB = 1024 * B
@@ -62,7 +64,9 @@ func test() {
 func bench() {
 	benchSizes("3000")
 	benchSizes("2001")
-	benchSizes("4001")
+	if ENABLE_CROWBAR {
+		benchSizes("4001")
+	}
 }
 
 func benchSizes(port string) {
@@ -75,6 +79,9 @@ func testTunnel(port string, size int) {
 	t0 := time.Now()
 	resp, err := requestFile(port, size)
 	if err != nil {
+		fatal(err)
+	}
+	if resp.StatusCode != 200 {
 		fatal(err)
 	}
 	b, err := ioutil.ReadAll(resp.Body)
@@ -135,46 +142,57 @@ func main() {
 		fatal(fs.Wait())
 	}()
 
-	dir, _ := os.Getwd()
-	cd := exec.Command("crowbard",
-		`-listen`, "0.0.0.0:4002",
-		`-userfile`, path.Join(dir, "userfile"))
-	if err := cd.Start(); err != nil {
-		fatal(err)
-	}
-	go func() {
-		fatalf("crowbard: %v", cd.Wait())
-	}()
+	if ENABLE_CROWBAR {
+		dir, _ := os.Getwd()
+		cd := exec.Command("crowbard",
+			`-listen`, "0.0.0.0:4002",
+			`-userfile`, path.Join(dir, "userfile"))
+		if err := cd.Start(); err != nil {
+			fatal(err)
+		}
+		go func() {
+			fatalf("crowbard: %v", cd.Wait())
+		}()
+		defer cd.Process.Kill()
 
-	time.Sleep(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
-	cf := exec.Command("crowbar-forward",
-		"-local=0.0.0.0:4001",
-		"-server=http://127.0.0.1:4002",
-		"-remote=127.0.0.1:3000",
-		"-username", "foo",
-		"-password", "bar")
-	if err := cf.Start(); err != nil {
-		fatal(err)
+		cf := exec.Command("crowbar-forward",
+			"-local=0.0.0.0:4001",
+			"-server=http://127.0.0.1:4002",
+			"-remote=127.0.0.1:3000",
+			"-username", "foo",
+			"-password", "bar")
+		if err := cf.Start(); err != nil {
+			fatal(err)
+		}
+		defer cf.Process.Kill()
 	}
 
 	time.Sleep(100 * time.Millisecond)
 
 	hd := exec.Command("chisel", "server",
-		// "--key", "foobar",
+		// "-v",
+		"--key", "foobar",
 		"--port", "2002")
-	// hd.Stdout = os.Stdout
+	hd.Stdout = os.Stdout
 	if err := hd.Start(); err != nil {
 		fatal(err)
 	}
+	defer hd.Process.Kill()
+
+	time.Sleep(100 * time.Millisecond)
+
 	hf := exec.Command("chisel", "client",
-		// "--key", "foobar",
+		// "-v",
+		"--fingerprint", "ed:f2:cf:3c:56",
 		"127.0.0.1:2002",
 		"2001:3000")
-	// hf.Stdout = os.Stdout
+	hf.Stdout = os.Stdout
 	if err := hf.Start(); err != nil {
 		fatal(err)
 	}
+	defer hf.Process.Kill()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -185,9 +203,5 @@ func main() {
 	}()
 	run()
 
-	cd.Process.Kill()
-	cf.Process.Kill()
-	hd.Process.Kill()
-	hf.Process.Kill()
 	fs.Close()
 }
