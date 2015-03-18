@@ -1,33 +1,62 @@
 package chserver
 
 import (
-	"net"
+	"errors"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
 	"github.com/jpillora/chisel/share"
-	"github.com/jpillora/conncrypt"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 )
 
 type Server struct {
 	*chshare.Logger
-	key        string
-	wsCount    int
-	wsServer   websocket.Server
-	httpServer *chshare.HTTPServer
-	proxy      *httputil.ReverseProxy
+	Users       chshare.Users
+	fingerprint string
+	wsCount     int
+	wsServer    websocket.Server
+	httpServer  *chshare.HTTPServer
+	proxy       *httputil.ReverseProxy
+	sshConfig   *ssh.ServerConfig
+	sessions    map[string]*chshare.User
 }
 
-func NewServer(key, proxy string) (*Server, error) {
+func NewServer(keySeed, authfile, proxy string) (*Server, error) {
 	s := &Server{
 		Logger:     chshare.NewLogger("server"),
-		key:        key,
 		wsServer:   websocket.Server{},
 		httpServer: chshare.NewHTTPServer(),
+		sessions:   map[string]*chshare.User{},
 	}
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
+
+	//parse users, if provided
+	if authfile != "" {
+		users, err := chshare.ParseUsers(authfile)
+		if err != nil {
+			return nil, err
+		}
+		s.Users = users
+	}
+
+	//generate private key (optionally using seed)
+	key, _ := chshare.GenerateKey(keySeed)
+	//convert into ssh.PrivateKey
+	private, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatal("Failed to parse key")
+	}
+	//fingerprint this key
+	s.fingerprint = chshare.FingerprintKey(private.PublicKey())
+	//create ssh config
+	s.sshConfig = &ssh.ServerConfig{
+		ServerVersion:    chshare.ProtocolVersion + "-server",
+		PasswordCallback: s.authUser,
+	}
+	s.sshConfig.AddHostKey(private)
 
 	if proxy != "" {
 		u, err := url.Parse(proxy)
@@ -57,8 +86,9 @@ func (s *Server) Run(host, port string) error {
 }
 
 func (s *Server) Start(host, port string) error {
-	if s.key != "" {
-		s.Infof("Authenication enabled")
+	s.Infof("Fingerprint %s", s.fingerprint)
+	if len(s.Users) > 0 {
+		s.Infof("User authenication enabled")
 	}
 	if s.proxy != nil {
 		s.Infof("Default proxy enabled")
@@ -93,25 +123,80 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(404)
 }
 
-func (s *Server) handleWS(ws *websocket.Conn) {
-
-	conn := net.Conn(ws)
-
-	if s.key != "" {
-		conn = conncrypt.New(conn, &conncrypt.Config{Password: s.key})
+//
+func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+	// no auth
+	if len(s.Users) == 0 {
+		return nil, nil
 	}
+	// authenticate user
+	u, ok := s.Users[c.User()]
+	if !ok || u.Pass != string(pass) {
+		return nil, errors.New("Invalid auth")
+	}
+	//insert session
+	s.sessions[string(c.SessionID())] = u
+	return nil, nil
+}
 
-	configb := chshare.SizeRead(conn)
-	config, err := chshare.DecodeConfig(configb)
-
+func (s *Server) handleWS(ws *websocket.Conn) {
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sshConn, chans, reqs, err := ssh.NewServerConn(ws, s.sshConfig)
 	if err != nil {
-		s.Infof("Handshake failed: %s", err)
-		chshare.SizeWrite(conn, []byte("Handshake failed"))
+		s.Debugf("Failed to handshake (%s)", err)
 		return
 	}
-	chshare.SizeWrite(conn, []byte("Handshake Success"))
-	// s.Infof("success %+v\n", config)
-	s.wsCount++
 
-	newWebSocket(s, config, conn).handle()
+	//load user
+	sid := string(sshConn.SessionID())
+	var user *chshare.User
+	if len(s.Users) > 0 {
+		user = s.sessions[sid]
+	}
+
+	//verify configuration
+	r := <-reqs
+	reply := func(err error) {
+		r.Reply(err == nil, []byte(err.Error()))
+		if err != nil {
+			sshConn.Close()
+		}
+	}
+	if r.Type != "config" {
+		reply(s.Errorf("expecting config request"))
+		return
+	}
+
+	c, err := chshare.DecodeConfig(r.Payload)
+	if err != nil {
+		reply(s.Errorf("invalid config"))
+		return
+	}
+
+	//if user is provided, ensure they have
+	//access to the desired remote
+	if user != nil {
+		for _, r := range c.Remotes {
+			addr := r.RemoteHost + ":" + r.RemotePort
+			if !user.HasAccess(addr) {
+				reply(s.Errorf("access to '%s' denied", addr))
+				return
+			}
+		}
+	}
+
+	//prepare connection logger
+	s.wsCount++
+	id := s.wsCount
+	l := s.Fork("session#%d", id)
+
+	l.Debugf("Open")
+	go ssh.DiscardRequests(reqs)
+	go chshare.ConnectStreams(l, chans)
+	sshConn.Wait()
+	l.Debugf("Close")
+
+	if user != nil {
+		delete(s.sessions, sid)
+	}
 }

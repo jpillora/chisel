@@ -2,11 +2,10 @@ package chshare
 
 import (
 	"io"
-	"net"
 	"sync"
 )
 
-func Pipe(src net.Conn, dst net.Conn) (int64, int64) {
+func Pipe(src io.ReadWriteCloser, dst io.ReadWriteCloser) (int64, int64) {
 
 	var sent, received int64
 	var c = make(chan bool)

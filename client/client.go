@@ -1,33 +1,34 @@
 package chclient
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/hashicorp/yamux"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
-	"github.com/jpillora/conncrypt"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 )
 
 type Client struct {
 	*chshare.Logger
 	config      *chshare.Config
-	encconfig   []byte
-	key, server string
+	sshConfig   *ssh.ClientConfig
 	proxies     []*Proxy
-	session     *yamux.Session
+	sshConn     ssh.Conn
+	fingerprint string
+	server      string
+	keyPrefix   string
 	running     bool
 	runningc    chan error
 }
 
-func NewClient(key, server string, remotes ...string) (*Client, error) {
+func NewClient(keyPrefix, auth, server string, remotes ...string) (*Client, error) {
 
 	//apply default scheme
 	if !strings.HasPrefix(server, "http") {
@@ -60,26 +61,42 @@ func NewClient(key, server string, remotes ...string) (*Client, error) {
 		config.Remotes = append(config.Remotes, r)
 	}
 
-	encconfig, err := chshare.EncodeConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to encode config: %s", err)
-	}
-
-	return &Client{
+	c := &Client{
 		Logger:    chshare.NewLogger("client"),
 		config:    config,
-		encconfig: encconfig,
-		key:       key,
 		server:    u.String(),
+		keyPrefix: keyPrefix,
 		running:   true,
 		runningc:  make(chan error, 1),
-	}, nil
+	}
+
+	c.sshConfig = &ssh.ClientConfig{
+		ClientVersion:   chshare.ProtocolVersion + "-client",
+		HostKeyCallback: c.verifyServer,
+	}
+
+	user, pass := chshare.ParseAuth(auth)
+	if user != "" {
+		c.sshConfig.User = user
+		c.sshConfig.Auth = []ssh.AuthMethod{ssh.Password(pass)}
+	}
+
+	return c, nil
 }
 
 //Start then Wait
 func (c *Client) Run() error {
 	go c.start()
 	return c.Wait()
+}
+
+func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	f := chshare.FingerprintKey(key)
+	if c.keyPrefix != "" && !strings.HasPrefix(f, c.keyPrefix) {
+		return fmt.Errorf("Invalid fingerprint (Got %s)", f)
+	}
+	c.fingerprint = f
+	return nil
 }
 
 //Starts the client
@@ -90,37 +107,24 @@ func (c *Client) Start() {
 func (c *Client) start() {
 	c.Infof("Connecting to %s\n", c.server)
 
-	//proxies all use this function
-	openStream := func() (net.Conn, error) {
-		if c.session == nil || c.session.IsClosed() {
-			return nil, c.Errorf("no session available")
-		}
-		stream, err := c.session.Open()
-		if err != nil {
-			return nil, err
-		}
-		return stream, nil
-	}
-
 	//prepare proxies
 	for id, r := range c.config.Remotes {
-		proxy := NewProxy(c, id, r, openStream)
+		proxy := NewProxy(c, id, r)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
 	}
 
-	var connerr error
-	b := &backoff.Backoff{Max: 15 * time.Second}
-
 	//connection loop!
+	var connerr error
+	b := &backoff.Backoff{Max: 5 * time.Minute}
+
 	for {
 		if !c.running {
 			break
 		}
 		if connerr != nil {
 			d := b.Duration()
-			c.Infof("Connerr: %v", connerr)
-			c.Infof("Retrying in %s...", d)
+			c.Infof("Retrying in %s...\n", d)
 			connerr = nil
 			time.Sleep(d)
 		}
@@ -131,58 +135,43 @@ func (c *Client) start() {
 			continue
 		}
 
-		conn := net.Conn(ws)
-
-		if c.key != "" {
-			conn = conncrypt.New(conn, &conncrypt.Config{Password: c.key})
+		sshConn, chans, reqs, err := ssh.NewClientConn(ws, "", c.sshConfig)
+		//NOTE break -> dont retry on handshake failures
+		if err != nil {
+			if strings.Contains(err.Error(), "unable to authenticate") {
+				c.Infof("Authentication failed")
+			} else {
+				c.Infof(err.Error())
+			}
+			break
 		}
-
-		//write config, read result
-		chshare.SizeWrite(conn, c.encconfig)
-
-		resp := chshare.SizeRead(conn)
-		if string(resp) != "Handshake Success" {
-			//no point in retrying
-			c.runningc <- errors.New("Handshake failed")
-			conn.Close()
+		conf, _ := chshare.EncodeConfig(c.config)
+		_, conerr, err := sshConn.SendRequest("config", true, conf)
+		if err != nil {
+			c.Infof("Config verification failed", c.fingerprint)
+			break
+		}
+		if len(conerr) > 0 {
+			c.Infof(string(conerr))
 			break
 		}
 
-		// Setup client side of yamux
-		c.session, err = yamux.Client(conn, nil)
-		if err != nil {
-			connerr = err
-			continue
-		}
+		c.Infof("Connected (%s)", c.fingerprint)
+		//connected
 		b.Reset()
 
-		//check latency
-		go func() {
-			d, err := c.session.Ping()
-			if err == nil {
-				c.Infof("Connected (Latency: %s)\n", d)
-			} else {
-				c.Infof("Connected\n")
-			}
-		}()
-
-		//signal is connected
-		connected := make(chan bool)
-
-		//poll websocket state
-		go func() {
-			for {
-				if c.session.IsClosed() {
-					connerr = c.Errorf("disconnected")
-					c.Infof("Disconnected\n")
-					close(connected)
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-		//block!
-		<-connected
+		c.sshConn = sshConn
+		go ssh.DiscardRequests(reqs)
+		go chshare.RejectStreams(chans)
+		err = sshConn.Wait()
+		//disconnected
+		c.sshConn = nil
+		if err != nil && err != io.EOF {
+			connerr = err
+			c.Infof("Disconnection error: %s", err)
+			continue
+		}
+		c.Infof("Disconnected\n")
 	}
 	close(c.runningc)
 }
@@ -195,8 +184,8 @@ func (c *Client) Wait() error {
 //Close manual stops the client
 func (c *Client) Close() error {
 	c.running = false
-	if c.session == nil {
+	if c.sshConn == nil {
 		return nil
 	}
-	return c.session.Close()
+	return c.sshConn.Close()
 }

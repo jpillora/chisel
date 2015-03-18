@@ -59,13 +59,13 @@ func main() {
 }
 
 var commonHelp = `
-	  --key, Enables AES256 encryption and specify the string to
-	  use to derive the key (derivation is performed using PBKDF2
-	  with 2048 iterations of SHA256).
-
 	  -v, Enable verbose logging
 
 	  --help, This help text
+
+	Read more:
+	  https://github.com/jpillora/chisel
+
 `
 
 var serverHelp = `
@@ -78,22 +78,32 @@ var serverHelp = `
 
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
+	  --key, An optional string to seed the generation of a ECC public
+	  and private key pair. All commications will be secured using this
+	  key pair. Share the resulting fingerprint with clients to prevent
+	  man-in-the-middle attacks.
+
+	  --authfile, An optional path to a users.json file. This file should
+	  be an object with users defined like:
+	    "<user:pass>": ["<addr-regex>","<addr-regex>"]
+	    when <user> connects, their <pass> will be verified and then
+	    each of the remote addresses will be compared against the list
+	    of address regular expressions for a match. Addresses will
+	    always come in the form "<host/ip>:<port>".
+
 	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
-` + commonHelp + `
-	Read more:
-	  https://github.com/jpillora/chisel
-
-`
+` + commonHelp
 
 func server(args []string) {
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
-	hostf := flags.String("host", "", "")
-	portf := flags.String("port", "", "")
-	authf := flags.String("key", "", "")
-	proxyf := flags.String("proxy", "", "")
+	host := flags.String("host", "", "")
+	port := flags.String("port", "", "")
+	key := flags.String("key", "", "")
+	authfile := flags.String("authfile", "", "")
+	proxy := flags.String("proxy", "", "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
@@ -102,28 +112,21 @@ func server(args []string) {
 	}
 	flags.Parse(args)
 
-	host := *hostf
-	if host == "" {
-		host = os.Getenv("HOST")
+	if *host == "" {
+		*host = os.Getenv("HOST")
 	}
-	if host == "" {
-		host = "0.0.0.0"
-	}
-
-	port := *portf
-	if port == "" {
-		port = os.Getenv("PORT")
-	}
-	if port == "" {
-		port = "8080"
+	if *host == "" {
+		*host = "0.0.0.0"
 	}
 
-	key := *authf
-	if key == "" {
-		key = os.Getenv("key")
+	if *port == "" {
+		*port = os.Getenv("PORT")
+	}
+	if *port == "" {
+		*port = "8080"
 	}
 
-	s, err := chserver.NewServer(key, *proxyf)
+	s, err := chserver.NewServer(*key, *authfile, *proxy)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +134,7 @@ func server(args []string) {
 	s.Info = true
 	s.Debug = *verbose
 
-	if err = s.Run(host, port); err != nil {
+	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -159,17 +162,22 @@ var clientHelp = `
 			192.168.0.5:3000:google.com:80
 
 	Options:
-` + commonHelp + `
-	Read more:
-	  https://github.com/jpillora/chisel
 
-`
+	  --key, An optional fingerprint (server authentication) string to
+	  compare against the server's public key. You may provide just a
+	  prefix of the key or the entire string. Fingerprint mismatches
+	  will disallow the connection.
+
+	  --auth, An optional username and password (client authentication)
+	  in the form: "<user>:<pass>".
+` + commonHelp
 
 func client(args []string) {
 
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 
 	key := flags.String("key", "", "")
+	auth := flags.String("auth", "", "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
@@ -185,7 +193,7 @@ func client(args []string) {
 	server := args[0]
 	remotes := args[1:]
 
-	c, err := chclient.NewClient(*key, server, remotes...)
+	c, err := chclient.NewClient(*key, *auth, server, remotes...)
 	if err != nil {
 		log.Fatal(err)
 	}
