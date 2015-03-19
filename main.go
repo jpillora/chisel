@@ -78,10 +78,10 @@ var serverHelp = `
 
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
-	  --key, An optional string to seed the generation of a ECC public
+	  --key, An optional string to seed the generation of a ECDSA public
 	  and private key pair. All commications will be secured using this
-	  key pair. Share the resulting fingerprint with clients to prevent
-	  man-in-the-middle attacks.
+	  key pair. Share this fingerprint with clients to enable detection
+	  of man-in-the-middle attacks.
 
 	  --authfile, An optional path to a users.json file. This file should
 	  be an object with users defined like:
@@ -144,7 +144,7 @@ var clientHelp = `
 
 	server is the URL to the chisel server.
 
-	remotes are remote connections tunneled through the server, each of
+	remotes are remote connections tunnelled through the server, each of
 	which come in the form:
 
 		<local-host>:<local-port>:<remote-host>:<remote-port>

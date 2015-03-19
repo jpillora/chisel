@@ -21,7 +21,7 @@ $ go get -v github.com/jpillora/chisel
 * Easy to use
 * [Performant](#performance)*
 * [Encrypted connections](#security) using `crypto/ssh`
-* [Authenticated connections](#authentication) using a users config file
+* [Authenticated connections](#authentication), authenticate clients with a users config file, authenticate servers with fingerprint matching.
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
@@ -78,7 +78,7 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
-	  --key, An optional string to seed the generation of a ECC public
+	  --key, An optional string to seed the generation of a ECDSA public
 	  and private key pair. All commications will be secured using this
 	  key pair. Share the resulting fingerprint with clients to prevent
 	  man-in-the-middle attacks.
@@ -155,7 +155,7 @@ See also [programmatic usage](https://github.com/jpillora/chisel/wiki/Programmat
 
 ### Security
 
-Encryption is enabled by default, when you start up a chisel server, it will generate an in-memory ECC public/private key pair. The public key fingerprint will be displayed as the server starts. Instead of always generating a random key, the server may optionally specify a key seed, using the `--key`, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
+Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
 
 ### Authentication
 
@@ -184,29 +184,29 @@ Note, we're using an in-memory "file" server on localhost for these tests
 *direct*
 
 ```
-:3000 => 1 bytes in 1.008883ms
-:3000 => 10 bytes in 543.198µs
-:3000 => 100 bytes in 675.957µs
-:3000 => 1000 bytes in 584.13µs
-:3000 => 10000 bytes in 580.56µs
-:3000 => 100000 bytes in 743.902µs
-:3000 => 1000000 bytes in 1.962673ms
-:3000 => 10000000 bytes in 19.192986ms
-:3000 => 100000000 bytes in 158.428239ms
+:3000 => 1 bytes in 1.440608ms
+:3000 => 10 bytes in 658.833µs
+:3000 => 100 bytes in 669.6µs
+:3000 => 1000 bytes in 570.242µs
+:3000 => 10000 bytes in 655.795µs
+:3000 => 100000 bytes in 693.761µs
+:3000 => 1000000 bytes in 2.156777ms
+:3000 => 10000000 bytes in 18.562896ms
+:3000 => 100000000 bytes in 146.355886ms
 ```
 
 `chisel`
 
 ```
-:2001 => 1 bytes in 1.190288ms
-:2001 => 10 bytes in 1.17237ms
-:2001 => 100 bytes in 821.369µs
-:2001 => 1000 bytes in 1.029366ms
-:2001 => 10000 bytes in 1.281065ms
-:2001 => 100000 bytes in 2.14094ms
-:2001 => 1000000 bytes in 9.538984ms
-:2001 => 10000000 bytes in 86.500426ms
-:2001 => 100000000 bytes in 814.630443ms
+:2001 => 1 bytes in 1.393731ms
+:2001 => 10 bytes in 1.002992ms
+:2001 => 100 bytes in 1.082757ms
+:2001 => 1000 bytes in 1.096081ms
+:2001 => 10000 bytes in 1.215036ms
+:2001 => 100000 bytes in 2.09334ms
+:2001 => 1000000 bytes in 9.136138ms
+:2001 => 10000000 bytes in 84.170904ms
+:2001 => 100000000 bytes in 796.713039ms
 ```
 
 ~100MB in **0.8 seconds**
@@ -250,7 +250,7 @@ See more [test/](test/)
 ### Changelog
 
 * `1.0.0` - Init
-* `1.1.0` - Swapped out simple symmetric encryption for ECC SSH
+* `1.1.0` - Swapped out simple symmetric encryption for ECDSA SSH
 
 ### Todo
 

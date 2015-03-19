@@ -1,5 +1,6 @@
 package chshare
 
+// Deterministic crypto.Reader
 // overview: half the result is used as the output
 // [a|...] -> sha512(a) -> [b|output] -> sha512(b)
 

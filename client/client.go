@@ -146,6 +146,7 @@ func (c *Client) start() {
 		}
 		conf, _ := chshare.EncodeConfig(c.config)
 		c.Debugf("Sending configurating")
+		t0 := time.Now()
 		_, conerr, err := sshConn.SendRequest("config", true, conf)
 		if err != nil {
 			c.Infof("Config verification failed")
@@ -155,8 +156,7 @@ func (c *Client) start() {
 			c.Infof(string(conerr))
 			break
 		}
-
-		c.Infof("Connected")
+		c.Infof("Connected (Latency %s)", time.Now().Sub(t0))
 		//connected
 		b.Reset()
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
@@ -159,7 +160,16 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 
 	//verify configuration
 	s.Debugf("Verifying configuration")
-	r := <-reqs
+
+	//wait for request, with timeout
+	var r *ssh.Request
+	select {
+	case r = <-reqs:
+	case <-time.After(10 * time.Second):
+		sshConn.Close()
+		return
+	}
+
 	failed := func(err error) {
 		r.Reply(false, []byte(err.Error()))
 	}
