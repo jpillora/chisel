@@ -13,9 +13,19 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+type Config struct {
+	KeySeed  string
+	AuthFile string
+	Proxy    string
+}
+
 type Server struct {
 	*chshare.Logger
-	Users       chshare.Users
+	//Users is an empty map of usernames to Users
+	//It can be optionally initialized using the
+	//file found at AuthFile
+	Users chshare.Users
+
 	fingerprint string
 	wsCount     int
 	wsServer    websocket.Server
@@ -25,7 +35,7 @@ type Server struct {
 	sessions    map[string]*chshare.User
 }
 
-func NewServer(keySeed, authfile, proxy string) (*Server, error) {
+func NewServer(config *Config) (*Server, error) {
 	s := &Server{
 		Logger:     chshare.NewLogger("server"),
 		wsServer:   websocket.Server{},
@@ -35,8 +45,8 @@ func NewServer(keySeed, authfile, proxy string) (*Server, error) {
 	s.wsServer.Handler = websocket.Handler(s.handleWS)
 
 	//parse users, if provided
-	if authfile != "" {
-		users, err := chshare.ParseUsers(authfile)
+	if config.AuthFile != "" {
+		users, err := chshare.ParseUsers(config.AuthFile)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +54,7 @@ func NewServer(keySeed, authfile, proxy string) (*Server, error) {
 	}
 
 	//generate private key (optionally using seed)
-	key, _ := chshare.GenerateKey(keySeed)
+	key, _ := chshare.GenerateKey(config.KeySeed)
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(key)
 	if err != nil {
@@ -59,8 +69,8 @@ func NewServer(keySeed, authfile, proxy string) (*Server, error) {
 	}
 	s.sshConfig.AddHostKey(private)
 
-	if proxy != "" {
-		u, err := url.Parse(proxy)
+	if config.Proxy != "" {
+		u, err := url.Parse(config.Proxy)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +212,18 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	l := s.Fork("session#%d", id)
 
 	l.Debugf("Open")
-	go ssh.DiscardRequests(reqs)
+
+	go func() {
+		for r := range reqs {
+			switch r.Type {
+			case "ping":
+				r.Reply(true, nil)
+			default:
+				l.Debugf("Unknown request: %s", r.Type)
+			}
+		}
+	}()
+
 	go chshare.ConnectStreams(l, chans)
 	sshConn.Wait()
 	l.Debugf("Close")

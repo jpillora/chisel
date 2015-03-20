@@ -126,7 +126,11 @@ func server(args []string) {
 		*port = "8080"
 	}
 
-	s, err := chserver.NewServer(*key, *authfile, *proxy)
+	s, err := chserver.NewServer(&chserver.Config{
+		KeySeed:  *key,
+		AuthFile: *authfile,
+		Proxy:    *proxy,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -171,6 +175,12 @@ var clientHelp = `
 	  --auth, An optional username and password (client authentication)
 	  in the form: "<user>:<pass>". These credentials are compared to
 	  the credentials inside the server's --authfile.
+
+	  --keepalive, An optional keepalive interval. Since the underlying
+	  transport is HTTP, in many instances we'll be traversing through
+	  proxies, often these proxies will close idle connections. You must
+	  specify a time with a unit, for example '30s' or '2m'. Defaults
+	  to '0s' (disabled).
 ` + commonHelp
 
 func client(args []string) {
@@ -179,22 +189,26 @@ func client(args []string) {
 
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
+	keepalive := flags.Duration("keepalive", 0, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
 		os.Exit(1)
 	}
 	flags.Parse(args)
-
+	//pull out options, put back remaining args
 	args = flags.Args()
 	if len(args) < 2 {
 		log.Fatalf("A server and least one remote is required")
 	}
 
-	server := args[0]
-	remotes := args[1:]
-
-	c, err := chclient.NewClient(*fingerprint, *auth, server, remotes...)
+	c, err := chclient.NewClient(&chclient.Config{
+		Fingerprint: *fingerprint,
+		Auth:        *auth,
+		KeepAlive:   *keepalive,
+		Server:      args[0],
+		Remotes:     args[1:],
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -202,9 +216,7 @@ func client(args []string) {
 	c.Info = true
 	c.Debug = *verbose
 
-	c.Start()
-
-	if err = c.Wait(); err != nil {
+	if err = c.Run(); err != nil {
 		log.Fatal(err)
 	}
 }

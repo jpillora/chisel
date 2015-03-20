@@ -80,8 +80,8 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 
 	  --key, An optional string to seed the generation of a ECDSA public
 	  and private key pair. All commications will be secured using this
-	  key pair. Share the resulting fingerprint with clients to prevent
-	  man-in-the-middle attacks.
+	  key pair. Share this fingerprint with clients to enable detection
+	  of man-in-the-middle attacks.
 
 	  --authfile, An optional path to a users.json file. This file should
 	  be an object with users defined like:
@@ -113,7 +113,7 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 
 	server is the URL to the chisel server.
 
-	remotes are remote connections tunneled through the server, each of
+	remotes are remote connections tunnelled through the server, each of
 	which come in the form:
 
 		<local-host>:<local-port>:<remote-host>:<remote-port>
@@ -140,6 +140,12 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 	  --auth, An optional username and password (client authentication)
 	  in the form: "<user>:<pass>". These credentials are compared to
 	  the credentials inside the server's --authfile.
+
+	  --keepalive, An optional keepalive interval. Since the underlying
+	  transport is HTTP, in many instances we'll be traversing through
+	  proxies, often these proxies will close idle connections. You must
+	  specify a time with a unit, for example '30s' or '2m'. Defaults
+	  to '0s' (disabled).
 
 	  -v, Enable verbose logging
 

@@ -15,26 +15,34 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type Client struct {
-	*chshare.Logger
-	config      *chshare.Config
-	sshConfig   *ssh.ClientConfig
-	proxies     []*Proxy
-	sshConn     ssh.Conn
-	fingerprint string
-	server      string
-	running     bool
-	runningc    chan error
+type Config struct {
+	shared      *chshare.Config
+	Fingerprint string
+	Auth        string
+	KeepAlive   time.Duration
+	Server      string
+	Remotes     []string
 }
 
-func NewClient(fingerprint, auth, server string, remotes ...string) (*Client, error) {
+type Client struct {
+	*chshare.Logger
+	config    *Config
+	sshConfig *ssh.ClientConfig
+	proxies   []*Proxy
+	sshConn   ssh.Conn
+	server    string
+	running   bool
+	runningc  chan error
+}
+
+func NewClient(config *Config) (*Client, error) {
 
 	//apply default scheme
-	if !strings.HasPrefix(server, "http") {
-		server = "http://" + server
+	if !strings.HasPrefix(config.Server, "http") {
+		config.Server = "http://" + config.Server
 	}
 
-	u, err := url.Parse(server)
+	u, err := url.Parse(config.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -51,34 +59,34 @@ func NewClient(fingerprint, auth, server string, remotes ...string) (*Client, er
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 
-	config := &chshare.Config{}
-	for _, s := range remotes {
+	shared := &chshare.Config{}
+	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
-		config.Remotes = append(config.Remotes, r)
+		shared.Remotes = append(shared.Remotes, r)
+	}
+	config.shared = shared
+
+	client := &Client{
+		Logger:   chshare.NewLogger("client"),
+		config:   config,
+		server:   u.String(),
+		running:  true,
+		runningc: make(chan error, 1),
 	}
 
-	c := &Client{
-		Logger:      chshare.NewLogger("client"),
-		config:      config,
-		server:      u.String(),
-		fingerprint: fingerprint,
-		running:     true,
-		runningc:    make(chan error, 1),
-	}
+	user, pass := chshare.ParseAuth(config.Auth)
 
-	user, pass := chshare.ParseAuth(auth)
-
-	c.sshConfig = &ssh.ClientConfig{
+	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
 		ClientVersion:   chshare.ProtocolVersion + "-client",
-		HostKeyCallback: c.verifyServer,
+		HostKeyCallback: client.verifyServer,
 	}
 
-	return c, nil
+	return client, nil
 }
 
 //Start then Wait
@@ -88,12 +96,13 @@ func (c *Client) Run() error {
 }
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
-	f := chshare.FingerprintKey(key)
-	if c.fingerprint != "" && !strings.HasPrefix(f, c.fingerprint) {
-		return fmt.Errorf("Invalid fingerprint (Got %s)", f)
+	expect := c.config.Fingerprint
+	got := chshare.FingerprintKey(key)
+	if expect != "" && !strings.HasPrefix(got, expect) {
+		return fmt.Errorf("Invalid fingerprint (%s)", got)
 	}
 	//overwrite with complete fingerprint
-	c.Infof("Fingerprint %s", f)
+	c.Infof("Fingerprint %s", got)
 	return nil
 }
 
@@ -106,10 +115,21 @@ func (c *Client) start() {
 	c.Infof("Connecting to %s\n", c.server)
 
 	//prepare proxies
-	for id, r := range c.config.Remotes {
+	for id, r := range c.config.shared.Remotes {
 		proxy := NewProxy(c, id, r)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
+	}
+
+	//optional keepalive loop
+	if c.config.KeepAlive > 0 {
+		go func() {
+			for range time.Tick(c.config.KeepAlive) {
+				if c.sshConn != nil {
+					c.sshConn.SendRequest("ping", true, nil)
+				}
+			}
+		}()
 	}
 
 	//connection loop!
@@ -134,7 +154,8 @@ func (c *Client) start() {
 		}
 
 		sshConn, chans, reqs, err := ssh.NewClientConn(ws, "", c.sshConfig)
-		//NOTE break -> dont retry on handshake failures
+
+		//NOTE: break == dont retry on handshake failures
 		if err != nil {
 			if strings.Contains(err.Error(), "unable to authenticate") {
 				c.Infof("Authentication failed")
@@ -144,16 +165,16 @@ func (c *Client) start() {
 			}
 			break
 		}
-		conf, _ := chshare.EncodeConfig(c.config)
+		conf, _ := chshare.EncodeConfig(c.config.shared)
 		c.Debugf("Sending configurating")
 		t0 := time.Now()
-		_, conerr, err := sshConn.SendRequest("config", true, conf)
+		_, configerr, err := sshConn.SendRequest("config", true, conf)
 		if err != nil {
 			c.Infof("Config verification failed")
 			break
 		}
-		if len(conerr) > 0 {
-			c.Infof(string(conerr))
+		if len(configerr) > 0 {
+			c.Infof(string(configerr))
 			break
 		}
 		c.Infof("Connected (Latency %s)", time.Now().Sub(t0))
