@@ -1,6 +1,6 @@
 # chisel
 
-Chisel is an HTTP client and server which acts as a TCP proxy, written in Go (Golang). Chisel useful in situations where you only have access to HTTP, for example – behind a corporate firewall. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** Chisel is currently beta software.
+Chisel is a fast TCP tunnel, transported over HTTP. Single executable including both client and server. Written in Go (Golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance). **Warning** Chisel is currently beta software.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
@@ -8,7 +8,7 @@ Chisel is an HTTP client and server which acts as a TCP proxy, written in Go (Go
 
 **Binaries**
 
-See [Releases](https://github.com/jpillora/chisel/releases/latest)
+See [the latest release](https://github.com/jpillora/chisel/releases/latest)
 
 **Source**
 
@@ -21,7 +21,7 @@ $ go get -v github.com/jpillora/chisel
 * Easy to use
 * [Performant](#performance)*
 * [Encrypted connections](#security) using `crypto/ssh`
-* [Authenticated connections](#authentication), authenticate clients with a users config file, authenticate servers with fingerprint matching.
+* [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
@@ -263,6 +263,7 @@ See more [test/](test/)
 * Better, faster tests
 * Expose a stats page for proxy throughput
 * Treat client stdin/stdout as a socket
+* Allow clients to act as an indirect tunnel endpoint for other clients
 
 #### MIT License
 
