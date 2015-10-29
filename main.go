@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
+	consulAPI "github.com/hashicorp/consul/api"
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
 )
@@ -93,7 +95,20 @@ var serverHelp = `
 
 	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
-` + commonHelp
+
+	  --consul, Enables automatic publishing of Chisel fingerprint and
+	  TTL-based health checks to Consul.
+
+	  --consul-address, Specifies the Consul address to connect to.
+
+	  --consul-dc, Specifies the Consul DC to use.
+
+	  --consul-secure, Forces HTTPS connection to Consul API.
+
+	  --consul-auth, Specifies HTTP Basic Auth string to connect to the API.
+
+	  --consul-token, Specifies Consul ACL token.
+	  ` + commonHelp
 
 func server(args []string) {
 
@@ -105,6 +120,13 @@ func server(args []string) {
 	authfile := flags.String("authfile", "", "")
 	proxy := flags.String("proxy", "", "")
 	verbose := flags.Bool("v", false, "")
+
+	useConsul := flags.Bool("consul", false, "")
+	consulAddress := flags.String("consul-address", "127.0.0.1:8500", "")
+	consulDC := flags.String("consul-dc", "", "")
+	consulHTTPS := flags.Bool("consul-secure", false, "")
+	consulBasicAuth := flags.String("consul-auth", "", "")
+	consulToken := flags.String("consul-token", "", "")
 
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, serverHelp)
@@ -137,6 +159,32 @@ func server(args []string) {
 
 	s.Info = true
 	s.Debug = *verbose
+
+	if *useConsul {
+		var consulAuth *consulAPI.HttpBasicAuth
+
+		if *consulBasicAuth != "" {
+			auth := strings.Split(*consulBasicAuth, ":")
+			if len(auth) != 2 {
+				log.Fatal("--consul-auth requires form 'username:password'")
+			}
+			consulAuth = &consulAPI.HttpBasicAuth{
+				Username: auth[0],
+				Password: auth[1],
+			}
+		}
+
+		consulConfig := &consulAPI.Config{
+			Address:    *consulAddress,
+			Datacenter: *consulDC,
+			Scheme:     map[bool]string{true: "https", false: "http"}[*consulHTTPS == true],
+			HttpAuth:   consulAuth,
+			Token:      *consulToken,
+		}
+
+		s.SetUpConsulClient(consulConfig)
+
+	}
 
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
