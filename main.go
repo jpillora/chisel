@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -157,12 +158,14 @@ func server(args []string) {
 }
 
 func socksserver(port string) {
-	s, err := socks5.New(&socks5.Config{})
+	// Disable the logger, because it's too verbose
+	conf := &socks5.Config{Logger: log.New(ioutil.Discard, "", 0)}
+	s, err := socks5.New(conf)
 	if err != nil {
 		log.Fatal(err)
 	}
 	addr := "127.0.0.1:" + port
-	log.Println("Socks server listening on " + addr)
+	log.Println("socks server: Listening on " + addr)
 	if err := s.ListenAndServe("tcp", addr); err != nil {
 		log.Fatal(err)
 	}
