@@ -134,7 +134,7 @@ func (c *Client) start() {
 
 	//connection loop!
 	var connerr error
-	b := &backoff.Backoff{Max: 5 * time.Minute}
+	b := &backoff.Backoff{Max: 5 * time.Second}
 
 	for {
 		if !c.running {
