@@ -10,6 +10,12 @@ Chisel is a fast TCP tunnel, transported over HTTP. Single executable including 
 
 See [the latest release](https://github.com/jpillora/chisel/releases/latest)
 
+**Docker**
+
+```sh
+docker run --rm -it jpillora/chisel --help
+```
+
 **Source**
 
 ``` sh
@@ -264,6 +270,7 @@ See more [test/](test/)
 * Expose a stats page for proxy throughput
 * Treat client stdin/stdout as a socket
 * Allow clients to act as an indirect tunnel endpoint for other clients
+* Keep local connections open and buffer between remote retries
 
 #### MIT License
 
