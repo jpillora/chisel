@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"strconv"
 	"time"
 
+	consulAPI "github.com/hashicorp/consul/api"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
@@ -33,6 +36,9 @@ type Server struct {
 	proxy       *httputil.ReverseProxy
 	sshConfig   *ssh.ServerConfig
 	sessions    map[string]*chshare.User
+	consul      *consulAPI.Client
+	consulSvc   *consulAPI.AgentServiceRegistration
+	consulComm  chan bool
 }
 
 func NewServer(config *Config) (*Server, error) {
@@ -106,6 +112,38 @@ func (s *Server) Start(host, port string) error {
 	}
 	s.Infof("Listening on %s...", port)
 
+	// register service with Consul
+	if s.consul != nil {
+		iport, err := strconv.Atoi(port)
+		if err != nil {
+			panic(err)
+		}
+		hostname, err := os.Hostname()
+		if err != nil {
+			panic(err)
+		}
+		consulSvc := s.consul.Agent()
+		check := &consulAPI.AgentServiceCheck{
+			TTL:    "60s",
+			Status: "passing",
+		}
+		s.consulSvc = &consulAPI.AgentServiceRegistration{
+			ID:      "chisel",
+			Name:    "chisel",
+			Tags:    []string{"host=" + hostname},
+			Port:    iport,
+			Address: host,
+			Check:   check,
+		}
+		err = consulSvc.ServiceRegister(s.consulSvc)
+		if err != nil {
+			panic(err)
+		}
+		s.Infof("Registered service with Consul")
+
+		go s.UpdateConsulCheck()
+	}
+
 	return s.httpServer.GoListenAndServe(":"+port, http.HandlerFunc(s.handleHTTP))
 }
 
@@ -114,8 +152,58 @@ func (s *Server) Wait() error {
 }
 
 func (s *Server) Close() error {
+	if s.consul != nil {
+		s.consulComm <- true
+		consulSvc := s.consul.Agent()
+		consulSvc.ServiceDeregister(s.consulSvc.ID)
+		s.Infof("Deregistered Consul service")
+	}
 	//this should cause an error in the open websockets
 	return s.httpServer.Close()
+}
+
+func (s *Server) SetUpConsulClient(config *consulAPI.Config) {
+	client, err := consulAPI.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
+
+	s.Infof("Created Consul client: " + config.Address)
+
+	s.consul = client
+
+	s.consulComm = make(chan bool, 1)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
+	consulKv := s.consul.KV()
+
+	fingerprint := &consulAPI.KVPair{
+		Key:   "chisel/" + hostname + "/fingerprint",
+		Value: []byte(s.fingerprint),
+	}
+
+	_, err = consulKv.Put(fingerprint, nil)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *Server) UpdateConsulCheck() {
+	for {
+		select {
+		case stop := <-s.consulComm:
+			if stop == true {
+				return
+			}
+		case <-time.After(time.Second * 30):
+			consulSvc := s.consul.Agent()
+			consulSvc.PassTTL("service:"+s.consulSvc.ID, "chisel okay")
+		}
+	}
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +222,6 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(404)
 }
 
-//
 func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	// no auth - allow all
 	if len(s.Users) == 0 {
