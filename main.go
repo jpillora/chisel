@@ -169,7 +169,7 @@ var clientHelp = `
 
 	  --fingerprint, An optional fingerprint (server authentication)
 	  string to compare against the server's public key. You may provide
-	  just a prefix of the key or the entire string. Fingerprint 
+	  just a prefix of the key or the entire string. Fingerprint
 	  mismatches will close the connection.
 
 	  --auth, An optional username and password (client authentication)
@@ -181,6 +181,8 @@ var clientHelp = `
 	  proxies, often these proxies will close idle connections. You must
 	  specify a time with a unit, for example '30s' or '2m'. Defaults
 	  to '0s' (disabled).
+
+	  --proxy, An optional URL for a HTTP proxy.
 ` + commonHelp
 
 func client(args []string) {
@@ -191,6 +193,7 @@ func client(args []string) {
 	auth := flags.String("auth", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
 	verbose := flags.Bool("v", false, "")
+	proxy := flags.String("proxy", "", "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
 		os.Exit(1)
@@ -206,6 +209,7 @@ func client(args []string) {
 		Fingerprint: *fingerprint,
 		Auth:        *auth,
 		KeepAlive:   *keepalive,
+		Proxy:       *proxy,
 		Server:      args[0],
 		Remotes:     args[1:],
 	})

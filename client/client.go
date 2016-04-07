@@ -1,9 +1,12 @@
 package chclient
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
@@ -21,6 +24,7 @@ type Config struct {
 	Auth        string
 	KeepAlive   time.Duration
 	Server      string
+	Proxy       string
 	Remotes     []string
 }
 
@@ -106,6 +110,76 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	return nil
 }
 
+func HttpConnect(proxy, url_ string) (net.Conn, error) {
+	p, err := net.Dial("tcp", proxy)
+	if err != nil {
+		return nil, err
+	}
+
+	turl, err := url.Parse(url_)
+	if err != nil {
+		return nil, err
+	}
+
+	req := http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{},
+		Host:   turl.Host,
+	}
+
+	cc := httputil.NewProxyClientConn(p, nil)
+	cc.Do(&req)
+	if err != nil && err != httputil.ErrPersistEOF {
+		return nil, err
+	}
+
+	rwc, _ := cc.Hijack()
+
+	return rwc, nil
+}
+
+func ProxyDial(server, proxy, protocol, origin string) (ws *websocket.Conn, err error) {
+	var wsConn net.Conn
+
+	if proxy == "" {
+		return websocket.Dial(server, protocol, origin)
+	}
+
+	purl, err := url.Parse(proxy)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := websocket.NewConfig(server, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	if protocol != "" {
+		config.Protocol = []string{protocol}
+	}
+
+	client, err := HttpConnect(purl.Host, server)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the endpoint of the URL to determine how to proxy
+	endptUrl, _ := url.Parse(server)
+	host, _, err := net.SplitHostPort(endptUrl.Host)
+
+	switch endptUrl.Scheme {
+	case "ws":
+		wsConn = client
+	case "wss":
+		wsConn = tls.Client(client, &tls.Config{ServerName: host})
+	default:
+		return nil, websocket.ErrBadScheme
+	}
+
+	return websocket.NewClient(config, wsConn)
+}
+
 //Starts the client
 func (c *Client) Start() {
 	go c.start()
@@ -147,7 +221,7 @@ func (c *Client) start() {
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.server, chshare.ProtocolVersion, "http://localhost/")
+		ws, err := ProxyDial(c.server, c.config.Proxy, chshare.ProtocolVersion, "http://localhost/")
 		if err != nil {
 			connerr = err
 			continue
