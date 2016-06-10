@@ -89,14 +89,14 @@ func NewServer(config *Config) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) Run(host string, port string) error {
+func (s *Server) Run(host, port string) error {
 	if err := s.Start(host, port); err != nil {
 		return err
 	}
 	return s.Wait()
 }
 
-func (s *Server) Start(host string, port string) error {
+func (s *Server) Start(host, port string) error {
 	s.Infof("Fingerprint %s", s.fingerprint)
 	if len(s.Users) > 0 {
 		s.Infof("User authenication enabled")
