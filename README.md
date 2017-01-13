@@ -85,7 +85,7 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 	  --port, Defines the HTTP listening port (defaults to 8080).
 
 	  --key, An optional string to seed the generation of a ECDSA public
-	  and private key pair. All commications will be secured using this
+	  and private key pair. All communications will be secured using this
 	  key pair. Share this fingerprint with clients to enable detection
 	  of man-in-the-middle attacks.
 
