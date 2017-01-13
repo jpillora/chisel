@@ -3,8 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/armon/go-socks5"
 
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
@@ -93,6 +96,8 @@ var serverHelp = `
 
 	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
+
+	  --socks PORT, Set up a socks5 server listening on localhost:PORT
 ` + commonHelp
 
 func server(args []string) {
@@ -104,6 +109,7 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	proxy := flags.String("proxy", "", "")
+	socks := flags.String("socks", "", "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
@@ -126,6 +132,14 @@ func server(args []string) {
 		*port = "8080"
 	}
 
+	// Start socks5 server if --socks is set
+	if *socks != "" {
+		if *port == *socks {
+			log.Fatal("Socks port cannot be the same as that of Chisel server.")
+		}
+		go socksserver(*socks)
+	}
+
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed:  *key,
 		AuthFile: *authfile,
@@ -139,6 +153,20 @@ func server(args []string) {
 	s.Debug = *verbose
 
 	if err = s.Run(*host, *port); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func socksserver(port string) {
+	// Disable the logger, because it's too verbose
+	conf := &socks5.Config{Logger: log.New(ioutil.Discard, "", 0)}
+	s, err := socks5.New(conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	addr := "127.0.0.1:" + port
+	log.Println("socks server: Listening on " + addr)
+	if err := s.ListenAndServe("tcp", addr); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -169,7 +197,7 @@ var clientHelp = `
 
 	  --fingerprint, An optional fingerprint (server authentication)
 	  string to compare against the server's public key. You may provide
-	  just a prefix of the key or the entire string. Fingerprint 
+	  just a prefix of the key or the entire string. Fingerprint
 	  mismatches will close the connection.
 
 	  --auth, An optional username and password (client authentication)
