@@ -8,7 +8,7 @@ Chisel is a fast TCP tunnel, transported over HTTP. Single executable including 
 
 **Binaries**
 
-See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download it and install it now with `curl https://i.jpillora.com/chisel! | bash`
+See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel! | bash`
 
 **Docker**
 
