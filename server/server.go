@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/websocket"
 )
 
 type Config struct {
@@ -28,8 +28,8 @@ type Server struct {
 
 	fingerprint string
 	wsCount     int
-	wsServer    websocket.Server
 	httpServer  *chshare.HTTPServer
+	wsUpgrader  websocket.Upgrader
 	proxy       *httputil.ReverseProxy
 	sshConfig   *ssh.ServerConfig
 	sessions    map[string]*chshare.User
@@ -37,12 +37,16 @@ type Server struct {
 
 func NewServer(config *Config) (*Server, error) {
 	s := &Server{
-		Logger:     chshare.NewLogger("server"),
-		wsServer:   websocket.Server{},
+		Logger: chshare.NewLogger("server"),
+		wsUpgrader: websocket.Upgrader{
+			Subprotocols: []string{chshare.ProtocolVersion},
+			CheckOrigin: func(req *http.Request) bool {
+				return true
+			},
+		},
 		httpServer: chshare.NewHTTPServer(),
 		sessions:   map[string]*chshare.User{},
 	}
-	s.wsServer.Handler = websocket.Handler(s.handleWS)
 
 	//parse users, if provided
 	if config.AuthFile != "" {
@@ -119,10 +123,9 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
-	//websockets upgrade AND has chisel prefix
-	if r.Header.Get("Upgrade") == "websocket" &&
-		r.Header.Get("Sec-WebSocket-Protocol") == chshare.ProtocolVersion {
-		s.wsServer.ServeHTTP(w, r)
+	c, err := s.wsUpgrader.Upgrade(w, r, nil)
+	if err == nil {
+		go s.handleWS(c)
 		return
 	}
 	//proxy target was provided
@@ -154,7 +157,7 @@ func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, er
 
 func (s *Server) handleWS(ws *websocket.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sshConn, chans, reqs, err := ssh.NewServerConn(ws, s.sshConfig)
+	sshConn, chans, reqs, err := ssh.NewServerConn(ws.UnderlyingConn(), s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
 		return
