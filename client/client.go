@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cicavey/chisel/share"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 

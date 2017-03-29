@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/jpillora/chisel/client"
-	"github.com/jpillora/chisel/server"
+	"github.com/cicavey/chisel/client"
+	"github.com/cicavey/chisel/server"
 )
 
-var VERSION string = "0.0.0-src" //set via ldflags
+var VERSION string = "0.0.1-src" //set via ldflags
 
 var help = `
 	Usage: chisel [command] [--help]
