@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"io/ioutil"
+	"strconv"
 
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
@@ -107,7 +108,7 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	proxy := flags.String("proxy", "", "")
-	pidfile := flags.Bool("pid", "", "")
+	pidfile := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
@@ -142,12 +143,12 @@ func server(args []string) {
 	s.Info = true
 	s.Debug = *verbose
 
-	if err = s.Run(*host, *port); err != nil {
-		log.Fatal(err)
-	}
-	
 	if *pidfile == true {
 		generatePidFile()
+	}
+
+	if err = s.Run(*host, *port); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -198,6 +199,7 @@ func client(args []string) {
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
+	pidfile := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
@@ -223,19 +225,24 @@ func client(args []string) {
 
 	c.Info = true
 	c.Debug = *verbose
-
-	if err = c.Run(); err != nil {
-		log.Fatal(err)
-	}
 	
 	if *pidfile == true {
 		generatePidFile()
 	}
+
+	if err = c.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func toBytes(i int) (result []byte) {
+	return []byte(strconv.Itoa(i))
 }
 
 func generatePidFile() {
-	err := ioutil.WriteFile("chisel.pid", os.Pid(), 0644)
+	err := ioutil.WriteFile("chisel.pid", toBytes(os.Getpid()), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
+
