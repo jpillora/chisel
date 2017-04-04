@@ -235,12 +235,10 @@ func client(args []string) {
 	}
 }
 
-func toBytes(i int) (result []byte) {
-	return []byte(strconv.Itoa(i))
-}
-
 func generatePidFile() {
-	err := ioutil.WriteFile("chisel.pid", toBytes(os.Getpid()), 0644)
+	pid := []byte(strconv.Itoa(os.Getpid()))
+	
+	err := ioutil.WriteFile("chisel.pid", pid, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
