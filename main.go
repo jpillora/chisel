@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"io/ioutil"
 
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
@@ -59,6 +60,8 @@ func main() {
 }
 
 var commonHelp = `
+	  --pid Generate pid file in current directory
+
 	  -v, Enable verbose logging
 
 	  --help, This help text
@@ -104,6 +107,7 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	proxy := flags.String("proxy", "", "")
+	pidfile := flags.Bool("pid", "", "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
@@ -140,6 +144,10 @@ func server(args []string) {
 
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
+	}
+	
+	if *pidfile == true {
+		generatePidFile()
 	}
 }
 
@@ -217,6 +225,17 @@ func client(args []string) {
 	c.Debug = *verbose
 
 	if err = c.Run(); err != nil {
+		log.Fatal(err)
+	}
+	
+	if *pidfile == true {
+		generatePidFile()
+	}
+}
+
+func generatePidFile() {
+	err := ioutil.WriteFile("chisel.pid", os.Pid(), 0644)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
