@@ -100,6 +100,8 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 	  --proxy, Specifies the default proxy target to use when chisel
 	  receives a normal HTTP request.
 
+	  --pid Generate pid file in current directory
+
 	  -v, Enable verbose logging
 
 	  --help, This help text
@@ -152,6 +154,8 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 	  proxies, often these proxies will close idle connections. You must
 	  specify a time with a unit, for example '30s' or '2m'. Defaults
 	  to '0s' (disabled).
+	  
+	  --pid Generate pid file in current directory
 
 	  -v, Enable verbose logging
 
