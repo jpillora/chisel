@@ -8,9 +8,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jpillora/chisel/client"
-	"github.com/jpillora/chisel/server"
-	chshare "github.com/jpillora/chisel/share"
+	"github.com/cicavey/chisel/client"
+	"github.com/cicavey/chisel/server"
+	chshare "github.com/cicavey/chisel/share"
 )
 
 var help = `
@@ -216,6 +216,10 @@ var clientHelp = `
     You may provide just a prefix of the key or the entire string.
     Fingerprint mismatches will close the connection.
 
+	--cert, User cert for Websocket client SSL (pem)
+
+	--key, User key for Websocket client SSL (pem, no passphrase)
+
     --auth, An optional username and password (client authentication)
     in the form: "<user>:<pass>". These credentials are compared to
     the credentials inside the server's --authfile. defaults to the
@@ -242,6 +246,9 @@ func client(args []string) {
 	proxy := flags.String("proxy", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	cert := flags.String("cert", "", "")
+	key := flags.String("key", "", "")
+
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(1)
@@ -258,6 +265,8 @@ func client(args []string) {
 	}
 
 	c, err := chclient.NewClient(&chclient.Config{
+		Cert:        *cert,
+		Key:         *key,
 		Fingerprint: *fingerprint,
 		Auth:        *auth,
 		KeepAlive:   *keepalive,
@@ -265,6 +274,7 @@ func client(args []string) {
 		Server:      args[0],
 		Remotes:     args[1:],
 	})
+
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -16,8 +16,8 @@ import (
 	"time"
 
 	socks5 "github.com/armon/go-socks5"
+	"github.com/cicavey/chisel/share"
 	"github.com/gorilla/websocket"
-	"github.com/jpillora/chisel/share"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
 )
