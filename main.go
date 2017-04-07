@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"io/ioutil"
-	"strconv"
 
+	chshare "github.com/jpillora/chisel/chshare"
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
 )
@@ -108,7 +107,7 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	proxy := flags.String("proxy", "", "")
-	pidfile := flags.Bool("pid", false, "")
+	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
@@ -131,6 +130,8 @@ func server(args []string) {
 		*port = "8080"
 	}
 
+	chshare.GeneratePidFile(pid)
+
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed:  *key,
 		AuthFile: *authfile,
@@ -142,10 +143,6 @@ func server(args []string) {
 
 	s.Info = true
 	s.Debug = *verbose
-
-	if *pidfile == true {
-		generatePidFile()
-	}
 
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
@@ -199,7 +196,7 @@ func client(args []string) {
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
-	pidfile := flags.Bool("pid", false, "")
+	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, clientHelp)
@@ -211,6 +208,8 @@ func client(args []string) {
 	if len(args) < 2 {
 		log.Fatalf("A server and least one remote is required")
 	}
+
+	chshare.GeneratePidFile(pid)
 
 	c, err := chclient.NewClient(&chclient.Config{
 		Fingerprint: *fingerprint,
@@ -225,22 +224,8 @@ func client(args []string) {
 
 	c.Info = true
 	c.Debug = *verbose
-	
-	if *pidfile == true {
-		generatePidFile()
-	}
 
 	if err = c.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
-
-func generatePidFile() {
-	pid := []byte(strconv.Itoa(os.Getpid()))
-	
-	err := ioutil.WriteFile("chisel.pid", pid, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
