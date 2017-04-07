@@ -216,9 +216,9 @@ var clientHelp = `
     You may provide just a prefix of the key or the entire string.
     Fingerprint mismatches will close the connection.
 
-	--cert, User cert for Websocket client SSL (pem)
+    --cert, User cert for Websocket client SSL (pem)
 
-	--key, User key for Websocket client SSL (pem, no passphrase)
+    --key, User key for Websocket client SSL (pem, no passphrase)
 
     --auth, An optional username and password (client authentication)
     in the form: "<user>:<pass>". These credentials are compared to
