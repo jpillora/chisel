@@ -97,23 +97,25 @@ var serverHelp = `
     and private key pair. All commications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
-	variable, otherwise a new key is generate each run).
+    variable, otherwise a new key is generate each run).
 
     --auth, An optional string representing a single user with full
-	access, in the form of <user:pass>. This is equivalent to creating an
-	authfile with {"<user:pass>": [""]}.
+    access, in the form of <user:pass>. This is equivalent to creating an
+    authfile with {"<user:pass>": [""]}.
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
-      "<user:pass>": ["<addr-regex>","<addr-regex>"]
-      when <user> connects, their <pass> will be verified and then
-      each of the remote addresses will be compared against the list
-      of address regular expressions for a match. Addresses will
-      always come in the form "<host/ip>:<port>".
+      {
+        "<user:pass>": ["<addr-regex>","<addr-regex>"]
+      }
+    when <user> connects, their <pass> will be verified and then
+    each of the remote addresses will be compared against the list
+    of address regular expressions for a match. Addresses will
+    always come in the form "<host/ip>:<port>".
 
     --proxy, Specifies another HTTP server to proxy requests to when
-	chisel receives a normal HTTP request. Useful for hiding chisel in
-	plain sight.
+    chisel receives a normal HTTP request. Useful for hiding chisel in
+    plain sight.
 
     --socks5, Allows client to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
@@ -201,7 +203,7 @@ var clientHelp = `
       socks
       5000:socks
 
-    *When the chisel server enables --socks5, remotes can
+    *When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
@@ -227,7 +229,7 @@ var clientHelp = `
 
     --proxy, An optional HTTP CONNECT proxy which will be used reach
     the chisel server. Authentication can be specified inside the URL.
-	For example, http://admin:password@my-server.com:8081
+    For example, http://admin:password@my-server.com:8081
 ` + commonHelp
 
 func client(args []string) {

@@ -39,7 +39,7 @@ type Server struct {
 	sessions chshare.Users
 
 	fingerprint  string
-	wsCount      int
+	wsCount      int32
 	httpServer   *chshare.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sshConfig    *ssh.ServerConfig
@@ -200,14 +200,18 @@ var upgrader = websocket.Upgrader{
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
+
+	id := atomic.AddInt32(&s.wsCount, 1)
+	clog := s.Fork("session#%d", id)
+
 	wsConn, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
-		s.Debugf("Failed to upgrade (%s)", err)
+		clog.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
 	conn := chshare.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
-	s.Debugf("Handshaking...")
+	clog.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
@@ -222,7 +226,7 @@ func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 	}
 
 	//verify configuration
-	s.Debugf("Verifying configuration")
+	clog.Debugf("Verifying configuration")
 
 	//wait for request, with timeout
 	var r *ssh.Request
@@ -250,7 +254,7 @@ func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 		if v == "" {
 			v = "<unknown>"
 		}
-		s.Infof("Client version (%s) differs from server version (%s)",
+		clog.Infof("Client version (%s) differs from server version (%s)",
 			v, chshare.BuildVersion)
 	}
 	//if user is provided, ensure they have
@@ -268,51 +272,48 @@ func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 	r.Reply(true, nil)
 
 	//prepare connection logger
-	s.wsCount++
-	id := s.wsCount
-	l := s.Fork("session#%d", id)
-	l.Debugf("Open")
-	go s.handleSSHRequests(l, reqs)
-	go s.handleSSHChannels(l, chans)
+	clog.Debugf("Open")
+	go s.handleSSHRequests(clog, reqs)
+	go s.handleSSHChannels(clog, chans)
 	sshConn.Wait()
-	l.Debugf("Close")
+	clog.Debugf("Close")
 }
 
-func (s *Server) handleSSHRequests(l *chshare.Logger, reqs <-chan *ssh.Request) {
+func (s *Server) handleSSHRequests(clientLog *chshare.Logger, reqs <-chan *ssh.Request) {
 	for r := range reqs {
 		switch r.Type {
 		case "ping":
 			r.Reply(true, nil)
 		default:
-			l.Debugf("Unknown request: %s", r.Type)
+			clientLog.Debugf("Unknown request: %s", r.Type)
 		}
 	}
 }
 
-func (s *Server) handleSSHChannels(l *chshare.Logger, chans <-chan ssh.NewChannel) {
+func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.NewChannel) {
 	var connCount int32
 	for ch := range chans {
 		remote := string(ch.ExtraData())
 		socks := remote == "socks"
 		//dont accept socks when --socks5 isn't enabled
 		if socks && s.socksServer == nil {
-			l.Debugf("Denied socks request, please enable --socks5")
+			clientLog.Debugf("Denied socks request, please enable --socks5")
 			ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled on the server")
 			continue
 		}
 		//accept rest
 		stream, reqs, err := ch.Accept()
 		if err != nil {
-			l.Debugf("Failed to accept stream: %s", err)
+			clientLog.Debugf("Failed to accept stream: %s", err)
 			continue
 		}
 		go ssh.DiscardRequests(reqs)
 		//handle stream type
 		connID := atomic.AddInt32(&connCount, 1)
 		if socks {
-			go s.handleSocksStream(l.Fork("socks#%d", connID), stream)
+			go s.handleSocksStream(clientLog.Fork("socks#%d", connID), stream)
 		} else {
-			go s.handleTCPStream(l.Fork("tcp#%d", connID), stream, remote)
+			go s.handleTCPStream(clientLog.Fork("tcp#%d", connID), stream, remote)
 		}
 	}
 }

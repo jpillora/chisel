@@ -10,15 +10,13 @@ Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single exec
 
 **Binaries**
 
-[![Releases](https://img.shields.io/github/release/jpillora/chisel.svg)](https://github.com/jpillora/chisel/releases)  [![Releases](https://img.shields.io/github/downloads/jpillora/chisel/total.svg)](https://github.com/jpillora/chisel/releases)
+[![Releases](https://img.shields.io/github/release/jpillora/chisel.svg)](https://github.com/jpillora/chisel/releases) [![Releases](https://img.shields.io/github/downloads/jpillora/chisel/total.svg)](https://github.com/jpillora/chisel/releases)
 
 See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel! | bash`
 
 **Docker**
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)][dockerhub] [![Image Size](https://images.microbadger.com/badges/image/jpillora/chisel.svg)][dockerhub]
-
-[dockerhub]: https://hub.docker.com/r/jpillora/chisel/
+[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://images.microbadger.com/badges/image/jpillora/chisel.svg)](https://microbadger.com/images/jpillora/chisel)
 
 ```sh
 docker run --rm -it jpillora/chisel --help
@@ -64,16 +62,16 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 ```
 $ chisel --help
 
-	Usage: chisel [command] [--help]
+   Usage: chisel [command] [--help]
 
-	Version: 0.0.0-src
+   Version: 0.0.0-src
 
-	Commands:
-	  server - runs chisel in server mode
-	  client - runs chisel in client mode
+   Commands:
+     server - runs chisel in server mode
+     client - runs chisel in client mode
 
-	Read more:
-	  https://github.com/jpillora/chisel
+   Read more:
+     https://github.com/jpillora/chisel
 
 ```
 
