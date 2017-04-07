@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var UserAllowAll = regexp.MustCompile("")
+
 func ParseAuth(auth string) (string, string) {
 	if strings.Contains(auth, ":") {
 		pair := strings.SplitN(auth, ":", 2)
@@ -56,11 +58,16 @@ func ParseUsers(authfile string) (Users, error) {
 			return nil, errors.New("Invalid user:pass string")
 		}
 		for _, r := range remotes {
-			re, err := regexp.Compile(r)
-			if err != nil {
-				return nil, errors.New("Invalid address regex")
+			if r == "" || r == "*" {
+				u.Addrs = append(u.Addrs, UserAllowAll)
+			} else {
+				re, err := regexp.Compile(r)
+				if err != nil {
+					return nil, errors.New("Invalid address regex")
+				}
+				u.Addrs = append(u.Addrs, re)
 			}
-			u.Addrs = append(u.Addrs, re)
+
 		}
 		users[u.Name] = u
 	}

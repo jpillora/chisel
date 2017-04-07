@@ -3,40 +3,41 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 
-	chshare "github.com/jpillora/chisel/chshare"
 	"github.com/jpillora/chisel/client"
 	"github.com/jpillora/chisel/server"
+	chshare "github.com/jpillora/chisel/share"
 )
 
-var VERSION string = "0.0.0-src" //set via ldflags
-
 var help = `
-	Usage: chisel [command] [--help]
+  Usage: chisel [command] [--help]
 
-	Version: ` + VERSION + `
+  Version: ` + chshare.BuildVersion + `
 
-	Commands:
-	  server - runs chisel in server mode
-	  client - runs chisel in client mode
+  Commands:
+    server - runs chisel in server mode
+    client - runs chisel in client mode
 
-	Read more:
-	  https://github.com/jpillora/chisel
+  Read more:
+    https://github.com/jpillora/chisel
 
 `
 
 func main() {
 
 	version := flag.Bool("version", false, "")
+	v := flag.Bool("v", false, "")
 	flag.Bool("help", false, "")
 	flag.Bool("h", false, "")
 	flag.Usage = func() {}
 	flag.Parse()
 
-	if *version {
-		fmt.Println(VERSION)
+	if *version || *v {
+		fmt.Println(chshare.BuildVersion)
 		os.Exit(1)
 	}
 
@@ -60,42 +61,62 @@ func main() {
 }
 
 var commonHelp = `
-	  --pid Generate pid file in current directory
+    --pid Generate pid file in current directory
 
-	  -v, Enable verbose logging
+    -v, Enable verbose logging
 
-	  --help, This help text
+    --help, This help text
 
-	Read more:
-	  https://github.com/jpillora/chisel
+  Version:
+    ` + chshare.BuildVersion + `
+
+  Read more:
+    https://github.com/jpillora/chisel
 
 `
 
+func generatePidFile() {
+	pid := []byte(strconv.Itoa(os.Getpid()))
+	if err := ioutil.WriteFile("chisel.pid", pid, 0644); err != nil {
+		log.Fatal(err)
+	}
+}
+
 var serverHelp = `
-	Usage: chisel server [options]
+  Usage: chisel server [options]
 
-	Options:
+  Options:
 
-	  --host, Defines the HTTP listening host – the network interface
-	  (defaults to 0.0.0.0).
+    --host, Defines the HTTP listening host – the network interface
+    (defaults the environment variable HOST and falls back to 0.0.0.0).
 
-	  --port, Defines the HTTP listening port (defaults to 8080).
+    --port, -p, Defines the HTTP listening port (defaults to the environment
+    variable PORT and fallsback to port 8080).
 
-	  --key, An optional string to seed the generation of a ECDSA public
-	  and private key pair. All commications will be secured using this
-	  key pair. Share this fingerprint with clients to enable detection
-	  of man-in-the-middle attacks.
+    --key, An optional string to seed the generation of a ECDSA public
+    and private key pair. All commications will be secured using this
+    key pair. Share the subsequent fingerprint with clients to enable detection
+    of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
+	variable, otherwise a new key is generate each run).
 
-	  --authfile, An optional path to a users.json file. This file should
-	  be an object with users defined like:
-	    "<user:pass>": ["<addr-regex>","<addr-regex>"]
-	    when <user> connects, their <pass> will be verified and then
-	    each of the remote addresses will be compared against the list
-	    of address regular expressions for a match. Addresses will
-	    always come in the form "<host/ip>:<port>".
+    --auth, An optional string representing a single user with full
+	access, in the form of <user:pass>. This is equivalent to creating an
+	authfile with {"<user:pass>": [""]}.
 
-	  --proxy, Specifies the default proxy target to use when chisel
-	  receives a normal HTTP request.
+    --authfile, An optional path to a users.json file. This file should
+    be an object with users defined like:
+      "<user:pass>": ["<addr-regex>","<addr-regex>"]
+      when <user> connects, their <pass> will be verified and then
+      each of the remote addresses will be compared against the list
+      of address regular expressions for a match. Addresses will
+      always come in the form "<host/ip>:<port>".
+
+    --proxy, Specifies another HTTP server to proxy requests to when
+	chisel receives a normal HTTP request. Useful for hiding chisel in
+	plain sight.
+
+    --socks5, Allows client to access the internal SOCKS5 proxy. See
+    chisel client --help for more information.
 ` + commonHelp
 
 func server(args []string) {
@@ -103,15 +124,18 @@ func server(args []string) {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	host := flags.String("host", "", "")
+	p := flags.String("p", "", "")
 	port := flags.String("port", "", "")
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
+	auth := flags.String("auth", "", "")
 	proxy := flags.String("proxy", "", "")
+	socks5 := flags.Bool("socks5", false, "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, serverHelp)
+		fmt.Print(serverHelp)
 		os.Exit(1)
 	}
 	flags.Parse(args)
@@ -122,71 +146,88 @@ func server(args []string) {
 	if *host == "" {
 		*host = "0.0.0.0"
 	}
-
+	if *port == "" {
+		*port = *p
+	}
 	if *port == "" {
 		*port = os.Getenv("PORT")
 	}
 	if *port == "" {
 		*port = "8080"
 	}
-
-	chshare.GeneratePidFile(pid)
-
+	if *key == "" {
+		*key = os.Getenv("CHISEL_KEY")
+	}
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed:  *key,
 		AuthFile: *authfile,
+		Auth:     *auth,
 		Proxy:    *proxy,
+		Socks5:   *socks5,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	s.Info = true
 	s.Debug = *verbose
-
+	if *pid {
+		generatePidFile()
+	}
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
 	}
 }
 
 var clientHelp = `
-	Usage: chisel client [options] <server> <remote> [remote] [remote] ...
+  Usage: chisel client [options] <server> <remote> [remote] [remote] ...
 
-	server is the URL to the chisel server.
+  <server> is the URL to the chisel server.
 
-	remotes are remote connections tunnelled through the server, each of
-	which come in the form:
+  <remote>s are remote connections tunnelled through the server, each of
+  which come in the form:
 
-		<local-host>:<local-port>:<remote-host>:<remote-port>
+    <local-host>:<local-port>:<remote-host>:<remote-port>
 
-		* remote-port is required.
-		* local-port defaults to remote-port.
-		* local-host defaults to 0.0.0.0 (all interfaces).
-		* remote-host defaults to 0.0.0.0 (server localhost).
+    ■ local-host defaults to 0.0.0.0 (all interfaces).
+    ■ local-port defaults to remote-port.
+    ■ remote-port is required*.
+    ■ remote-host defaults to 0.0.0.0 (server localhost).
 
-		example remotes
+    example remotes
 
-			3000
-			example.com:3000
-			3000:google.com:80
-			192.168.0.5:3000:google.com:80
+      3000
+      example.com:3000
+      3000:google.com:80
+      192.168.0.5:3000:google.com:80
+      socks
+      5000:socks
 
-	Options:
+    *When the chisel server enables --socks5, remotes can
+    specify "socks" in place of remote-host and remote-port.
+    The default local host and port for a "socks" remote is
+    0.0.0.0:1080. Connections to this remote will terminate
+    at the server's internal SOCKS5 proxy.
 
-	  --fingerprint, An optional fingerprint (server authentication)
-	  string to compare against the server's public key. You may provide
-	  just a prefix of the key or the entire string. Fingerprint 
-	  mismatches will close the connection.
+  Options:
 
-	  --auth, An optional username and password (client authentication)
-	  in the form: "<user>:<pass>". These credentials are compared to
-	  the credentials inside the server's --authfile.
+    --fingerprint, A *strongly recommended* fingerprint string
+    to perform host-key validation against the server's public key.
+    You may provide just a prefix of the key or the entire string.
+    Fingerprint mismatches will close the connection.
 
-	  --keepalive, An optional keepalive interval. Since the underlying
-	  transport is HTTP, in many instances we'll be traversing through
-	  proxies, often these proxies will close idle connections. You must
-	  specify a time with a unit, for example '30s' or '2m'. Defaults
-	  to '0s' (disabled).
+    --auth, An optional username and password (client authentication)
+    in the form: "<user>:<pass>". These credentials are compared to
+    the credentials inside the server's --authfile. defaults to the
+	AUTH environment variable.
+
+    --keepalive, An optional keepalive interval. Since the underlying
+    transport is HTTP, in many instances we'll be traversing through
+    proxies, often these proxies will close idle connections. You must
+    specify a time with a unit, for example '30s' or '2m'. Defaults
+    to '0s' (disabled).
+
+    --proxy, An optional HTTP CONNECT proxy which will be used reach
+    the chisel server. Authentication can be specified inside the URL.
+	For example, http://admin:password@my-server.com:8081
 ` + commonHelp
 
 func client(args []string) {
@@ -196,10 +237,11 @@ func client(args []string) {
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
+	proxy := flags.String("proxy", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, clientHelp)
+		fmt.Print(clientHelp)
 		os.Exit(1)
 	}
 	flags.Parse(args)
@@ -209,22 +251,25 @@ func client(args []string) {
 		log.Fatalf("A server and least one remote is required")
 	}
 
-	chshare.GeneratePidFile(pid)
+	if *auth == "" {
+		*auth = os.Getenv("AUTH")
+	}
 
 	c, err := chclient.NewClient(&chclient.Config{
 		Fingerprint: *fingerprint,
 		Auth:        *auth,
 		KeepAlive:   *keepalive,
+		HTTPProxy:   *proxy,
 		Server:      args[0],
 		Remotes:     args[1:],
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	c.Info = true
 	c.Debug = *verbose
-
+	if *pid {
+		generatePidFile()
+	}
 	if err = c.Run(); err != nil {
 		log.Fatal(err)
 	}

@@ -9,21 +9,18 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"net"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
 
 func GenerateKey(seed string) ([]byte, error) {
-
 	var r io.Reader
 	if seed == "" {
 		r = rand.Reader
 	} else {
 		r = NewDetermRand([]byte(seed))
 	}
-
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
 	if err != nil {
 		return nil, err
@@ -57,40 +54,4 @@ func RejectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		ch.Reject(ssh.Prohibited, "Tunnels disallowed")
 	}
-}
-
-func ConnectStreams(l *Logger, chans <-chan ssh.NewChannel) {
-
-	var streamCount int
-
-	for ch := range chans {
-
-		addr := string(ch.ExtraData())
-
-		stream, reqs, err := ch.Accept()
-		if err != nil {
-			l.Debugf("Failed to accept stream: %s", err)
-			continue
-		}
-
-		streamCount++
-		id := streamCount
-
-		go ssh.DiscardRequests(reqs)
-		go handleStream(l.Fork("stream#%d", id), stream, addr)
-	}
-}
-
-func handleStream(l *Logger, src io.ReadWriteCloser, remote string) {
-
-	dst, err := net.Dial("tcp", remote)
-	if err != nil {
-		l.Debugf("%s", err)
-		src.Close()
-		return
-	}
-
-	l.Debugf("Open")
-	s, r := Pipe(src, dst)
-	l.Debugf("Close (sent %d received %d)", s, r)
 }

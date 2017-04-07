@@ -20,23 +20,25 @@ import (
 
 type Remote struct {
 	LocalHost, LocalPort, RemoteHost, RemotePort string
+	Socks                                        bool
 }
 
 func DecodeRemote(s string) (*Remote, error) {
 	parts := strings.Split(s, ":")
-
 	if len(parts) <= 0 || len(parts) >= 5 {
 		return nil, errors.New("Invalid remote")
 	}
-
 	r := &Remote{}
-
 	//TODO fix up hacky decode
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i]
-
+		//last part "socks"?
+		if i == len(parts)-1 && p == "socks" {
+			r.Socks = true
+			continue
+		}
 		if isPort(p) {
-			if r.RemotePort == "" {
+			if !r.Socks && r.RemotePort == "" {
 				r.RemotePort = p
 				r.LocalPort = p
 			} else {
@@ -44,16 +46,13 @@ func DecodeRemote(s string) (*Remote, error) {
 			}
 			continue
 		}
-
-		if r.RemotePort == "" && r.LocalPort == "" {
+		if !r.Socks && (r.RemotePort == "" && r.LocalPort == "") {
 			return nil, errors.New("Missing ports")
 		}
-
 		if !isHost(p) {
 			return nil, errors.New("Invalid host")
 		}
-
-		if r.RemoteHost == "" {
+		if !r.Socks && r.RemoteHost == "" {
 			r.RemoteHost = p
 		} else {
 			r.LocalHost = p
@@ -62,7 +61,10 @@ func DecodeRemote(s string) (*Remote, error) {
 	if r.LocalHost == "" {
 		r.LocalHost = "0.0.0.0"
 	}
-	if r.RemoteHost == "" {
+	if r.LocalPort == "" && r.Socks {
+		r.LocalPort = "1080"
+	}
+	if !r.Socks && r.RemoteHost == "" {
 		r.RemoteHost = "0.0.0.0"
 	}
 	return r, nil
@@ -89,6 +91,12 @@ func isHost(s string) bool {
 
 //implement Stringer
 func (r *Remote) String() string {
-	return r.LocalHost + ":" + r.LocalPort + " => " +
-		r.RemoteHost + ":" + r.RemotePort
+	return r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote()
+}
+
+func (r *Remote) Remote() string {
+	if r.Socks {
+		return "socks"
+	}
+	return r.RemoteHost + ":" + r.RemotePort
 }

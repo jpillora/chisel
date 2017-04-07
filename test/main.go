@@ -16,6 +16,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -33,9 +34,9 @@ const ENABLE_CROWBAR = false
 
 const (
 	B  = 1
-	KB = 1024 * B
-	MB = 1024 * KB
-	GB = 1024 * MB
+	KB = 1000 * B
+	MB = 1000 * KB
+	GB = 1000 * MB
 )
 
 func run() {
@@ -70,7 +71,7 @@ func bench() {
 }
 
 func benchSizes(port string) {
-	for size := 1; size < 100*MB; size *= 10 {
+	for size := 1; size <= 100*MB; size *= 10 {
 		testTunnel(port, size)
 	}
 }
@@ -84,14 +85,15 @@ func testTunnel(port string, size int) {
 	if resp.StatusCode != 200 {
 		fatal(err)
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+
+	n, err := io.Copy(ioutil.Discard, resp.Body)
 	if err != nil {
 		fatal(err)
 	}
 	t1 := time.Now()
 	fmt.Printf(":%s => %d bytes in %s\n", port, size, t1.Sub(t0))
-	if len(b) != size {
-		fatalf("%d bytes expected, got %d", size, len(b))
+	if int(n) != size {
+		fatalf("%d bytes expected, got %d", size, n)
 	}
 }
 
@@ -139,7 +141,10 @@ func main() {
 
 	fs := makeFileServer()
 	go func() {
-		fatal(fs.Wait())
+		err := fs.Wait()
+		if err != nil {
+			fmt.Printf("fs server closed (%s)\n", err)
+		}
 	}()
 
 	if ENABLE_CROWBAR {

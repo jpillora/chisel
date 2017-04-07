@@ -4,37 +4,43 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/websocket"
 )
 
+//Config represents a client configuration
 type Config struct {
 	shared      *chshare.Config
 	Fingerprint string
 	Auth        string
 	KeepAlive   time.Duration
 	Server      string
+	HTTPProxy   string
 	Remotes     []string
 }
 
+//Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config    *Config
-	sshConfig *ssh.ClientConfig
-	proxies   []*Proxy
-	sshConn   ssh.Conn
-	server    string
-	running   bool
-	runningc  chan error
+	config       *Config
+	sshConfig    *ssh.ClientConfig
+	proxies      []*tcpProxy
+	sshConn      ssh.Conn
+	httpProxyURL *url.URL
+	server       string
+	running      bool
+	runningc     chan error
 }
 
+//NewClient creates a new client instance
 func NewClient(config *Config) (*Client, error) {
 
 	//apply default scheme
@@ -76,6 +82,14 @@ func NewClient(config *Config) (*Client, error) {
 		running:  true,
 		runningc: make(chan error, 1),
 	}
+	client.Info = true
+
+	if p := config.HTTPProxy; p != "" {
+		client.httpProxyURL, err = url.Parse(p)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
+		}
+	}
 
 	user, pass := chshare.ParseAuth(config.Auth)
 
@@ -89,7 +103,7 @@ func NewClient(config *Config) (*Client, error) {
 	return client, nil
 }
 
-//Start then Wait
+//Run starts client and blocks while connected
 func (c *Client) Run() error {
 	go c.start()
 	return c.Wait()
@@ -106,17 +120,21 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	return nil
 }
 
-//Starts the client
+//Start client and do not block
 func (c *Client) Start() {
 	go c.start()
 }
 
 func (c *Client) start() {
-	c.Infof("Connecting to %s\n", c.server)
+	via := ""
+	if c.httpProxyURL != nil {
+		via = " via " + c.httpProxyURL.String()
+	}
+	c.Infof("Connecting to %s%s\n", c.server, via)
 
 	//prepare proxies
-	for id, r := range c.config.shared.Remotes {
-		proxy := NewProxy(c, id, r)
+	for i, r := range c.config.shared.Remotes {
+		proxy := newTCPProxy(c, i, r)
 		go proxy.start()
 		c.proxies = append(c.proxies, proxy)
 	}
@@ -137,25 +155,38 @@ func (c *Client) start() {
 	b := &backoff.Backoff{Max: 5 * time.Minute}
 
 	for {
+		//NOTE: break == dont retry on handshake failures
 		if !c.running {
 			break
 		}
 		if connerr != nil {
 			d := b.Duration()
-			c.Infof("Retrying in %s...\n", d)
+			c.Debugf("Connection error: %s", connerr)
+			c.Infof("Retrying in %s...", d)
 			connerr = nil
 			time.Sleep(d)
 		}
 
-		ws, err := websocket.Dial(c.server, chshare.ProtocolVersion, "http://localhost/")
+		d := websocket.Dialer{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			Subprotocols:    []string{chshare.ProtocolVersion},
+		}
+		//optionally CONNECT proxy
+		if c.httpProxyURL != nil {
+			d.Proxy = func(*http.Request) (*url.URL, error) {
+				return c.httpProxyURL, nil
+			}
+		}
+		wsConn, _, err := d.Dial(c.server, nil)
 		if err != nil {
 			connerr = err
 			continue
 		}
-
-		sshConn, chans, reqs, err := ssh.NewClientConn(ws, "", c.sshConfig)
-
-		//NOTE: break == dont retry on handshake failures
+		conn := chshare.NewWebSocketConn(wsConn)
+		// perform SSH handshake on net.Conn
+		c.Debugf("Handshaking...")
+		sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
 		if err != nil {
 			if strings.Contains(err.Error(), "unable to authenticate") {
 				c.Infof("Authentication failed")
@@ -165,6 +196,7 @@ func (c *Client) start() {
 			}
 			break
 		}
+		c.config.shared.Version = chshare.BuildVersion
 		conf, _ := chshare.EncodeConfig(c.config.shared)
 		c.Debugf("Sending configurating")
 		t0 := time.Now()
@@ -180,7 +212,6 @@ func (c *Client) start() {
 		c.Infof("Connected (Latency %s)", time.Now().Sub(t0))
 		//connected
 		b.Reset()
-
 		c.sshConn = sshConn
 		go ssh.DiscardRequests(reqs)
 		go chshare.RejectStreams(chans) //TODO allow client to ConnectStreams
@@ -189,7 +220,6 @@ func (c *Client) start() {
 		c.sshConn = nil
 		if err != nil && err != io.EOF {
 			connerr = err
-			c.Infof("Disconnection error: %s", err)
 			continue
 		}
 		c.Infof("Disconnected\n")

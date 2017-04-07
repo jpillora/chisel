@@ -5,3 +5,5 @@ package chshare
 //be incremented to signify a protocol
 //mismatch.
 const ProtocolVersion = "chisel-v2"
+
+var BuildVersion = "0.0.0-src"
