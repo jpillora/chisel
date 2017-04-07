@@ -59,7 +59,11 @@ func DecodeRemote(s string) (*Remote, error) {
 		}
 	}
 	if r.LocalHost == "" {
-		r.LocalHost = "0.0.0.0"
+		if r.Socks {
+			r.LocalHost = "127.0.0.1"
+		} else {
+			r.LocalHost = "0.0.0.0"
+		}
 	}
 	if r.LocalPort == "" && r.Socks {
 		r.LocalPort = "1080"

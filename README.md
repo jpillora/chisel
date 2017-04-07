@@ -159,7 +159,7 @@ $ chisel client --help
     *When the chisel server enables --socks5, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
-    0.0.0.0:1080. Connections to this remote will terminate
+    127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy.
 
   Options:

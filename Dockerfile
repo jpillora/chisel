@@ -9,14 +9,15 @@ ENV PACKAGE github.com/jpillora/$NAME
 ENV PACKAGE_DIR $GOPATH/src/$PACKAGE
 ENV GOLANG_VERSION 1.8
 ENV GOLANG_SRC_URL https://golang.org/dl/go$GOLANG_VERSION.src.tar.gz
-ENV GOLANG_SRC_SHA256 2b843f133b81b7995f26d0cb64bbdbb9d0704b90c44df45f844d28881ad442d3
+ENV GOLANG_SRC_SHA256 406865f587b44be7092f206d73fc1de252600b79b3cacc587b74b5ef5c623596
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 # https://golang.org/issue/14851
 RUN echo -e "diff --git a/src/cmd/link/internal/ld/lib.go b/src/cmd/link/internal/ld/lib.go\nindex 14f4fa9..5599307 100644\n--- a/src/cmd/link/internal/ld/lib.go\n+++ b/src/cmd/link/internal/ld/lib.go\n@@ -1272,6 +1272,11 @@ func hostlink() {\n \t\targv = append(argv, peimporteddlls()...)\n \t}\n\n+\t// The Go linker does not currently support building PIE\n+\t// executables when using the external linker. See:\n+\t// https://github.com/golang/go/issues/6940\n+\targv = append(argv, \"-fno-PIC\")\n+\n \tif Debug['v'] != 0 {\n \t\tfmt.Fprintf(Bso, \"host link:\")\n \t\tfor _, v := range argv {" > /no-pic.patch
 # in one step (to prevent creating superfluous layers):
 # 1. fetch and install temporary build programs,
-# 2. build chisel alpine binary
-# 3. remove build programs
+# 2. fetch chisel from github (avoid ADD to reduce image size)
+# 3. build chisel alpine binary
+# 4. remove build programs
 RUN set -ex \
     && apk update \
 	&& apk add ca-certificates \
@@ -38,7 +39,9 @@ RUN set -ex \
 	&& mkdir -p $PACKAGE_DIR \
 	&& git clone https://$PACKAGE.git $PACKAGE_DIR \
 	&& cd $PACKAGE_DIR \
-	&& go build -ldflags "-X main.VERSION=$(git describe --abbrev=0 --tags)" -o /usr/local/bin/$NAME \
+	&& go build \
+		-ldflags "-X github.com/jpillora/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
+		-o /usr/local/bin/$NAME \
 	&& apk del .build-deps \
 	&& rm -rf /no-pic.patch $GOPATH /usr/local/go
 #run!
