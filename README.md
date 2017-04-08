@@ -32,10 +32,11 @@ $ go get -v github.com/jpillora/chisel
 
 * Easy to use
 * [Performant](#performance)*
-* [Encrypted connections](#security) using `crypto/ssh`
+* [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
 * [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
 * Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 * Client can create multiple tunnel endpoints over one TCP connection
+* Client can optionally pass through HTTP CONNECT proxys
 * Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 
 ### Demo
@@ -64,7 +65,7 @@ $ chisel --help
 
    Usage: chisel [command] [--help]
 
-   Version: 0.0.0-src
+   Version: X.Y.Z
 
    Commands:
      server - runs chisel in server mode
@@ -77,7 +78,6 @@ $ chisel --help
 
 ```
 $ chisel server --help
-
 
   Usage: chisel server [options]
 
@@ -93,23 +93,25 @@ $ chisel server --help
     and private key pair. All commications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
-	variable, otherwise a new key is generate each run).
-
-    --auth, An optional string representing a single user with full
-	access, in the form of <user:pass>. This is equivalent to creating an
-	authfile with {"<user:pass>": [""]}.
+    variable, otherwise a new key is generate each run).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
-      "<user:pass>": ["<addr-regex>","<addr-regex>"]
-      when <user> connects, their <pass> will be verified and then
-      each of the remote addresses will be compared against the list
-      of address regular expressions for a match. Addresses will
-      always come in the form "<host/ip>:<port>".
+      {
+        "<user:pass>": ["<addr-regex>","<addr-regex>"]
+      }
+    when <user> connects, their <pass> will be verified and then
+    each of the remote addresses will be compared against the list
+    of address regular expressions for a match. Addresses will
+    always come in the form "<host/ip>:<port>".
+
+    --auth, An optional string representing a single user with full
+    access, in the form of <user:pass>. This is equivalent to creating an
+    authfile with {"<user:pass>": [""]}.
 
     --proxy, Specifies another HTTP server to proxy requests to when
-	chisel receives a normal HTTP request. Useful for hiding chisel in
-	plain sight.
+    chisel receives a normal HTTP request. Useful for hiding chisel in
+    plain sight.
 
     --socks5, Allows client to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
@@ -121,7 +123,7 @@ $ chisel server --help
     --help, This help text
 
   Version:
-    0.0.0-src
+    X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
@@ -154,7 +156,7 @@ $ chisel client --help
       socks
       5000:socks
 
-    *When the chisel server enables --socks5, remotes can
+    *When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
@@ -170,7 +172,7 @@ $ chisel client --help
     --auth, An optional username and password (client authentication)
     in the form: "<user>:<pass>". These credentials are compared to
     the credentials inside the server's --authfile. defaults to the
-	AUTH environment variable.
+    AUTH environment variable.
 
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
@@ -180,7 +182,7 @@ $ chisel client --help
 
     --proxy, An optional HTTP CONNECT proxy which will be used reach
     the chisel server. Authentication can be specified inside the URL.
-	For example, http://admin:password@my-server.com:8081
+    For example, http://admin:password@my-server.com:8081
 
     --pid Generate pid file in current directory
 
@@ -189,14 +191,12 @@ $ chisel client --help
     --help, This help text
 
   Version:
-    0.0.0-src
+    X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
 
 ```
-
-See also [programmatic usage](https://github.com/jpillora/chisel/wiki/Programmatic-Usage).
 
 ### Security
 
@@ -207,6 +207,31 @@ Encryption is always enabled. When you start up a chisel server, it will generat
 Using the `--authfile` option, the server may optionally provide a `user.json` configuration file to create a list of accepted users. The client then authenticates using the `--auth` option. See [users.json](example/users.json) for an example authentication configuration file. See the `--help` above for more information.
 
 Internally, this is done using the *Password* authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
+
+### SOCKS5 Guide
+
+1. Start your chisel server
+
+```sh
+docker run \
+  --name chisel -p 9312 \
+  -d --restart always \
+  jpillora/chisel server -p 9312 --socks5 --key supersecret
+```
+
+2. Connect your chisel client
+
+```sh
+chisel client --fingerprint ab:12:34 server-address:9312 socks
+```
+
+3. Point your SOCKS5 clients (e.g. Browsers) to:
+
+```
+localhost:1080
+```
+
+4. Now you have an encrypted, authenticated SOCKS connection over HTTP
 
 ### Performance
 

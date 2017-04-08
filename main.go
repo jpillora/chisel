@@ -99,10 +99,6 @@ var serverHelp = `
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
 
-    --auth, An optional string representing a single user with full
-    access, in the form of <user:pass>. This is equivalent to creating an
-    authfile with {"<user:pass>": [""]}.
-
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
       {
@@ -112,6 +108,10 @@ var serverHelp = `
     each of the remote addresses will be compared against the list
     of address regular expressions for a match. Addresses will
     always come in the form "<host/ip>:<port>".
+
+    --auth, An optional string representing a single user with full
+    access, in the form of <user:pass>. This is equivalent to creating an
+    authfile with {"<user:pass>": [""]}.
 
     --proxy, Specifies another HTTP server to proxy requests to when
     chisel receives a normal HTTP request. Useful for hiding chisel in
@@ -219,7 +219,7 @@ var clientHelp = `
     --auth, An optional username and password (client authentication)
     in the form: "<user>:<pass>". These credentials are compared to
     the credentials inside the server's --authfile. defaults to the
-	AUTH environment variable.
+    AUTH environment variable.
 
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
