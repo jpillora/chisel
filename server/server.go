@@ -2,6 +2,7 @@ package chserver
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/chisel/share"
 	"github.com/jpillora/requestlog"
+	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -39,7 +41,9 @@ type Server struct {
 	sessions chshare.Users
 
 	fingerprint  string
-	wsCount      int32
+	sessCount    int32
+	connCount    int32
+	connOpen     int32
 	httpServer   *chshare.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sshConfig    *ssh.ServerConfig
@@ -201,7 +205,7 @@ var upgrader = websocket.Upgrader{
 
 func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 
-	id := atomic.AddInt32(&s.wsCount, 1)
+	id := atomic.AddInt32(&s.sessCount, 1)
 	clog := s.Fork("session#%d", id)
 
 	wsConn, err := upgrader.Upgrade(w, req, nil)
@@ -291,7 +295,6 @@ func (s *Server) handleSSHRequests(clientLog *chshare.Logger, reqs <-chan *ssh.R
 }
 
 func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.NewChannel) {
-	var connCount int32
 	for ch := range chans {
 		remote := string(ch.ExtraData())
 		socks := remote == "socks"
@@ -309,34 +312,43 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		}
 		go ssh.DiscardRequests(reqs)
 		//handle stream type
-		connID := atomic.AddInt32(&connCount, 1)
+		connID := atomic.AddInt32(&s.connCount, 1)
 		if socks {
-			go s.handleSocksStream(clientLog.Fork("socks#%d", connID), stream)
+			go s.handleSocksStream(clientLog.Fork("socks#%05d", connID), stream)
 		} else {
-			go s.handleTCPStream(clientLog.Fork("tcp#%d", connID), stream, remote)
+			go s.handleTCPStream(clientLog.Fork(" tcp#%05d", connID), stream, remote)
 		}
 	}
 }
 
 func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
-	l.Debugf("Openning")
 	conn := chshare.NewRWCConn(src)
-	if err := s.socksServer.ServeConn(conn); err != nil {
-		l.Debugf("socks error: %s", err)
-		src.Close()
-		return
+	// conn.SetDeadline(time.Now().Add(30 * time.Second))
+	atomic.AddInt32(&s.connOpen, 1)
+	l.Debugf("%s Openning", s.connStatus())
+	err := s.socksServer.ServeConn(conn)
+	atomic.AddInt32(&s.connOpen, -1)
+	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
+		l.Debugf("%s Closed (error: %s)", s.connStatus(), err)
+	} else {
+		l.Debugf("%s Closed", s.connStatus())
 	}
-	l.Debugf("Closed")
 }
 
 func (s *Server) handleTCPStream(l *chshare.Logger, src io.ReadWriteCloser, remote string) {
 	dst, err := net.Dial("tcp", remote)
 	if err != nil {
-		l.Debugf("remote: %s (%s)", remote, err)
+		l.Debugf("Remote failed (%s)", err)
 		src.Close()
 		return
 	}
-	l.Debugf("Open")
+	atomic.AddInt32(&s.connOpen, 1)
+	l.Debugf("%s Open", s.connStatus())
 	sent, received := chshare.Pipe(src, dst)
-	l.Debugf("Close (sent %d received %d)", sent, received)
+	atomic.AddInt32(&s.connOpen, -1)
+	l.Debugf("%s Close (sent %s received %s)", s.connStatus(), sizestr.ToString(sent), sizestr.ToString(received))
+}
+
+func (s *Server) connStatus() string {
+	return fmt.Sprintf("[%d/%d]", atomic.LoadInt32(&s.connOpen), atomic.LoadInt32(&s.connCount))
 }
