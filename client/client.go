@@ -105,7 +105,9 @@ func NewClient(config *Config) (*Client, error) {
 
 //Run starts client and blocks while connected
 func (c *Client) Run() error {
-	go c.start()
+	if err := c.Start(); err != nil {
+		return err
+	}
 	return c.Wait()
 }
 
@@ -120,25 +122,27 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	return nil
 }
 
-//Start client and do not block
-func (c *Client) Start() {
-	go c.start()
-}
-
-func (c *Client) start() {
+//Start client and does not block
+func (c *Client) Start() error {
 	via := ""
 	if c.httpProxyURL != nil {
 		via = " via " + c.httpProxyURL.String()
 	}
-	c.Infof("Connecting to %s%s\n", c.server, via)
-
 	//prepare proxies
 	for i, r := range c.config.shared.Remotes {
 		proxy := newTCPProxy(c, i, r)
-		go proxy.start()
+		if err := proxy.start(); err != nil {
+			return err
+		}
 		c.proxies = append(c.proxies, proxy)
 	}
+	c.Infof("Connecting to %s%s\n", c.server, via)
+	//
+	go c.loop()
+	return nil
+}
 
+func (c *Client) loop() {
 	//optional keepalive loop
 	if c.config.KeepAlive > 0 {
 		go func() {
@@ -149,11 +153,9 @@ func (c *Client) start() {
 			}
 		}()
 	}
-
 	//connection loop!
 	var connerr error
 	b := &backoff.Backoff{Max: 5 * time.Minute}
-
 	for {
 		//NOTE: break == dont retry on handshake failures
 		if !c.running {
@@ -166,7 +168,6 @@ func (c *Client) start() {
 			connerr = nil
 			time.Sleep(d)
 		}
-
 		d := websocket.Dialer{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -227,7 +228,8 @@ func (c *Client) start() {
 	close(c.runningc)
 }
 
-//Wait blocks while the client is running
+//Wait blocks while the client is running.
+//Can only be called once.
 func (c *Client) Wait() error {
 	return <-c.runningc
 }

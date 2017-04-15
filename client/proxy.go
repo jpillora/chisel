@@ -1,6 +1,7 @@
 package chclient
 
 import (
+	"fmt"
 	"io"
 	"net"
 
@@ -25,13 +26,17 @@ func newTCPProxy(c *Client, index int, remote *chshare.Remote) *tcpProxy {
 	}
 }
 
-func (p *tcpProxy) start() {
+func (p *tcpProxy) start() error {
 	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
 	if err != nil {
-		p.Infof("%s", err)
-		return
+		return fmt.Errorf("%s: %s", p.Logger.Prefix(), err)
 	}
-	p.Infof("Enabled")
+	go p.listen(l)
+	return nil
+}
+
+func (p *tcpProxy) listen(l net.Listener) {
+	p.Infof("Listening")
 	for {
 		src, err := l.Accept()
 		if err != nil {

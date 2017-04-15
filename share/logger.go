@@ -51,3 +51,7 @@ func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {
 	ll.Debug = l.Debug
 	return ll
 }
+
+func (l *Logger) Prefix() string {
+	return l.prefix
+}
