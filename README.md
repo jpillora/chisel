@@ -6,6 +6,18 @@ Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single exec
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
+### Features
+
+* Easy to use
+* [Performant](#performance)*
+* [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
+* [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
+* Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
+* Client can create multiple tunnel endpoints over one TCP connection
+* Client can optionally pass through HTTP CONNECT proxies
+* Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
+* Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
+
 ### Install
 
 **Binaries**
@@ -27,17 +39,6 @@ docker run --rm -it jpillora/chisel --help
 ``` sh
 $ go get -v github.com/jpillora/chisel
 ```
-
-### Features
-
-* Easy to use
-* [Performant](#performance)*
-* [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
-* [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
-* Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
-* Client can create multiple tunnel endpoints over one TCP connection
-* Client can optionally pass through HTTP CONNECT proxys
-* Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 
 ### Demo
 
@@ -214,24 +215,24 @@ Internally, this is done using the *Password* authentication method provided by 
 
 ```sh
 docker run \
-  --name chisel -p 9312 \
+  --name chisel -p 9312:9312 \
   -d --restart always \
   jpillora/chisel server -p 9312 --socks5 --key supersecret
 ```
 
-2. Connect your chisel client
+2. Connect your chisel client (using server's fingerprint)
 
 ```sh
 chisel client --fingerprint ab:12:34 server-address:9312 socks
 ```
 
-3. Point your SOCKS5 clients (e.g. Browsers) to:
+3. Point your SOCKS5 clients (e.g. OS/Browser) to:
 
 ```
 localhost:1080
 ```
 
-4. Now you have an encrypted, authenticated SOCKS connection over HTTP
+4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
 
 ### Performance
 
@@ -268,15 +269,15 @@ Note, we're using an in-memory "file" server on localhost for these tests
 `chisel`
 
 ```
-:2001 => 1 bytes in 1.556521ms
-:2001 => 10 bytes in 1.310739ms
-:2001 => 100 bytes in 1.26706ms
-:2001 => 1000 bytes in 1.189441ms
-:2001 => 10000 bytes in 1.509267ms
-:2001 => 100000 bytes in 2.98981ms
-:2001 => 1000000 bytes in 14.737928ms
-:2001 => 10000000 bytes in 141.936428ms
-:2001 => 100000000 bytes in 1.208960105s
+:2001 => 1 bytes in 1.351976ms
+:2001 => 10 bytes in 1.106086ms
+:2001 => 100 bytes in 1.005729ms
+:2001 => 1000 bytes in 1.254396ms
+:2001 => 10000 bytes in 1.139777ms
+:2001 => 100000 bytes in 2.35437ms
+:2001 => 1000000 bytes in 11.502673ms
+:2001 => 10000000 bytes in 123.130246ms
+:2001 => 100000000 bytes in 966.48636ms
 ```
 
 ~100MB in **~1 second**
