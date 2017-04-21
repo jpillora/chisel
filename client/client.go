@@ -1,6 +1,7 @@
 package chclient
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -10,15 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cicavey/chisel/share"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 
 //Config represents a client configuration
 type Config struct {
 	shared      *chshare.Config
+	Cert        string
+	Key         string
 	Fingerprint string
 	Auth        string
 	KeepAlive   time.Duration
@@ -31,6 +34,7 @@ type Config struct {
 type Client struct {
 	*chshare.Logger
 	config       *Config
+	tlsConfig    *tls.Config
 	sshConfig    *ssh.ClientConfig
 	proxies      []*tcpProxy
 	sshConn      ssh.Conn
@@ -83,6 +87,14 @@ func NewClient(config *Config) (*Client, error) {
 		runningc: make(chan error, 1),
 	}
 	client.Info = true
+
+	if config.Cert != "" && config.Key != "" {
+		cert, err := tls.LoadX509KeyPair(config.Cert, config.Key)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to load client keys: %s", err)
+		}
+		client.tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true} // TODO: Verify entire chain
+	}
 
 	if p := config.HTTPProxy; p != "" {
 		client.httpProxyURL, err = url.Parse(p)
@@ -172,6 +184,7 @@ func (c *Client) loop() {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			Subprotocols:    []string{chshare.ProtocolVersion},
+			TLSClientConfig: c.tlsConfig,
 		}
 		//optionally CONNECT proxy
 		if c.httpProxyURL != nil {
@@ -180,6 +193,7 @@ func (c *Client) loop() {
 			}
 		}
 		wsConn, _, err := d.Dial(c.server, nil)
+
 		if err != nil {
 			connerr = err
 			continue
