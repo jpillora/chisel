@@ -119,6 +119,12 @@ func (s *Server) Serve(l net.Listener) error {
 
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
+	ctx := context.Background()
+	return s.ServeConnContext(conn, ctx)
+}
+
+// ServeConn is used to serve a single connection.
+func (s *Server) ServeConnContext(conn net.Conn, ctx context.Context) error {
 	defer conn.Close()
 	bufConn := bufio.NewReader(conn)
 
@@ -159,7 +165,7 @@ func (s *Server) ServeConn(conn net.Conn) error {
 	}
 
 	// Process the client request
-	if err := s.handleRequest(request, conn); err != nil {
+	if err := s.handleRequestContext(request, conn, ctx); err != nil {
 		err = fmt.Errorf("Failed to handle request: %v", err)
 		s.config.Logger.Printf("[ERR] socks: %v", err)
 		return err

@@ -118,6 +118,11 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 // handleRequest is used for request processing after authentication
 func (s *Server) handleRequest(req *Request, conn conn) error {
 	ctx := context.Background()
+	return s.handleRequestContext(req, conn, ctx)
+}
+
+// handleRequest is used for request processing after authentication (with custom context)
+func (s *Server) handleRequestContext(req *Request, conn conn, ctx context.Context) error {
 
 	// Resolve the address if we have a FQDN
 	dest := req.DestAddr

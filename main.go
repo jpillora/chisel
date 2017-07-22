@@ -49,6 +49,8 @@ func main() {
 		args = args[1:]
 	}
 
+	go chshare.ShowStats()
+
 	switch subcmd {
 	case "server":
 		server(args)
