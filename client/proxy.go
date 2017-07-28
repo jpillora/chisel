@@ -10,6 +10,11 @@ import (
 	"github.com/silenceper/pool"
 )
 
+const (
+	PoolInitCap = 15
+	PoolMaxCap = 50
+)
+
 type tcpProxy struct {
 	*chshare.Logger
 	client *Client

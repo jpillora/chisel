@@ -14,15 +14,7 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
-	"github.com/silenceper/pool"
 )
-
-const (
-	PoolInitCap = 15
-	PoolMaxCap = 50
-)
-
-var m map[string]pool.Pool
 
 //Config represents a client configuration
 type Config struct {
@@ -106,9 +98,6 @@ func NewClient(config *Config) (*Client, error) {
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
 		ClientVersion:   chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
-		Config: ssh.Config{
-			Ciphers: []string{"arcfour128"},
-		},
 	}
 
 	return client, nil
@@ -153,50 +142,6 @@ func (c *Client) Start() error {
 	return nil
 }
 
-func (c *Client) checkOrIntPool(remote string) (pool.Pool){
-
-	if m[remote] == nil {
-		d := websocket.Dialer{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			Subprotocols:    []string{chshare.ProtocolVersion},
-		}
-
-		//optionally CONNECT proxy
-		if c.httpProxyURL != nil {
-			d.Proxy = func(*http.Request) (*url.URL, error) {
-				return c.httpProxyURL, nil
-			}
-		}
-		factory := func() (interface{}, error) {
-			conn, _, err := d.Dial(remote, nil)
-			return conn, err
-		}
-		close := func(v interface{}) error { return v.(*websocket.Conn).Close() }
-
-		poolConfig := &pool.PoolConfig{
-			InitialCap: PoolInitCap,
-			MaxCap:     PoolMaxCap,
-			Factory:    factory,
-			Close:      close,
-			IdleTimeout: 60 * time.Second,
-		}
-		p, err := pool.NewChannelPool(poolConfig)
-		if err != nil {
-			fmt.Println("err=", err)
-		}
-		if len(m) == 0 {
-			m = make(map[string]pool.Pool)
-		}
-		m[remote] = p
-	} else {
-		fmt.Println("Got conn from pool %v", m[remote])
-	}
-
-	return m[remote]
-}
-
-
 func (c *Client) loop() {
 	//optional keepalive loop
 	if c.config.KeepAlive > 0 {
@@ -211,30 +156,30 @@ func (c *Client) loop() {
 	//connection loop!
 	var connerr error
 	b := &backoff.Backoff{Max: 5 * time.Minute}
-	if connerr != nil {
-		d := b.Duration()
-		fmt.Println("Connection error: %s")
-		fmt.Println("Retrying in %s...")
-		connerr = nil
-		time.Sleep(d)
-	}
-    p := c.checkOrIntPool(c.server)
 	for {
 		//NOTE: break == dont retry on handshake failures
-
 		if !c.running {
 			break
 		}
-		v, err := p.Get()
-		if err != nil {
-			fmt.Println(err)
-			continue
-		} else {
-			fmt.Println("client.goL233->Got conn from pool")
+		if connerr != nil {
+			d := b.Duration()
+			c.Debugf("Connection error: %s", connerr)
+			c.Infof("Retrying in %s...", d)
+			connerr = nil
+			time.Sleep(d)
 		}
-		wsConn := v.(*websocket.Conn)
-
-//		wsConn, _, err := d.Dial(c.server, nil)
+		d := websocket.Dialer{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			Subprotocols:    []string{chshare.ProtocolVersion},
+		}
+		//optionally CONNECT proxy
+		if c.httpProxyURL != nil {
+			d.Proxy = func(*http.Request) (*url.URL, error) {
+				return c.httpProxyURL, nil
+			}
+		}
+		wsConn, _, err := d.Dial(c.server, nil)
 		if err != nil {
 			connerr = err
 			continue
@@ -279,7 +224,6 @@ func (c *Client) loop() {
 			continue
 		}
 		c.Infof("Disconnected\n")
-		p.Put(v)
 	}
 	close(c.runningc)
 }
