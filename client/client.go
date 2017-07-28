@@ -14,6 +14,12 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
+	"github.com/silenceper/pool"
+)
+
+const (
+	PoolInitCap = 3
+	PoolMaxCap = 50
 )
 
 //Config represents a client configuration
@@ -179,7 +185,28 @@ func (c *Client) loop() {
 				return c.httpProxyURL, nil
 			}
 		}
-		wsConn, _, err := d.Dial(c.server, nil)
+		factory := func() (interface{}, error) {
+			conn, _, err := d.Dial(c.server, nil)
+			return conn, err
+		}
+		close := func(v interface{}) error { return v.(*websocket.Conn).Close() }
+
+		poolConfig := &pool.PoolConfig{
+			InitialCap: PoolInitCap,
+			MaxCap:     PoolMaxCap,
+			Factory:    factory,
+			Close:      close,
+			IdleTimeout: 60 * time.Second,
+		}
+		p, err := pool.NewChannelPool(poolConfig)
+		if err != nil {
+			fmt.Println("err=", err)
+		}
+
+		v, err := p.Get()
+		wsConn := v.(*websocket.Conn)
+
+//		wsConn, _, err := d.Dial(c.server, nil)
 		if err != nil {
 			connerr = err
 			continue
