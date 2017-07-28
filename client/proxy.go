@@ -6,6 +6,8 @@ import (
 	"net"
 
 	"github.com/jpillora/chisel/share"
+	"time"
+	"github.com/silenceper/pool"
 )
 
 type tcpProxy struct {
@@ -15,6 +17,8 @@ type tcpProxy struct {
 	count  int
 	remote *chshare.Remote
 }
+
+var pm map[string]pool.Pool
 
 func newTCPProxy(c *Client, index int, remote *chshare.Remote) *tcpProxy {
 	id := index + 1
@@ -57,7 +61,26 @@ func (p *tcpProxy) accept(src io.ReadWriteCloser) {
 		src.Close()
 		return
 	}
-	dst, err := chshare.OpenStream(p.client.sshConn, p.remote.Remote())
+	fmt.Println("Now openStream with :", p.remote.Remote())
+
+	//TODO get ioReadWriteClose from pool
+	pm, err := p.checkOrIntPool()
+	if err != nil {
+		fmt.Println("Can not get pool")
+	}
+	v, err := pm.Get()
+
+	if err != nil {
+		v, _ = pm.Get()
+	}
+	if  v == nil {
+		src.Close()
+		fmt.Println("Can not connect remote")
+		return
+	}
+	fmt.Println("Get conn from pool")
+	dst := v.(io.ReadWriteCloser)
+//	dst, err := chshare.OpenStream(p.client.sshConn, p.remote.Remote())
 	if err != nil {
 		l.Infof("Stream error: %s", err)
 		src.Close()
@@ -66,4 +89,60 @@ func (p *tcpProxy) accept(src io.ReadWriteCloser) {
 	//then pipe
 	s, r := chshare.Pipe(src, dst)
 	l.Debugf("Close (sent %d received %d)", s, r)
+}
+
+func (p *tcpProxy) fillPool(pm pool.Pool) {
+	if pm == nil {
+		return
+	}
+	fmt.Println("Before fill pool, the pool size->", pm.Len())
+	for i := pm.Len(); i <= PoolInitCap; i++ {
+		if pm.Len() > PoolInitCap {
+			break
+		}
+		if p.client.sshConn == nil {
+			break
+		}
+		conn, err := chshare.OpenStream(p.client.sshConn, p.remote.Remote())
+		if  err == nil {
+			pm.Put(conn)
+		} else {
+			conn, err = chshare.OpenStream(p.client.sshConn, p.remote.Remote())
+			if err == nil {
+				pm.Put(conn)
+			}
+		}
+	}
+	fmt.Println("Now the pool size->", pm.Len())
+}
+
+func (p *tcpProxy) checkOrIntPool() (pool.Pool, error){
+	remote := p.remote.Remote()
+	if pm[remote] == nil {
+		factory := func() (interface{}, error) {
+			conn, err := chshare.OpenStream(p.client.sshConn, remote)
+			return conn, err
+		}
+		close := func(v interface{}) error { return v.(io.ReadWriteCloser).Close() }
+		poolConfig := &pool.PoolConfig{
+			InitialCap: PoolInitCap,
+			MaxCap:     PoolMaxCap,
+			Factory:    factory,
+			Close:      close,
+			IdleTimeout: 60 * time.Second,
+		}
+		p, err := pool.NewChannelPool(poolConfig)
+		if err != nil {
+			fmt.Println("err=", err)
+			return nil, err
+		}
+		if len(pm) == 0 {
+			pm = make(map[string]pool.Pool)
+		}
+		pm[remote] = p
+	} else {
+		fmt.Println("Got factory from pool ", remote, pm[remote], "The len of the pool->", pm[remote].Len())
+	}
+	go p.fillPool(pm[remote])
+	return pm[remote], nil
 }

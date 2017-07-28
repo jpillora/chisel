@@ -56,6 +56,8 @@ type Server struct {
 	socksServer  *socks5.Server
 }
 
+var m map[string]pool.Pool
+
 func NewServer(config *Config) (*Server, error) {
 	s := &Server{
 		Logger:     chshare.NewLogger("server"),
@@ -322,9 +324,34 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		if socks {
 			go s.handleSocksStream(clientLog.Fork("socks#%05d", connID), stream)
 		} else {
-			go s.handleTCPStream(clientLog.Fork(" tcp#%05d", connID), stream, remote)
+			p := s.checkOrIntPool(remote)
+			go s.handleTCPStream(clientLog.Fork(" tcp#%05d", connID), stream, remote, p)
 		}
 	}
+}
+func (s *Server) checkOrIntPool(remote string) (pool.Pool){
+	p := m[remote]
+	if p == nil {
+		factory := func() (interface{}, error) { return net.Dial("tcp", remote) }
+		close := func(v interface{}) error { return v.(net.Conn).Close() }
+		poolConfig := &pool.PoolConfig{
+			InitialCap:  PoolInitCap,
+			MaxCap:      PoolMaxCap,
+			Factory:     factory,
+			Close:       close,
+			IdleTimeout: 60 * time.Second,
+		}
+		p, err := pool.NewChannelPool(poolConfig)
+		if err != nil {
+			fmt.Println("err=", err)
+		}
+		if len(m) == 0 {
+			m = make(map[string]pool.Pool)
+		}
+		m[remote] = p
+	}
+	go s.fillPool(m[remote], remote)
+	return m[remote]
 }
 
 func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
@@ -341,20 +368,32 @@ func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 	}
 }
 
-func (s *Server) handleTCPStream(l *chshare.Logger, src io.ReadWriteCloser, remote string) {
-	factory := func() (interface{}, error) { return net.Dial("tcp", remote) }
-	close := func(v interface{}) error { return v.(net.Conn).Close() }
-	poolConfig := &pool.PoolConfig{
-		InitialCap: PoolInitCap,
-		MaxCap:     PoolMaxCap,
-		Factory:    factory,
-		Close:      close,
-		IdleTimeout: 60 * time.Second,
+func (s *Server) fillPool(pm pool.Pool, remote string) {
+	if pm == nil {
+		return
 	}
-	p, err := pool.NewChannelPool(poolConfig)
-	if err != nil {
-		fmt.Println("err=", err)
+	if remote == "" {
+		return
 	}
+	fmt.Println("Before fill pool, the pool size->", pm.Len())
+	for i := pm.Len(); i <= PoolInitCap; i++ {
+		if pm.Len() > PoolInitCap {
+			break
+		}
+		conn, err := net.Dial("tcp", remote)
+		if  err == nil {
+			pm.Put(conn)
+		} else {
+			conn, err = net.Dial("tcp", remote)
+			if err == nil {
+				pm.Put(conn)
+			}
+		}
+	}
+	fmt.Println("Now the pool size->", pm.Len())
+}
+func (s *Server) handleTCPStream(l *chshare.Logger, src io.ReadWriteCloser, remote string, p pool.Pool) {
+
 	v, err := p.Get()
 	//do something
 	dst := v.(net.Conn)
