@@ -22,6 +22,12 @@ import (
 	"github.com/jpillora/requestlog"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
+	"github.com/silenceper/pool"
+)
+
+const (
+	PoolInitCap = 3
+	PoolMaxCap = 50
 )
 
 type Config struct {
@@ -336,7 +342,23 @@ func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 }
 
 func (s *Server) handleTCPStream(l *chshare.Logger, src io.ReadWriteCloser, remote string) {
-	dst, err := net.Dial("tcp", remote)
+	factory := func() (interface{}, error) { return net.Dial("tcp", remote) }
+	close := func(v interface{}) error { return v.(net.Conn).Close() }
+	poolConfig := &pool.PoolConfig{
+		InitialCap: PoolInitCap,
+		MaxCap:     PoolMaxCap,
+		Factory:    factory,
+		Close:      close,
+		IdleTimeout: 60 * time.Second,
+	}
+	p, err := pool.NewChannelPool(poolConfig)
+	if err != nil {
+		fmt.Println("err=", err)
+	}
+	v, err := p.Get()
+	//do something
+	dst := v.(net.Conn)
+	//dst, err := net.Dial("tcp", remote)
 	if err != nil {
 		l.Debugf("Remote failed (%s)", err)
 		src.Close()
