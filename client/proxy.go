@@ -112,6 +112,9 @@ func (p *tcpProxy) fillPool(pm pool.Pool) {
 		if  err == nil {
 			pm.Put(conn)
 		} else {
+			if p.client.sshConn == nil {
+				break
+			}
 			conn, err = chshare.OpenStream(p.client.sshConn, p.remote.Remote())
 			if err == nil {
 				pm.Put(conn)
