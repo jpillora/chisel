@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	PoolInitCap = 3
-	PoolMaxCap = 50
+	PoolInitCap = 30
+	PoolMaxCap = 150
 )
 
 type Config struct {
