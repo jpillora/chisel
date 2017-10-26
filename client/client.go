@@ -22,6 +22,7 @@ type Config struct {
 	Fingerprint string
 	Auth        string
 	KeepAlive   time.Duration
+	MaxRetryInterval time.Duration
 	Server      string
 	HTTPProxy   string
 	Remotes     []string
@@ -46,6 +47,10 @@ func NewClient(config *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(config.Server, "http") {
 		config.Server = "http://" + config.Server
+	}
+
+	if config.MaxRetryInterval == 0 {
+		config.MaxRetryInterval = 5 * time.Minute
 	}
 
 	u, err := url.Parse(config.Server)
@@ -155,7 +160,7 @@ func (c *Client) loop() {
 	}
 	//connection loop!
 	var connerr error
-	b := &backoff.Backoff{Max: 5 * time.Minute}
+	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
 	for {
 		//NOTE: break == dont retry on handshake failures
 		if !c.running {

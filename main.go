@@ -227,6 +227,9 @@ var clientHelp = `
     specify a time with a unit, for example '30s' or '2m'. Defaults
     to '0s' (disabled).
 
+    --max-retry-interval, An optional max retry interval. Defaults to
+    5 minutes.
+
     --proxy, An optional HTTP CONNECT proxy which will be used reach
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
@@ -239,6 +242,7 @@ func client(args []string) {
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
+	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
 	proxy := flags.String("proxy", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
@@ -258,12 +262,13 @@ func client(args []string) {
 	}
 
 	c, err := chclient.NewClient(&chclient.Config{
-		Fingerprint: *fingerprint,
-		Auth:        *auth,
-		KeepAlive:   *keepalive,
-		HTTPProxy:   *proxy,
-		Server:      args[0],
-		Remotes:     args[1:],
+		Fingerprint:      *fingerprint,
+		Auth:             *auth,
+		KeepAlive:        *keepalive,
+		MaxRetryInterval: *maxRetryInterval,
+		HTTPProxy:        *proxy,
+		Server:           args[0],
+		Remotes:          args[1:],
 	})
 	if err != nil {
 		log.Fatal(err)
