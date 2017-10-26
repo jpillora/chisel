@@ -185,6 +185,9 @@ $ chisel client --help
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
 
+    --max-retry-interval, An optional max retry interval. Defaults to
+    5 minutes.
+
     --pid Generate pid file in current directory
 
     -v, Enable verbose logging
