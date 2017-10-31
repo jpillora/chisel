@@ -176,6 +176,7 @@ func (c *Client) loop() {
 		d := websocket.Dialer{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
+			HandshakeTimeout: b.Duration(),
 			Subprotocols:    []string{chshare.ProtocolVersion},
 		}
 		//optionally CONNECT proxy
