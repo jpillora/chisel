@@ -145,7 +145,7 @@ func (s *Server) Start(host, port string) error {
 	}
 	s.Infof("Listening on %s...", port)
 
-	h := http.Handler(http.HandlerFunc(s.handleHTTP))
+	var h http.Handler = http.HandlerFunc(s.handleHTTP)
 	if s.Debug {
 		h = requestlog.Wrap(h)
 	}

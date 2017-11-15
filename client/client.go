@@ -199,7 +199,7 @@ func (c *Client) loop() {
 		}
 		c.config.shared.Version = chshare.BuildVersion
 		conf, _ := chshare.EncodeConfig(c.config.shared)
-		c.Debugf("Sending configurating")
+		c.Debugf("Sending config")
 		t0 := time.Now()
 		_, configerr, err := sshConn.SendRequest("config", true, conf)
 		if err != nil {
@@ -210,7 +210,7 @@ func (c *Client) loop() {
 			c.Infof(string(configerr))
 			break
 		}
-		c.Infof("Connected (Latency %s)", time.Now().Sub(t0))
+		c.Infof("Connected (Latency %s)", time.Since(t0))
 		//connected
 		b.Reset()
 		c.sshConn = sshConn
