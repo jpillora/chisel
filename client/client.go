@@ -166,7 +166,7 @@ func (c *Client) loop() {
 			c.Debugf("Connection error: %s", connerr)
 			c.Infof("Retrying in %s...", d)
 			connerr = nil
-			time.Sleep(d)
+			chshare.SleepSignal(d)
 		}
 		d := websocket.Dialer{
 			ReadBufferSize:  1024,
