@@ -34,20 +34,17 @@ type Config struct {
 
 type Server struct {
 	*chshare.Logger
-	//Users is an empty map of usernames to Users
-	//It can be optionally initialized using the
-	//file found at AuthFile
-	Users    chshare.Users
-	sessions chshare.Users
 
-	fingerprint  string
-	sessCount    int32
 	connCount    int32
 	connOpen     int32
+	fingerprint  string
 	httpServer   *chshare.HTTPServer
 	reverseProxy *httputil.ReverseProxy
-	sshConfig    *ssh.ServerConfig
+	sessCount    int32
+	sessions     chshare.Users
 	socksServer  *socks5.Server
+	sshConfig    *ssh.ServerConfig
+	users        *chshare.UserSource
 }
 
 func NewServer(config *Config) (*Server, error) {
@@ -58,23 +55,18 @@ func NewServer(config *Config) (*Server, error) {
 	}
 	s.Info = true
 
-	//parse users, if provided
+	s.users = chshare.NewUserSource(s.Logger)
 	if config.AuthFile != "" {
-		users, err := chshare.ParseUsers(config.AuthFile)
-		if err != nil {
+		if err := s.users.LoadUsers(config.AuthFile, true); err != nil {
 			return nil, err
 		}
-		s.Users = users
 	}
 	//parse single user, if provided
 	if config.Auth != "" {
 		u := &chshare.User{Addrs: []*regexp.Regexp{chshare.UserAllowAll}}
 		u.Name, u.Pass = chshare.ParseAuth(config.Auth)
 		if u.Name != "" {
-			if s.Users == nil {
-				s.Users = chshare.Users{}
-			}
-			s.Users[u.Name] = u
+			s.users.AddUser(u)
 		}
 	}
 
@@ -137,13 +129,14 @@ func (s *Server) Run(host, port string) error {
 
 func (s *Server) Start(host, port string) error {
 	s.Infof("Fingerprint %s", s.fingerprint)
-	if len(s.Users) > 0 {
+
+	if s.users.Size() > 0 {
 		s.Infof("User authenication enabled")
 	}
 	if s.reverseProxy != nil {
 		s.Infof("Reverse proxy enabled")
 	}
-	s.Infof("Listening on %s...", port)
+	s.Infof("Listening on %s:%s...", host, port)
 
 	var h http.Handler = http.HandlerFunc(s.handleHTTP)
 	if s.Debug {
@@ -182,18 +175,20 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 //
 func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	// no auth - allow all
-	if len(s.Users) == 0 {
+	if s.users.Size() == 0 {
 		return nil, nil
 	}
+
 	// authenticate user
 	n := c.User()
-	u, ok := s.Users[n]
+	u, ok := s.users.HasUser(n)
 	if !ok || u.Pass != string(pass) {
 		s.Debugf("Login failed: %s", n)
 		return nil, errors.New("Invalid auth")
 	}
-	//insert session
+
 	s.sessions[string(c.SessionID())] = u
+
 	return nil, nil
 }
 
@@ -204,7 +199,6 @@ var upgrader = websocket.Upgrader{
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
-
 	id := atomic.AddInt32(&s.sessCount, 1)
 	clog := s.Fork("session#%d", id)
 
@@ -223,7 +217,8 @@ func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 	}
 	//load user
 	var user *chshare.User
-	if len(s.Users) > 0 {
+
+	if s.users.Size() > 0 {
 		sid := string(sshConn.SessionID())
 		user = s.sessions[sid]
 		defer delete(s.sessions, sid)

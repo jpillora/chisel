@@ -3,6 +3,7 @@ package chshare
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"regexp"
 	"strings"
@@ -38,15 +39,13 @@ func (u *User) HasAccess(addr string) bool {
 type Users map[string]*User
 
 func ParseUsers(authfile string) (Users, error) {
-
 	b, err := ioutil.ReadFile(authfile)
 	if err != nil {
-		return nil, errors.New("Failed to read auth file")
+		return nil, fmt.Errorf("Failed to read auth file: %s, error: %s", authfile, err)
 	}
 
 	var raw map[string][]string
-	err = json.Unmarshal(b, &raw)
-	if err != nil {
+	if err := json.Unmarshal(b, &raw); err != nil {
 		return nil, errors.New("Invalid JSON: " + err.Error())
 	}
 
