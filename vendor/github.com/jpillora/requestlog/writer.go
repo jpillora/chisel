@@ -10,15 +10,16 @@ import (
 	"time"
 
 	"github.com/jpillora/sizestr"
+	"github.com/tomasen/realip"
 )
 
 func monitorWriter(w http.ResponseWriter, r *http.Request, opts *Options) *monitorableWriter {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if opts.TrustProxy {
+		ip = realip.FromRequest(r)
 	}
 	if ip == "127.0.0.1" || ip == "::1" {
-		ip = ""
+		ip = "" //dont show localhost ips
 	}
 	return &monitorableWriter{
 		opts:   opts,

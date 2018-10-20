@@ -60,7 +60,8 @@ func (c *wsConn) Write(b []byte) (int, error) {
 	if err := c.Conn.WriteMessage(websocket.BinaryMessage, b); err != nil {
 		return 0, err
 	}
-	return len(b), nil
+	n := len(b)
+	return n, nil
 }
 
 func (c *wsConn) SetDeadline(t time.Time) error {

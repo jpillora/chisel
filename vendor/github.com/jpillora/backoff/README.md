@@ -116,4 +116,4 @@ https://godoc.org/github.com/jpillora/backoff
 
 #### Credits
 
-Forked from some JavaScript written by [@tj](https://github.com/tj)
+Forked from [some JavaScript](https://github.com/segmentio/backo) written by [@tj](https://github.com/tj)

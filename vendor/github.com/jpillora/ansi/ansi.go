@@ -272,6 +272,10 @@ const (
 	MagentaBG Attribute = "45"
 	CyanBG    Attribute = "46"
 	WhiteBG   Attribute = "47"
+
+	// Default Colors
+	Default   Attribute = "39"
+	DefaultBG Attribute = "49"
 )
 
 //Set attributes

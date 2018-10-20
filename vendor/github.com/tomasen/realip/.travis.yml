@@ -1,0 +1,19 @@
+language: go
+
+go:
+  - tip
+
+before_install:
+  # lint
+  - go get github.com/golang/lint/golint
+
+  # code complexity
+  - go get github.com/on99/gocyclo
+
+  # test
+  - go get github.com/smartystreets/goconvey/convey
+
+script:
+  - golint ./...
+  - go vet ./...
+  - gocyclo -skip-godeps=true -top 10 -over 10 . # over 10 is bad code

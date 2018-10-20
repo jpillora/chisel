@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	sizestr.LowerCase()
+	sizestr.UpperCase()
 }
 
 type Colors struct {
@@ -31,6 +31,8 @@ type Options struct {
 	formatTmpl *template.Template
 	Colors     *Colors
 	Filter     func(r *http.Request, code int, duration time.Duration, size int64) bool
+	//TrustProxy will log X-Forwarded-For/X-Real-Ip instead of the IP source
+	TrustProxy bool
 }
 
 var DefaultOptions = Options{
@@ -40,16 +42,15 @@ var DefaultOptions = Options{
 		`{{ .Method }} {{ .Path }} {{ .CodeColor }}{{ .Code }}{{ .Reset }} ` +
 		`{{ .Duration }}{{ if .Size }} {{ .Size }}{{end}}` +
 		`{{ if .IP }} ({{ .IP }}){{end}}` + "\n",
-	Colors: defaultColors(),
+	Colors:     defaultColors(),
+	TrustProxy: false,
 }
 
 func defaultColors() *Colors {
-	sizestr.ToggleCase()
 	if termutil.Isatty(os.Stdout.Fd()) {
 		return basicColors
-	} else {
-		return noColors
 	}
+	return noColors
 }
 
 func Wrap(next http.Handler) http.Handler {
