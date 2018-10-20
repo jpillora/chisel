@@ -2,21 +2,21 @@
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel)
 
-Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (Golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance).
+Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance).
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
 ### Features
 
-* Easy to use
-* [Performant](#performance)*
-* [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
-* [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
-* Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
-* Client can create multiple tunnel endpoints over one TCP connection
-* Client can optionally pass through HTTP CONNECT proxies
-* Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
-* Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
+- Easy to use
+- [Performant](#performance)\*
+- [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
+- [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
+- Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
+- Client can create multiple tunnel endpoints over one TCP connection
+- Client can optionally pass through HTTP CONNECT proxies
+- Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
+- Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
 
 ### Install
 
@@ -36,7 +36,7 @@ docker run --rm -it jpillora/chisel --help
 
 **Source**
 
-``` sh
+```sh
 $ go get -v github.com/jpillora/chisel
 ```
 
@@ -44,14 +44,14 @@ $ go get -v github.com/jpillora/chisel
 
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
-``` sh
+```sh
 $ chisel server --port $PORT --proxy http://example.com
 # listens on $PORT, proxy web requests to 'http://example.com'
 ```
 
 This demo app is also running a [simple file server](https://www.npmjs.com/package/serve) on `:3000`, which is normally inaccessible due to Heroku's firewall. However, if we tunnel in with:
 
-``` sh
+```sh
 $ chisel client https://chisel-demo.herokuapp.com 3000
 # connects to 'https://chisel-demo.herokuapp.com',
 # tunnels your localhost:3000 to the server's localhost:3000
@@ -74,7 +74,6 @@ $ chisel --help
 
    Read more:
      https://github.com/jpillora/chisel
-
 ```
 
 ```
@@ -128,7 +127,6 @@ $ chisel server --help
 
   Read more:
     https://github.com/jpillora/chisel
-
 ```
 
 ```
@@ -185,6 +183,12 @@ $ chisel client --help
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
 
+    --max-retry-count, Maximum number of times to retry before exiting.
+    Defaults to unlimited.
+
+    --max-retry-interval, Maximum wait time before retrying after a
+    disconnection. Defaults to 5 minutes.
+
     --pid Generate pid file in current directory
 
     -v, Enable verbose logging
@@ -196,7 +200,6 @@ $ chisel client --help
 
   Read more:
     https://github.com/jpillora/chisel
-
 ```
 
 ### Security
@@ -207,7 +210,7 @@ Encryption is always enabled. When you start up a chisel server, it will generat
 
 Using the `--authfile` option, the server may optionally provide a `user.json` configuration file to create a list of accepted users. The client then authenticates using the `--auth` option. See [users.json](example/users.json) for an example authentication configuration file. See the `--help` above for more information.
 
-Internally, this is done using the *Password* authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
+Internally, this is done using the _Password_ authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
 
 ### SOCKS5 Guide
 
@@ -252,7 +255,7 @@ request--->client:2001--->server:2002---->fileserver:3000
 
 Note, we're using an in-memory "file" server on localhost for these tests
 
-*direct*
+_direct_
 
 ```
 :3000 => 1 bytes in 1.291417ms
@@ -302,34 +305,34 @@ See more [test/](test/)
 
 ### Known Issues
 
-* WebSockets support is required
-	* IaaS providers all will support WebSockets
-		* Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
-	* PaaS providers vary in their support for WebSockets
-		* Heroku has full support
-		* Openshift has full support though connections are only accepted on ports 8443 and 8080
-		* Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
+- WebSockets support is required
+  _ IaaS providers all will support WebSockets
+  _ Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
+  _ PaaS providers vary in their support for WebSockets
+  _ Heroku has full support
+  _ Openshift has full support though connections are only accepted on ports 8443 and 8080
+  _ Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
 
 ### Contributing
 
-* http://golang.org/doc/code.html
-* http://golang.org/doc/effective_go.html
-* `github.com/jpillora/chisel/share` contains the shared package
-* `github.com/jpillora/chisel/server` contains the server package
-* `github.com/jpillora/chisel/client` contains the client package
+- http://golang.org/doc/code.html
+- http://golang.org/doc/effective_go.html
+- `github.com/jpillora/chisel/share` contains the shared package
+- `github.com/jpillora/chisel/server` contains the server package
+- `github.com/jpillora/chisel/client` contains the client package
 
 ### Changelog
 
-* `1.0.0` - Initial release
-* `1.1.0` - Swapped out simple symmetric encryption for ECDSA SSH
-* `1.2.0` - Added SOCKS5 (server) and HTTP CONNECT (client) support
+- `1.0.0` - Initial release
+- `1.1.0` - Swapped out simple symmetric encryption for ECDSA SSH
+- `1.2.0` - Added SOCKS5 (server) and HTTP CONNECT (client) support
 
 ### Todo
 
-* Allow clients to act as an indirect tunnel endpoint for other clients
-* Better, faster tests
-* Expose a stats page for proxy throughput
-* Treat client stdin/stdout as a socket
+- Allow clients to act as an indirect tunnel endpoint for other clients
+- Better, faster tests
+- Expose a stats page for proxy throughput
+- Treat client stdin/stdout as a socket
 
 #### MIT License
 

@@ -18,13 +18,15 @@ import (
 
 //Config represents a client configuration
 type Config struct {
-	shared      *chshare.Config
-	Fingerprint string
-	Auth        string
-	KeepAlive   time.Duration
-	Server      string
-	HTTPProxy   string
-	Remotes     []string
+	shared           *chshare.Config
+	Fingerprint      string
+	Auth             string
+	KeepAlive        time.Duration
+	MaxRetryCount    int
+	MaxRetryInterval time.Duration
+	Server           string
+	HTTPProxy        string
+	Remotes          []string
 }
 
 //Client represents a client instance
@@ -45,6 +47,9 @@ func NewClient(config *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(config.Server, "http") {
 		config.Server = "http://" + config.Server
+	}
+	if config.MaxRetryInterval < time.Second {
+		config.MaxRetryInterval = 5 * time.Minute
 	}
 	u, err := url.Parse(config.Server)
 	if err != nil {
@@ -150,23 +155,38 @@ func (c *Client) loop() {
 	}
 	//connection loop!
 	var connerr error
-	b := &backoff.Backoff{Max: 5 * time.Minute}
+	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
 	for {
-		//NOTE: break == dont retry on handshake failures
 		if !c.running {
 			break
 		}
 		if connerr != nil {
+			attempt := int(b.Attempt())
+			maxAttempt := c.config.MaxRetryCount
 			d := b.Duration()
-			c.Debugf("Connection error: %s", connerr)
+			//show error and attempt counts
+			msg := fmt.Sprintf("Connection error: %s", connerr)
+			if attempt > 0 {
+				msg += fmt.Sprintf(" (Attempt: %d", attempt)
+				if maxAttempt > 0 {
+					msg += fmt.Sprintf("/%d", maxAttempt)
+				}
+				msg += ")"
+			}
+			c.Debugf(msg)
+			//give up?
+			if maxAttempt >= 0 && attempt >= maxAttempt {
+				break
+			}
 			c.Infof("Retrying in %s...", d)
 			connerr = nil
 			chshare.SleepSignal(d)
 		}
 		d := websocket.Dialer{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			Subprotocols:    []string{chshare.ProtocolVersion},
+			ReadBufferSize:   1024,
+			WriteBufferSize:  1024,
+			HandshakeTimeout: 45 * time.Second,
+			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
 		//optionally CONNECT proxy
 		if c.httpProxyURL != nil {
