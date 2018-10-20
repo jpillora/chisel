@@ -81,7 +81,7 @@ func NewServer(config *Config) (*Server, error) {
 	s.fingerprint = chshare.FingerprintKey(private.PublicKey())
 	//create ssh config
 	s.sshConfig = &ssh.ServerConfig{
-		ServerVersion:    chshare.ProtocolVersion + "-server",
+		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",
 		PasswordCallback: s.authUser,
 	}
 	s.sshConfig.AddHostKey(private)

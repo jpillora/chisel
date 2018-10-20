@@ -42,17 +42,14 @@ type Client struct {
 
 //NewClient creates a new client instance
 func NewClient(config *Config) (*Client, error) {
-
 	//apply default scheme
 	if !strings.HasPrefix(config.Server, "http") {
 		config.Server = "http://" + config.Server
 	}
-
 	u, err := url.Parse(config.Server)
 	if err != nil {
 		return nil, err
 	}
-
 	//apply default port
 	if !regexp.MustCompile(`:\d+$`).MatchString(u.Host) {
 		if u.Scheme == "https" || u.Scheme == "wss" {
@@ -61,10 +58,8 @@ func NewClient(config *Config) (*Client, error) {
 			u.Host = u.Host + ":80"
 		}
 	}
-
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
-
 	shared := &chshare.Config{}
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
@@ -74,7 +69,6 @@ func NewClient(config *Config) (*Client, error) {
 		shared.Remotes = append(shared.Remotes, r)
 	}
 	config.shared = shared
-
 	client := &Client{
 		Logger:   chshare.NewLogger("client"),
 		config:   config,
@@ -96,8 +90,9 @@ func NewClient(config *Config) (*Client, error) {
 	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
-		ClientVersion:   chshare.ProtocolVersion + "-client",
+		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
+		Timeout:         30 * time.Second,
 	}
 
 	return client, nil
