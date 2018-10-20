@@ -1,74 +1,102 @@
 package chshare
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-// UserSource is a reloadable user source
+type Users map[string]*User
+
+func ParseUsers(authfile string) (Users, error) {
+	b, err := ioutil.ReadFile(authfile)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read auth file: %s, error: %s", authfile, err)
+	}
+	var raw map[string][]string
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return nil, errors.New("Invalid JSON: " + err.Error())
+	}
+	users := Users{}
+	for auth, remotes := range raw {
+		u := &User{}
+		u.Name, u.Pass = ParseAuth(auth)
+		if u.Name == "" {
+			return nil, errors.New("Invalid user:pass string")
+		}
+		for _, r := range remotes {
+			if r == "" || r == "*" {
+				u.Addrs = append(u.Addrs, UserAllowAll)
+			} else {
+				re, err := regexp.Compile(r)
+				if err != nil {
+					return nil, errors.New("Invalid address regex")
+				}
+				u.Addrs = append(u.Addrs, re)
+			}
+
+		}
+		users[u.Name] = u
+	}
+	return users, nil
+}
+
+//UserSource is a reloadable user source
 type UserSource struct {
+	*Logger
 	sync.RWMutex
 	configFile string
-	logger     *Logger
 	users      Users
 }
 
-// NewUserSource
+//NewUserSource creates a source for users
 func NewUserSource(logger *Logger) *UserSource {
 	return &UserSource{
-		logger: logger,
+		Logger: logger,
 		users:  make(Users, 0),
 	}
 }
 
-// LoadUsers is responsible for loading users from a file
-func (u *UserSource) LoadUsers(filename string, reloadable bool) error {
-	u.configFile = filename
-
-	u.logger.Infof("Loading the configuraion from: %s", filename)
+//LoadUsers is responsible for loading users from a file
+func (u *UserSource) LoadUsers(configFile string) error {
+	u.configFile = configFile
+	u.Infof("Loading the configuraion from: %s", configFile)
 	if err := u.loadUserSource(); err != nil {
 		return err
 	}
-
-	if reloadable {
-		u.logger.Infof("Enabling reloading of configuration")
-		if err := u.addWatchEvents(); err != nil {
-			return err
-		}
+	if err := u.addWatchEvents(); err != nil {
+		return err
 	}
-
 	return nil
 }
 
 // Size returns the numbers of users
 func (u *UserSource) Size() int {
 	u.RLock()
-	defer u.RUnlock()
-
-	return len(u.users)
+	l := len(u.users)
+	u.RUnlock()
+	return l
 }
 
 // HasUser is responsible for checking the user exists
 func (u *UserSource) HasUser(username string) (*User, bool) {
 	u.RLock()
-	defer u.RUnlock()
-
-	if u, found := u.users[username]; found {
-		return u, true
-	}
-
-	return nil, false
+	user, found := u.users[username]
+	u.RUnlock()
+	return user, found
 }
 
 // AddUser adds a users to the list
 func (u *UserSource) AddUser(user *User) {
 	u.Lock()
-	defer u.Unlock()
-
 	u.users[user.Name] = user
+	u.Unlock()
 }
 
 // watchEvents is responsible for watching for updates to the file and reloading
@@ -77,28 +105,25 @@ func (u *UserSource) addWatchEvents() error {
 	if err != nil {
 		return err
 	}
-	if err := watcher.Add(filepath.Dir(u.configFile)); err != nil {
+	configDir := filepath.Dir(u.configFile)
+	if err := watcher.Add(configDir); err != nil {
 		return err
 	}
-
 	go func() {
 		for e := range watcher.Events {
 			if e.Name != u.configFile {
 				continue
 			}
-
-			if e.Op&fsnotify.Write == fsnotify.Write {
-				u.logger.Debugf("User configuration has changed: %s", u.configFile)
-
-				if err := u.loadUserSource(); err != nil {
-					u.logger.Errorf("Failed to reload the users configuration: %s", err)
-					continue
-				}
-				u.logger.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+			if e.Op&fsnotify.Write != fsnotify.Write {
+				continue
+			}
+			if err := u.loadUserSource(); err != nil {
+				u.Infof("Failed to reload the users configuration: %s", err)
+			} else {
+				u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
 			}
 		}
 	}()
-
 	return nil
 }
 
@@ -107,15 +132,12 @@ func (u *UserSource) loadUserSource() error {
 	if u.configFile == "" {
 		return errors.New("configuration file not set")
 	}
-
 	users, err := ParseUsers(u.configFile)
 	if err != nil {
 		return err
 	}
-
 	u.Lock()
-	defer u.Unlock()
 	u.users = users
-
+	u.Unlock()
 	return nil
 }

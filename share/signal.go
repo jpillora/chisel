@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-//Sleep unless Signal
+//SleepSignal sleeps for the given duration,
+//or until a SIGHUP is received
 func SleepSignal(d time.Duration) {
 	//during this time, also listen for SIGHUP
 	//(this uses 0xc to allow windows to compile)

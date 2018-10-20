@@ -107,7 +107,8 @@ var serverHelp = `
     when <user> connects, their <pass> will be verified and then
     each of the remote addresses will be compared against the list
     of address regular expressions for a match. Addresses will
-    always come in the form "<host/ip>:<port>".
+    always come in the form "<host/ip>:<port>". This file will be
+    automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. This is equivalent to creating an

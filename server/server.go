@@ -34,7 +34,6 @@ type Config struct {
 
 type Server struct {
 	*chshare.Logger
-
 	connCount    int32
 	connOpen     int32
 	fingerprint  string
@@ -54,10 +53,9 @@ func NewServer(config *Config) (*Server, error) {
 		sessions:   chshare.Users{},
 	}
 	s.Info = true
-
 	s.users = chshare.NewUserSource(s.Logger)
 	if config.AuthFile != "" {
-		if err := s.users.LoadUsers(config.AuthFile, true); err != nil {
+		if err := s.users.LoadUsers(config.AuthFile); err != nil {
 			return nil, err
 		}
 	}
@@ -69,7 +67,6 @@ func NewServer(config *Config) (*Server, error) {
 			s.users.AddUser(u)
 		}
 	}
-
 	//generate private key (optionally using seed)
 	key, _ := chshare.GenerateKey(config.KeySeed)
 	//convert into ssh.PrivateKey
@@ -157,7 +154,7 @@ func (s *Server) Close() error {
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	//websockets upgrade AND has chisel prefix
+	//websockets upgrade AND has matching chisel version
 	if upgrade == "websocket" && protocol == chshare.ProtocolVersion {
 		s.handleWS(w, r)
 		return
@@ -172,13 +169,11 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Not found"))
 }
 
-//
 func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	// no auth - allow all
 	if s.users.Size() == 0 {
 		return nil, nil
 	}
-
 	// authenticate user
 	n := c.User()
 	u, ok := s.users.HasUser(n)
@@ -186,9 +181,7 @@ func (s *Server) authUser(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, er
 		s.Debugf("Login failed: %s", n)
 		return nil, errors.New("Invalid auth")
 	}
-
 	s.sessions[string(c.SessionID())] = u
-
 	return nil, nil
 }
 
@@ -235,7 +228,6 @@ func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 		sshConn.Close()
 		return
 	}
-
 	failed := func(err error) {
 		r.Reply(false, []byte(err.Error()))
 	}
