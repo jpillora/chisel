@@ -12,6 +12,7 @@ RUN go build \
     -o chisel
 # container stage
 FROM alpine
+RUN apk update && apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=build-env /src/chisel /app/chisel
 ENTRYPOINT ["/app/chisel"]
