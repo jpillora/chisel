@@ -30,8 +30,7 @@ type Config struct {
 // Server respresent a chisel service
 type Server struct {
 	*chshare.Logger
-	connCount    int32
-	connOpen     int32
+	connStats    chshare.ConnStats
 	fingerprint  string
 	httpServer   *chshare.HTTPServer
 	reverseProxy *httputil.ReverseProxy

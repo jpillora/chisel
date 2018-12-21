@@ -1,7 +1,6 @@
 package chserver
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -147,7 +146,7 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		}
 		go ssh.DiscardRequests(reqs)
 		//handle stream type
-		connID := atomic.AddInt32(&s.connCount, 1)
+		connID := s.connStats.New()
 		if socks {
 			go s.handleSocksStream(clientLog.Fork("socks#%05d", connID), stream)
 		} else {
@@ -159,14 +158,14 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 	conn := chshare.NewRWCConn(src)
 	// conn.SetDeadline(time.Now().Add(30 * time.Second))
-	atomic.AddInt32(&s.connOpen, 1)
-	l.Debugf("%s Opening", s.connStatus())
+	s.connStats.Open()
+	l.Debugf("%s Opening", s.connStats.Status())
 	err := s.socksServer.ServeConn(conn)
-	atomic.AddInt32(&s.connOpen, -1)
+	s.connStats.Close()
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("%s Closed (error: %s)", s.connStatus(), err)
+		l.Debugf("%s Closed (error: %s)", s.connStats.Status(), err)
 	} else {
-		l.Debugf("%s Closed", s.connStatus())
+		l.Debugf("%s Closed", s.connStats.Status())
 	}
 }
 
@@ -177,13 +176,9 @@ func (s *Server) handleTCPStream(l *chshare.Logger, src io.ReadWriteCloser, remo
 		src.Close()
 		return
 	}
-	atomic.AddInt32(&s.connOpen, 1)
-	l.Debugf("%s Open", s.connStatus())
+	s.connStats.Open()
+	l.Debugf("%s Open", s.connStats.Status())
 	sent, received := chshare.Pipe(src, dst)
-	atomic.AddInt32(&s.connOpen, -1)
-	l.Debugf("%s Close (sent %s received %s)", s.connStatus(), sizestr.ToString(sent), sizestr.ToString(received))
-}
-
-func (s *Server) connStatus() string {
-	return fmt.Sprintf("[%d/%d]", atomic.LoadInt32(&s.connOpen), atomic.LoadInt32(&s.connCount))
+	s.connStats.Close()
+	l.Debugf("%s Close (sent %s received %s)", s.connStats.Status(), sizestr.ToString(sent), sizestr.ToString(received))
 }
