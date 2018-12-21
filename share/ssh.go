@@ -9,8 +9,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 
+	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -54,4 +56,18 @@ func RejectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		ch.Reject(ssh.Prohibited, "Tunnels disallowed")
 	}
+}
+
+func HandleTCPStream(l *Logger, connStats *ConnStats, src io.ReadWriteCloser, remote string) {
+	dst, err := net.Dial("tcp", remote)
+	if err != nil {
+		l.Debugf("Remote failed (%s)", err)
+		src.Close()
+		return
+	}
+	connStats.Open()
+	l.Debugf("%s Open", connStats.Status())
+	sent, received := Pipe(src, dst)
+	connStats.Close()
+	l.Debugf("%s Close (sent %s received %s)", connStats.Status(), sizestr.ToString(sent), sizestr.ToString(received))
 }

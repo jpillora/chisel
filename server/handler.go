@@ -2,13 +2,11 @@ package chserver
 
 import (
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/jpillora/chisel/share"
@@ -150,7 +148,7 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		if socks {
 			go s.handleSocksStream(clientLog.Fork("socks#%05d", connID), stream)
 		} else {
-			go HandleTCPStream(clientLog.Fork(" tcp#%05d", connID), &s.connStats, stream, remote)
+			go chshare.HandleTCPStream(clientLog.Fork(" tcp#%05d", connID), &s.connStats, stream, remote)
 		}
 	}
 }
@@ -167,18 +165,4 @@ func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 	} else {
 		l.Debugf("%s Closed", s.connStats.Status())
 	}
-}
-
-func HandleTCPStream(l *chshare.Logger, connStats *shshare.ConnStats, src io.ReadWriteCloser, remote string) {
-	dst, err := net.Dial("tcp", remote)
-	if err != nil {
-		l.Debugf("Remote failed (%s)", err)
-		src.Close()
-		return
-	}
-	connStats.Open()
-	l.Debugf("%s Open", connStats.Status())
-	sent, received := chshare.Pipe(src, dst)
-	connStats.Close()
-	l.Debugf("%s Close (sent %s received %s)", connStats.Status(), sizestr.ToString(sent), sizestr.ToString(received))
 }
