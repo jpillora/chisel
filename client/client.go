@@ -34,7 +34,7 @@ type Client struct {
 	*chshare.Logger
 	config       *Config
 	sshConfig    *ssh.ClientConfig
-	proxies      []*tcpProxy
+	proxies      []*chshare.TCPProxy
 	sshConn      ssh.Conn
 	httpProxyURL *url.URL
 	server       string
@@ -130,8 +130,8 @@ func (c *Client) Start() error {
 	}
 	//prepare proxies
 	for i, r := range c.config.shared.Remotes {
-		proxy := newTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
-		if err := proxy.start(); err != nil {
+		proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
+		if err := proxy.Start(); err != nil {
 			return err
 		}
 		c.proxies = append(c.proxies, proxy)
