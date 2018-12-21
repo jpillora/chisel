@@ -41,6 +41,7 @@ type Client struct {
 	server       string
 	running      bool
 	runningc     chan error
+	connStats    chshare.ConnStats
 }
 
 //NewClient creates a new client instance
@@ -238,7 +239,7 @@ func (c *Client) loop() {
 		b.Reset()
 		c.sshConn = sshConn
 		go ssh.DiscardRequests(reqs)
-		go chshare.RejectStreams(chans) //TODO allow client to ConnectStreams
+		go c.connectStreams(chans)
 		err = sshConn.Wait()
 		//disconnected
 		c.sshConn = nil
@@ -264,4 +265,17 @@ func (c *Client) Close() error {
 		return nil
 	}
 	return c.sshConn.Close()
+}
+
+func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
+	for ch := range chans {
+		remote := string(ch.ExtraData())
+		stream, reqs, err := ch.Accept()
+		if err != nil {
+			c.Logger.Debugf("Failed to accept stream: %s", err)
+			continue
+		}
+		go ssh.DiscardRequests(reqs)
+		go chshare.HandleTCPStream(c.Logger.Fork("tcp#%05d", c.connStats.New()), &c.connStats, stream, remote)
+	}
 }

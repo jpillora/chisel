@@ -1,6 +1,7 @@
 package chserver
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -106,6 +107,19 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 				failed(s.Errorf("access to '%s' denied", addr))
 				return
 			}
+		}
+	}
+	//set up reverse port forwarding
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for i, r := range c.Remotes {
+		if !r.Reverse {
+			continue
+		}
+		proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
+		if err := proxy.Start(ctx); err != nil {
+			failed(s.Errorf("start '%v' error: %v", r, err))
+			return
 		}
 	}
 	//success!

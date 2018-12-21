@@ -52,12 +52,6 @@ func OpenStream(conn ssh.Conn, remote string) (io.ReadWriteCloser, error) {
 	return stream, nil
 }
 
-func RejectStreams(chans <-chan ssh.NewChannel) {
-	for ch := range chans {
-		ch.Reject(ssh.Prohibited, "Tunnels disallowed")
-	}
-}
-
 func HandleTCPStream(l *Logger, connStats *ConnStats, src io.ReadWriteCloser, remote string) {
 	dst, err := net.Dial("tcp", remote)
 	if err != nil {

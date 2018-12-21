@@ -195,6 +195,14 @@ var clientHelp = `
     ■ remote-port is required*.
     ■ remote-host defaults to 0.0.0.0 (server localhost).
 
+  which shares <remote-host>:<remote-port> from the server to the client
+  as <local-host>:<local-port>, or:
+
+    R:<local-interface>:<local-port>:<remote-host>:<remote-port>
+
+  which does reverse port forwarding, sharing <remote-host>:<remote-port>
+  from the client to the server's <local-interface>:<local-port>.
+
     example remotes
 
       3000
@@ -203,6 +211,7 @@ var clientHelp = `
       192.168.0.5:3000:google.com:80
       socks
       5000:socks
+      R:2222:localhost:22
 
     *When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
