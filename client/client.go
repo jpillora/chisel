@@ -133,6 +133,9 @@ func (c *Client) Start(ctx context.Context) error {
 	}
 	//prepare proxies
 	for i, r := range c.config.shared.Remotes {
+		if r.Reverse {
+			continue
+		}
 		proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
 		if err := proxy.Start(ctx); err != nil {
 			return err

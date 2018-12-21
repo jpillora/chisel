@@ -20,20 +20,31 @@ import (
 
 type Remote struct {
 	LocalHost, LocalPort, RemoteHost, RemotePort string
-	Socks                                        bool
+	Socks, Reverse                               bool
 }
 
 func DecodeRemote(s string) (*Remote, error) {
+	const revPrefix = "R:"
+	reverse := false
+	if strings.HasPrefix(s, revPrefix) {
+		s = s[len(revPrefix):]
+		reverse = true
+	}
 	parts := strings.Split(s, ":")
 	if len(parts) <= 0 || len(parts) >= 5 {
 		return nil, errors.New("Invalid remote")
 	}
-	r := &Remote{}
+	r := &Remote{Reverse: reverse}
 	//TODO fix up hacky decode
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i]
 		//last part "socks"?
 		if i == len(parts)-1 && p == "socks" {
+			if reverse {
+				// TODO allow reverse+socks by having client
+				// automatically start local SOCKS5 server
+				return nil, errors.New("'socks' incompatible with reverse port forwarding")
+			}
 			r.Socks = true
 			continue
 		}
@@ -95,7 +106,11 @@ func isHost(s string) bool {
 
 //implement Stringer
 func (r *Remote) String() string {
-	return r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote()
+	var tag string
+	if r.Reverse {
+		tag = " [reverse]"
+	}
+	return r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote() + tag
 }
 
 func (r *Remote) Remote() string {

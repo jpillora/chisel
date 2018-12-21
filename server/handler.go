@@ -98,6 +98,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	//access to the desired remotes
 	if user != nil {
 		for _, r := range c.Remotes {
+			if r.Reverse {
+				continue
+			}
 			addr := r.RemoteHost + ":" + r.RemotePort
 			if !user.HasAccess(addr) {
 				failed(s.Errorf("access to '%s' denied", addr))
