@@ -130,7 +130,7 @@ func (c *Client) Start() error {
 	}
 	//prepare proxies
 	for i, r := range c.config.shared.Remotes {
-		proxy := newTCPProxy(c, i, r)
+		proxy := newTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
 		if err := proxy.start(); err != nil {
 			return err
 		}

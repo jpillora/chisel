@@ -6,21 +6,24 @@ import (
 	"net"
 
 	"github.com/jpillora/chisel/share"
+	"golang.org/x/crypto/ssh"
 )
+
+type GetSSHConn func() ssh.Conn
 
 type tcpProxy struct {
 	*chshare.Logger
-	client *Client
+	ssh    GetSSHConn
 	id     int
 	count  int
 	remote *chshare.Remote
 }
 
-func newTCPProxy(c *Client, index int, remote *chshare.Remote) *tcpProxy {
+func newTCPProxy(logger *chshare.Logger, ssh GetSSHConn, index int, remote *chshare.Remote) *tcpProxy {
 	id := index + 1
 	return &tcpProxy{
-		Logger: c.Logger.Fork("tunnel#%d %s", id, remote),
-		client: c,
+		Logger: logger.Fork("tunnel#%d %s", id, remote),
+		ssh:    ssh,
 		id:     id,
 		remote: remote,
 	}
@@ -52,12 +55,12 @@ func (p *tcpProxy) accept(src io.ReadWriteCloser) {
 	cid := p.count
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
-	if p.client.sshConn == nil {
-		l.Debugf("No server connection")
+	if p.ssh() == nil {
+		l.Debugf("No remote connection")
 		src.Close()
 		return
 	}
-	dst, err := chshare.OpenStream(p.client.sshConn, p.remote.Remote())
+	dst, err := chshare.OpenStream(p.ssh(), p.remote.Remote())
 	if err != nil {
 		l.Infof("Stream error: %s", err)
 		src.Close()
