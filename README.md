@@ -136,7 +136,7 @@ $ chisel client --help
 
   <server> is the URL to the chisel server.
 
-  <remote>s are remote connections tunnelled through the server, each of
+  <remote>s are remote connections tunneled through the server, each of
   which come in the form:
 
     <local-host>:<local-port>:<remote-host>:<remote-port>
@@ -239,7 +239,7 @@ localhost:1080
 
 ### Performance
 
-With [crowbar](https://github.com/q3k/crowbar), a connection is tunnelled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [crypto/ssh](https://golang.org/x/crypto/ssh) to create hundreds of logical connections, resulting in **one** TCP connection per client.
+With [crowbar](https://github.com/q3k/crowbar), a connection is tunneled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [crypto/ssh](https://golang.org/x/crypto/ssh) to create hundreds of logical connections, resulting in **one** TCP connection per client.
 
 In this simple benchmark, we have:
 

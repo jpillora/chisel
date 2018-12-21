@@ -249,7 +249,7 @@ func (c *Client) Wait() error {
 	return <-c.runningc
 }
 
-//Close manual stops the client
+//Close manually stops the client
 func (c *Client) Close() error {
 	c.running = false
 	if c.sshConn == nil {

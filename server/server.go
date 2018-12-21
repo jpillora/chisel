@@ -153,7 +153,7 @@ func (s *Server) Wait() error {
 	return s.httpServer.Wait()
 }
 
-// Close forciable closes the http server
+// Close forcibly closes the http server
 func (s *Server) Close() error {
 	return s.httpServer.Close()
 }

@@ -94,7 +94,7 @@ var serverHelp = `
     variable PORT and fallsback to port 8080).
 
     --key, An optional string to seed the generation of a ECDSA public
-    and private key pair. All commications will be secured using this
+    and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
@@ -185,7 +185,7 @@ var clientHelp = `
 
   <server> is the URL to the chisel server.
 
-  <remote>s are remote connections tunnelled through the server, each of
+  <remote>s are remote connections tunneled through the server, each of
   which come in the form:
 
     <local-host>:<local-port>:<remote-host>:<remote-port>

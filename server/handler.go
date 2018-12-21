@@ -15,7 +15,7 @@ import (
 	"github.com/jpillora/chisel/share"
 )
 
-// handleClientHandler is the main http sebsocket handler for the chisel server
+// handleClientHandler is the main http websocket handler for the chisel server
 func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
@@ -43,7 +43,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Not found"))
 }
 
-// handleWebsocket is responsible for hanlding the websocket connection
+// handleWebsocket is responsible for handling the websocket connection
 func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	id := atomic.AddInt32(&s.sessCount, 1)
 	clog := s.Fork("session#%d", id)
@@ -160,7 +160,7 @@ func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 	conn := chshare.NewRWCConn(src)
 	// conn.SetDeadline(time.Now().Add(30 * time.Second))
 	atomic.AddInt32(&s.connOpen, 1)
-	l.Debugf("%s Openning", s.connStatus())
+	l.Debugf("%s Opening", s.connStatus())
 	err := s.socksServer.ServeConn(conn)
 	atomic.AddInt32(&s.connOpen, -1)
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
