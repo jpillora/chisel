@@ -104,7 +104,9 @@ $ chisel server --help
     when <user> connects, their <pass> will be verified and then
     each of the remote addresses will be compared against the list
     of address regular expressions for a match. Addresses will
-    always come in the form "<host/ip>:<port>".
+    always come in the form "<remote-host>:<remote-port>" for normal remotes
+    and "R:<local-interface>:<local-port>" for reverse port forwarding
+    remotes. This file will be automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. This is equivalent to creating an
@@ -116,6 +118,9 @@ $ chisel server --help
 
     --socks5, Allows client to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
+
+    --reverse, Allows client to specify reverse port forwarding remotes
+    in addition to normal remotes.
 
     --pid Generate pid file in current directory
 

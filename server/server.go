@@ -25,6 +25,7 @@ type Config struct {
 	Auth     string
 	Proxy    string
 	Socks5   bool
+	Reverse  bool
 }
 
 // Server respresent a chisel service
@@ -39,6 +40,7 @@ type Server struct {
 	socksServer  *socks5.Server
 	sshConfig    *ssh.ServerConfig
 	users        *chshare.UserIndex
+	reverseOk    bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -53,6 +55,7 @@ func NewServer(config *Config) (*Server, error) {
 		httpServer: chshare.NewHTTPServer(),
 		Logger:     chshare.NewLogger("server"),
 		sessions:   chshare.Users{},
+		reverseOk:  config.Reverse,
 	}
 	s.Info = true
 	s.users = chshare.NewUserIndex(s.Logger)

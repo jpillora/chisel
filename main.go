@@ -107,8 +107,9 @@ var serverHelp = `
     when <user> connects, their <pass> will be verified and then
     each of the remote addresses will be compared against the list
     of address regular expressions for a match. Addresses will
-    always come in the form "<host/ip>:<port>". This file will be
-    automatically reloaded on change.
+    always come in the form "<remote-host>:<remote-port>" for normal remotes
+    and "R:<local-interface>:<local-port>" for reverse port forwarding
+    remotes. This file will be automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. This is equivalent to creating an
@@ -120,6 +121,9 @@ var serverHelp = `
 
     --socks5, Allows client to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
+
+    --reverse, Allows client to specify reverse port forwarding remotes
+    in addition to normal remotes.
 ` + commonHelp
 
 func server(args []string) {
@@ -134,6 +138,7 @@ func server(args []string) {
 	auth := flags.String("auth", "", "")
 	proxy := flags.String("proxy", "", "")
 	socks5 := flags.Bool("socks5", false, "")
+	reverse := flags.Bool("reverse", false, "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 
@@ -167,6 +172,7 @@ func server(args []string) {
 		Auth:     *auth,
 		Proxy:    *proxy,
 		Socks5:   *socks5,
+		Reverse:  *reverse,
 	})
 	if err != nil {
 		log.Fatal(err)
