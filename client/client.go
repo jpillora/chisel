@@ -149,6 +149,8 @@ func (c *Client) loop() {
 			for range time.Tick(c.config.KeepAlive) {
 				if c.sshConn != nil {
 					c.sshConn.SendRequest("ping", true, nil)
+				} else {
+					break
 				}
 			}
 		}()
