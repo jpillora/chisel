@@ -1,6 +1,7 @@
 package chclient
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -105,7 +106,9 @@ func NewClient(config *Config) (*Client, error) {
 
 //Run starts client and blocks while connected
 func (c *Client) Run() error {
-	if err := c.Start(); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := c.Start(ctx); err != nil {
 		return err
 	}
 	return c.Wait()
@@ -123,7 +126,7 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 }
 
 //Start client and does not block
-func (c *Client) Start() error {
+func (c *Client) Start(ctx context.Context) error {
 	via := ""
 	if c.httpProxyURL != nil {
 		via = " via " + c.httpProxyURL.String()
@@ -131,7 +134,7 @@ func (c *Client) Start() error {
 	//prepare proxies
 	for i, r := range c.config.shared.Remotes {
 		proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
-		if err := proxy.Start(); err != nil {
+		if err := proxy.Start(ctx); err != nil {
 			return err
 		}
 		c.proxies = append(c.proxies, proxy)

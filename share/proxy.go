@@ -1,6 +1,7 @@
 package chshare
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -28,21 +29,37 @@ func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCP
 	}
 }
 
-func (p *TCPProxy) Start() error {
+func (p *TCPProxy) Start(ctx context.Context) error {
 	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
 	if err != nil {
 		return fmt.Errorf("%s: %s", p.Logger.Prefix(), err)
 	}
-	go p.listen(l)
+	go p.listen(ctx, l)
 	return nil
 }
 
-func (p *TCPProxy) listen(l net.Listener) {
+func (p *TCPProxy) listen(ctx context.Context, l net.Listener) {
 	p.Infof("Listening")
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			p.Debugf("Context canceled; closing listener")
+			l.Close()
+		case <-done:
+		}
+	}()
+
 	for {
 		src, err := l.Accept()
 		if err != nil {
-			p.Infof("Accept error: %s", err)
+			select {
+			case <-ctx.Done():
+				p.Infof("Stop listening; remote disconnected")
+			default:
+				p.Infof("Accept error: %s", err)
+			}
+			close(done)
 			return
 		}
 		go p.accept(src)
