@@ -18,9 +18,14 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	if upgrade == "websocket" && protocol == chshare.ProtocolVersion {
-		s.handleWebsocket(w, r)
-		return
+	if upgrade == "websocket" && strings.HasPrefix(protocol, "chisel-") {
+		if protocol == chshare.ProtocolVersion {
+			s.handleWebsocket(w, r)
+			return
+		}
+		//print into server logs and silently fall-through
+		s.Infof("ignored client connection using protocol version %s (expected %s)",
+			protocol, chshare.ProtocolVersion)
 	}
 	//proxy target was provided
 	if s.reverseProxy != nil {
@@ -62,8 +67,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	var user *chshare.User
 	if s.users.Len() > 0 {
 		sid := string(sshConn.SessionID())
-		user = s.sessions[sid]
-		defer delete(s.sessions, sid)
+		user, _ = s.sessions.Get(sid)
+		s.sessions.Del(sid)
 	}
 	//verify configuration
 	clog.Debugf("Verifying configuration")
@@ -76,6 +81,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	failed := func(err error) {
+		clog.Debugf("Failed: %s", err)
 		r.Reply(false, []byte(err.Error()))
 	}
 	if r.Type != "config" {
@@ -87,6 +93,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		failed(s.Errorf("invalid config"))
 		return
 	}
+	//print if client and server  versions dont match
 	if c.Version != chshare.BuildVersion {
 		v := c.Version
 		if v == "" {
@@ -95,6 +102,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		clog.Infof("Client version (%s) differs from server version (%s)",
 			v, chshare.BuildVersion)
 	}
+	//confirm reverse tunnels are allowed
 	for _, r := range c.Remotes {
 		if r.Reverse && !s.reverseOk {
 			clog.Debugf("Denied reverse port forwarding request, please enable --reverse")
@@ -122,13 +130,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for i, r := range c.Remotes {
-		if !r.Reverse {
-			continue
-		}
-		proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
-		if err := proxy.Start(ctx); err != nil {
-			failed(s.Errorf("start '%v' error: %v", r, err))
-			return
+		if r.Reverse {
+			proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
+			if err := proxy.Start(ctx); err != nil {
+				failed(s.Errorf("%s", err))
+				return
+			}
 		}
 	}
 	//success!
@@ -172,23 +179,22 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		//handle stream type
 		connID := s.connStats.New()
 		if socks {
-			go s.handleSocksStream(clientLog.Fork("socks#%05d", connID), stream)
+			go s.handleSocksStream(clientLog.Fork("socksconn#%d", connID), stream)
 		} else {
-			go chshare.HandleTCPStream(clientLog.Fork(" tcp#%05d", connID), &s.connStats, stream, remote)
+			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote)
 		}
 	}
 }
 
 func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
 	conn := chshare.NewRWCConn(src)
-	// conn.SetDeadline(time.Now().Add(30 * time.Second))
 	s.connStats.Open()
-	l.Debugf("%s Opening", s.connStats.Status())
+	l.Debugf("%s Opening", s.connStats)
 	err := s.socksServer.ServeConn(conn)
 	s.connStats.Close()
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("%s Closed (error: %s)", s.connStats.Status(), err)
+		l.Debugf("%s: Closed (error: %s)", s.connStats, err)
 	} else {
-		l.Debugf("%s Closed", s.connStats.Status())
+		l.Debugf("%s: Closed", s.connStats)
 	}
 }

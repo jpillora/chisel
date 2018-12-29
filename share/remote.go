@@ -8,26 +8,30 @@ import (
 )
 
 // short-hand conversions
+//   3000 ->
+//     local  127.0.0.1:3000
+//     remote 127.0.0.1:3000
 //   foobar.com:3000 ->
-//		local 127.0.0.1:3000
-//		remote foobar.com:3000
+//     local  127.0.0.1:3000
+//     remote foobar.com:3000
 //   3000:google.com:80 ->
-//		local 127.0.0.1:3000
-//		remote google.com:80
+//     local  127.0.0.1:3000
+//     remote google.com:80
 //   192.168.0.1:3000:google.com:80 ->
-//		local 192.168.0.1:3000
-//		remote google.com:80
+//     local  192.168.0.1:3000
+//     remote google.com:80
 
 type Remote struct {
 	LocalHost, LocalPort, RemoteHost, RemotePort string
 	Socks, Reverse                               bool
 }
 
+const revPrefix = "R:"
+
 func DecodeRemote(s string) (*Remote, error) {
-	const revPrefix = "R:"
 	reverse := false
 	if strings.HasPrefix(s, revPrefix) {
-		s = s[len(revPrefix):]
+		s = strings.TrimPrefix(s, revPrefix)
 		reverse = true
 	}
 	parts := strings.Split(s, ":")
@@ -35,7 +39,6 @@ func DecodeRemote(s string) (*Remote, error) {
 		return nil, errors.New("Invalid remote")
 	}
 	r := &Remote{Reverse: reverse}
-	//TODO fix up hacky decode
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i]
 		//last part "socks"?
@@ -94,8 +97,6 @@ func isPort(s string) bool {
 	return true
 }
 
-var isHTTP = regexp.MustCompile(`^http?:\/\/`)
-
 func isHost(s string) bool {
 	_, err := url.Parse(s)
 	if err != nil {
@@ -106,11 +107,11 @@ func isHost(s string) bool {
 
 //implement Stringer
 func (r *Remote) String() string {
-	var tag string
+	tag := ""
 	if r.Reverse {
-		tag = " [reverse]"
+		tag = revPrefix
 	}
-	return r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote() + tag
+	return tag + r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote()
 }
 
 func (r *Remote) Remote() string {

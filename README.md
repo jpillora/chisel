@@ -47,18 +47,18 @@ A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chise
 
 ```sh
 $ chisel server --port $PORT --proxy http://example.com
-# listens on $PORT, proxy web requests to 'http://example.com'
+# listens on $PORT, proxy web requests to http://example.com
 ```
 
 This demo app is also running a [simple file server](https://www.npmjs.com/package/serve) on `:3000`, which is normally inaccessible due to Heroku's firewall. However, if we tunnel in with:
 
 ```sh
 $ chisel client https://chisel-demo.herokuapp.com 3000
-# connects to 'https://chisel-demo.herokuapp.com',
+# connects to chisel server at https://chisel-demo.herokuapp.com,
 # tunnels your localhost:3000 to the server's localhost:3000
 ```
 
-and then visit [localhost:3000](http://localhost:3000/), we should see a directory listing of the demo app's root. Also, if we visit the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's default proxy and see a copy of [example.com](http://example.com).
+and then visit [localhost:3000](http://localhost:3000/), we should see a directory listing. Also, if we visit the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's default proxy and see a copy of [example.com](http://example.com).
 
 ### Usage
 

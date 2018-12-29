@@ -36,7 +36,7 @@ type Server struct {
 	httpServer   *chshare.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     chshare.Users
+	sessions     *chshare.Users
 	socksServer  *socks5.Server
 	sshConfig    *ssh.ServerConfig
 	users        *chshare.UserIndex
@@ -54,7 +54,7 @@ func NewServer(config *Config) (*Server, error) {
 	s := &Server{
 		httpServer: chshare.NewHTTPServer(),
 		Logger:     chshare.NewLogger("server"),
-		sessions:   chshare.Users{},
+		sessions:   chshare.NewUsers(),
 		reverseOk:  config.Reverse,
 	}
 	s.Info = true
@@ -64,7 +64,6 @@ func NewServer(config *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-
 	if config.Auth != "" {
 		u := &chshare.User{Addrs: []*regexp.Regexp{chshare.UserAllowAll}}
 		u.Name, u.Pass = chshare.ParseAuth(config.Auth)
@@ -87,7 +86,6 @@ func NewServer(config *Config) (*Server, error) {
 		PasswordCallback: s.authUser,
 	}
 	s.sshConfig.AddHostKey(private)
-
 	//setup reverse proxy
 	if config.Proxy != "" {
 		u, err := url.Parse(config.Proxy)
@@ -105,7 +103,6 @@ func NewServer(config *Config) (*Server, error) {
 			r.Host = u.Host
 		}
 	}
-
 	//setup socks server (not listening on any port!)
 	if config.Socks5 {
 		socksConfig := &socks5.Config{}
@@ -118,9 +115,12 @@ func NewServer(config *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.Infof("SOCKS5 Enabled")
+		s.Infof("SOCKS5 server enabled")
 	}
-
+	//print when reverse tunnelling is enabled
+	if config.Reverse {
+		s.Infof("Reverse tunnelling enabled")
+	}
 	return s, nil
 }
 
@@ -168,13 +168,13 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	}
 	// check the user exists and has matching password
 	n := c.User()
-	user, found := s.users.GetUser(n)
+	user, found := s.users.Get(n)
 	if !found || user.Pass != string(password) {
 		s.Debugf("Login failed for user: %s", n)
 		return nil, errors.New("Invalid authentication for username: %s")
 	}
 	// insert the user session map
 	// @note: this should probably have a lock on it given the map isn't thread-safe??
-	s.sessions[string(c.SessionID())] = user
+	s.sessions.Set(string(c.SessionID()), user)
 	return nil, nil
 }

@@ -1,4 +1,4 @@
-# build stage (go modules! farewell GOPATH!)
+# build stage
 FROM golang:alpine AS build-env
 LABEL maintainer="dev@jpillora.com"
 RUN apk update

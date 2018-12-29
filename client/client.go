@@ -35,7 +35,6 @@ type Client struct {
 	*chshare.Logger
 	config       *Config
 	sshConfig    *ssh.ClientConfig
-	proxies      []*chshare.TCPProxy
 	sshConn      ssh.Conn
 	httpProxyURL *url.URL
 	server       string
@@ -132,43 +131,39 @@ func (c *Client) Start(ctx context.Context) error {
 	if c.httpProxyURL != nil {
 		via = " via " + c.httpProxyURL.String()
 	}
-	//prepare proxies
+	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
-		if r.Reverse {
-			continue
+		if !r.Reverse {
+			proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
+			if err := proxy.Start(ctx); err != nil {
+				return err
+			}
 		}
-		proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
-		if err := proxy.Start(ctx); err != nil {
-			return err
-		}
-		c.proxies = append(c.proxies, proxy)
 	}
 	c.Infof("Connecting to %s%s\n", c.server, via)
-	//
-	go c.loop()
+	//optional keepalive loop
+	if c.config.KeepAlive > 0 {
+		go c.keepAliveLoop()
+	}
+	//connection loop
+	go c.connectionLoop()
 	return nil
 }
 
-func (c *Client) loop() {
-	//optional keepalive loop
-	if c.config.KeepAlive > 0 {
-		go func() {
-			for range time.Tick(c.config.KeepAlive) {
-				if c.sshConn != nil {
-					c.sshConn.SendRequest("ping", true, nil)
-				} else {
-					break
-				}
-			}
-		}()
+func (c *Client) keepAliveLoop() {
+	for c.running {
+		time.Sleep(c.config.KeepAlive)
+		if c.sshConn != nil {
+			c.sshConn.SendRequest("ping", true, nil)
+		}
 	}
+}
+
+func (c *Client) connectionLoop() {
 	//connection loop!
 	var connerr error
 	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
-	for {
-		if !c.running {
-			break
-		}
+	for c.running {
 		if connerr != nil {
 			attempt := int(b.Attempt())
 			maxAttempt := c.config.MaxRetryCount
@@ -272,10 +267,11 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		remote := string(ch.ExtraData())
 		stream, reqs, err := ch.Accept()
 		if err != nil {
-			c.Logger.Debugf("Failed to accept stream: %s", err)
+			c.Debugf("Failed to accept stream: %s", err)
 			continue
 		}
 		go ssh.DiscardRequests(reqs)
-		go chshare.HandleTCPStream(c.Logger.Fork("tcp#%05d", c.connStats.New()), &c.connStats, stream, remote)
+		l := c.Logger.Fork("conn#%d", c.connStats.New())
+		go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
 	}
 }

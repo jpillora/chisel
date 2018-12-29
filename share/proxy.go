@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -22,7 +23,7 @@ type TCPProxy struct {
 func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCPProxy {
 	id := index + 1
 	return &TCPProxy{
-		Logger: logger.Fork("tunnel#%d %s", id, remote),
+		Logger: logger.Fork("proxy#%d<%s>", id, remote),
 		ssh:    ssh,
 		id:     id,
 		remote: remote,
@@ -44,18 +45,17 @@ func (p *TCPProxy) listen(ctx context.Context, l net.Listener) {
 	go func() {
 		select {
 		case <-ctx.Done():
-			p.Debugf("Context canceled; closing listener")
 			l.Close()
+			p.Debugf("Closed")
 		case <-done:
 		}
 	}()
-
 	for {
 		src, err := l.Accept()
 		if err != nil {
 			select {
 			case <-ctx.Done():
-				p.Infof("Stop listening; remote disconnected")
+				//listener closed
 			default:
 				p.Infof("Accept error: %s", err)
 			}
@@ -67,22 +67,24 @@ func (p *TCPProxy) listen(ctx context.Context, l net.Listener) {
 }
 
 func (p *TCPProxy) accept(src io.ReadWriteCloser) {
+	defer src.Close()
 	p.count++
 	cid := p.count
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
-	if p.ssh() == nil {
+	sshConn := p.ssh()
+	if sshConn == nil {
 		l.Debugf("No remote connection")
-		src.Close()
 		return
 	}
-	dst, err := OpenStream(p.ssh(), p.remote.Remote())
+	//ssh request for tcp connection for this proxy's remote
+	dst, reqs, err := sshConn.OpenChannel("chisel", []byte(p.remote.Remote()))
 	if err != nil {
 		l.Infof("Stream error: %s", err)
-		src.Close()
 		return
 	}
+	go ssh.DiscardRequests(reqs)
 	//then pipe
 	s, r := Pipe(src, dst)
-	l.Debugf("Close (sent %d received %d)", s, r)
+	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
 }

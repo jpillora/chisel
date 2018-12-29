@@ -22,6 +22,6 @@ func (c *ConnStats) Close() {
 	atomic.AddInt32(&c.open, -1)
 }
 
-func (c *ConnStats) Status() string {
+func (c *ConnStats) String() string {
 	return fmt.Sprintf("[%d/%d]", atomic.LoadInt32(&c.open), atomic.LoadInt32(&c.count))
 }

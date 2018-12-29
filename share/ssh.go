@@ -43,15 +43,6 @@ func FingerprintKey(k ssh.PublicKey) string {
 	return strings.Join(strbytes, ":")
 }
 
-func OpenStream(conn ssh.Conn, remote string) (io.ReadWriteCloser, error) {
-	stream, reqs, err := conn.OpenChannel("chisel", []byte(remote))
-	if err != nil {
-		return nil, err
-	}
-	go ssh.DiscardRequests(reqs)
-	return stream, nil
-}
-
 func HandleTCPStream(l *Logger, connStats *ConnStats, src io.ReadWriteCloser, remote string) {
 	dst, err := net.Dial("tcp", remote)
 	if err != nil {
@@ -60,8 +51,8 @@ func HandleTCPStream(l *Logger, connStats *ConnStats, src io.ReadWriteCloser, re
 		return
 	}
 	connStats.Open()
-	l.Debugf("%s Open", connStats.Status())
-	sent, received := Pipe(src, dst)
+	l.Debugf("%s: Open", connStats)
+	s, r := Pipe(src, dst)
 	connStats.Close()
-	l.Debugf("%s Close (sent %s received %s)", connStats.Status(), sizestr.ToString(sent), sizestr.ToString(received))
+	l.Debugf("%s: Close (sent %s received %s)", connStats, sizestr.ToString(s), sizestr.ToString(r))
 }

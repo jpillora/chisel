@@ -12,21 +12,62 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type Users map[string]*User
+type Users struct {
+	sync.RWMutex
+	inner map[string]*User
+}
+
+func NewUsers() *Users {
+	return &Users{inner: map[string]*User{}}
+}
+
+// Len returns the numbers of users
+func (u *Users) Len() int {
+	u.RLock()
+	l := len(u.inner)
+	u.RUnlock()
+	return l
+}
+
+// Get user from the index by key
+func (u *Users) Get(key string) (*User, bool) {
+	u.RLock()
+	user, found := u.inner[key]
+	u.RUnlock()
+	return user, found
+}
+
+// Set a users into the list by specific key
+func (u *Users) Set(key string, user *User) {
+	u.Lock()
+	u.inner[key] = user
+	u.Unlock()
+}
+
+// Del ete a users from the list
+func (u *Users) Del(key string) {
+	u.Lock()
+	delete(u.inner, key)
+	u.Unlock()
+}
+
+// AddUser adds a users to the list
+func (u *Users) AddUser(user *User) {
+	u.Set(user.Name, user)
+}
 
 // UserIndex is a reloadable user source
 type UserIndex struct {
 	*Logger
-	sync.RWMutex
+	*Users
 	configFile string
-	users      Users
 }
 
 // NewUserIndex creates a source for users
 func NewUserIndex(logger *Logger) *UserIndex {
 	return &UserIndex{
 		Logger: logger.Fork("users"),
-		users:  make(Users, 0),
+		Users:  NewUsers(),
 	}
 }
 
@@ -41,29 +82,6 @@ func (u *UserIndex) LoadUsers(configFile string) error {
 		return err
 	}
 	return nil
-}
-
-// Len returns the numbers of users
-func (u *UserIndex) Len() int {
-	u.RLock()
-	l := len(u.users)
-	u.RUnlock()
-	return l
-}
-
-// GetUser retrieves a user from the index
-func (u *UserIndex) GetUser(username string) (*User, bool) {
-	u.RLock()
-	user, found := u.users[username]
-	u.RUnlock()
-	return user, found
-}
-
-// AddUser adds a users to the list
-func (u *UserIndex) AddUser(user *User) {
-	u.Lock()
-	u.users[user.Name] = user
-	u.Unlock()
 }
 
 // watchEvents is responsible for watching for updates to the file and reloading
@@ -107,7 +125,7 @@ func (u *UserIndex) loadUserIndex() error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return errors.New("Invalid JSON: " + err.Error())
 	}
-	users := Users{}
+	users := NewUsers()
 	for auth, remotes := range raw {
 		u := &User{}
 		u.Name, u.Pass = ParseAuth(auth)
@@ -126,10 +144,10 @@ func (u *UserIndex) loadUserIndex() error {
 			}
 
 		}
-		users[u.Name] = u
+		users.AddUser(u)
 	}
 	u.Lock()
-	u.users = users
+	u.Users = users
 	u.Unlock()
 	return nil
 }

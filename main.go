@@ -61,11 +61,16 @@ func main() {
 }
 
 var commonHelp = `
-    --pid Generate pid file in current directory
+    --pid Generate pid file in current working directory
 
     -v, Enable verbose logging
 
     --help, This help text
+
+  Signals:
+    The chisel process is listening for:
+      a SIGUSR2 to print process stats, and
+      a SIGHUP to short-circuit the client reconnect timer
 
   Version:
     ` + chshare.BuildVersion + `
@@ -181,6 +186,7 @@ func server(args []string) {
 	if *pid {
 		generatePidFile()
 	}
+	go chshare.GoStats()
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
 	}
@@ -219,11 +225,16 @@ var clientHelp = `
       5000:socks
       R:2222:localhost:22
 
-    *When the chisel server has --socks5 enabled, remotes can
+    When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy.
+
+    When the chisel server has --reverse enabled, remotes can
+    be prefixed with R to denote that they are reversed. That
+    is, the server will listen and accept connections, and they
+    will be proxied through the client which specified the remote.
 
   Options:
 
@@ -276,11 +287,9 @@ func client(args []string) {
 	if len(args) < 2 {
 		log.Fatalf("A server and least one remote is required")
 	}
-
 	if *auth == "" {
 		*auth = os.Getenv("AUTH")
 	}
-
 	c, err := chclient.NewClient(&chclient.Config{
 		Fingerprint:      *fingerprint,
 		Auth:             *auth,
@@ -298,6 +307,7 @@ func client(args []string) {
 	if *pid {
 		generatePidFile()
 	}
+	go chshare.GoStats()
 	if err = c.Run(); err != nil {
 		log.Fatal(err)
 	}
