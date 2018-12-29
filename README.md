@@ -91,7 +91,7 @@ $ chisel server --help
     variable PORT and fallsback to port 8080).
 
     --key, An optional string to seed the generation of a ECDSA public
-    and private key pair. All commications will be secured using this
+    and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
@@ -122,17 +122,24 @@ $ chisel server --help
     --reverse, Allows client to specify reverse port forwarding remotes
     in addition to normal remotes.
 
-    --pid Generate pid file in current directory
+    --pid Generate pid file in current working directory
 
     -v, Enable verbose logging
 
     --help, This help text
+
+  Signals:
+    The chisel process is listening for:
+      a SIGUSR2 to print process stats, and
+      a SIGHUP to short-circuit the client reconnect timer
 
   Version:
     X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
+
+
 ```
 
 ```
@@ -170,11 +177,16 @@ $ chisel client --help
       5000:socks
       R:2222:localhost:22
 
-    *When the chisel server has --socks5 enabled, remotes can
+    When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy.
+
+    When the chisel server has --reverse enabled, remotes can
+    be prefixed with R to denote that they are reversed. That
+    is, the server will listen and accept connections, and they
+    will be proxied through the client which specified the remote.
 
   Options:
 
@@ -194,27 +206,34 @@ $ chisel client --help
     specify a time with a unit, for example '30s' or '2m'. Defaults
     to '0s' (disabled).
 
-    --proxy, An optional HTTP CONNECT proxy which will be used reach
-    the chisel server. Authentication can be specified inside the URL.
-    For example, http://admin:password@my-server.com:8081
-
     --max-retry-count, Maximum number of times to retry before exiting.
     Defaults to unlimited.
 
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --pid Generate pid file in current directory
+    --proxy, An optional HTTP CONNECT proxy which will be used reach
+    the chisel server. Authentication can be specified inside the URL.
+    For example, http://admin:password@my-server.com:8081
+
+    --pid Generate pid file in current working directory
 
     -v, Enable verbose logging
 
     --help, This help text
+
+  Signals:
+    The chisel process is listening for:
+      a SIGUSR2 to print process stats, and
+      a SIGHUP to short-circuit the client reconnect timer
 
   Version:
     X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
+
+
 ```
 
 ### Security
@@ -338,13 +357,13 @@ See more [test/](test/)
 
 ### Changelog
 
-- `1.0.0` - Initial release
-- `1.1.0` - Swapped out simple symmetric encryption for ECDSA SSH
-- `1.2.0` - Added SOCKS5 (server) and HTTP CONNECT (client) support
+- `1.0` - Initial release
+- `1.1` - Swapped out simple symmetric encryption for ECDSA SSH
+- `1.2` - Added SOCKS5 (server) and HTTP CONNECT (client) support
+- `1.3` - Added reverse tunnelling support
 
 ### Todo
 
-- Allow clients to act as an indirect tunnel endpoint for other clients
 - Better, faster tests
 - Expose a stats page for proxy throughput
 - Treat client stdin/stdout as a socket
