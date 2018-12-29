@@ -23,7 +23,7 @@ type TCPProxy struct {
 func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCPProxy {
 	id := index + 1
 	return &TCPProxy{
-		Logger: logger.Fork("proxy#%d<%s>", id, remote),
+		Logger: logger.Fork("proxy#%d:%s", id, remote),
 		ssh:    ssh,
 		id:     id,
 		remote: remote,
@@ -46,7 +46,7 @@ func (p *TCPProxy) listen(ctx context.Context, l net.Listener) {
 		select {
 		case <-ctx.Done():
 			l.Close()
-			p.Debugf("Closed")
+			p.Infof("Closed")
 		case <-done:
 		}
 	}()

@@ -24,7 +24,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		//print into server logs and silently fall-through
-		s.Infof("ignored client connection using protocol version %s (expected %s)",
+		s.Infof("ignored client connection using protocol '%s', expected '%s'",
 			protocol, chshare.ProtocolVersion)
 	}
 	//proxy target was provided
