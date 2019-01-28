@@ -199,13 +199,13 @@ func (c *Client) connectionLoop() {
 				return c.httpProxyURL, nil
 			}
 		}
-		hostHeader := http.Header{}
-		if c.config.HostHeader == "" {
-			hostHeader = nil
-		} else {
-			hostHeader = http.Header{"Host": {c.config.HostHeader}}
+		wsHeaders := http.Header{}
+		if c.config.HostHeader != "" {
+			wsHeaders = http.Header{
+				"Host": {c.config.HostHeader},
+			}
 		}
-		wsConn, _, err := d.Dial(c.server, hostHeader)
+		wsConn, _, err := d.Dial(c.server, wsHeaders)
 		if err != nil {
 			connerr = err
 			continue

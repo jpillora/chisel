@@ -116,10 +116,10 @@ $ chisel server --help
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
 
-    --socks5, Allows client to access the internal SOCKS5 proxy. See
+    --socks5, Allow clients to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
 
-    --reverse, Allows client to specify reverse port forwarding remotes
+    --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
     --pid Generate pid file in current working directory
@@ -215,6 +215,9 @@ $ chisel client --help
     --proxy, An optional HTTP CONNECT proxy which will be used reach
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
+
+    --hostname, Optionally set the 'Host' header (defaults to the host
+    defined in the endpoint url).
 
     --pid Generate pid file in current working directory
 
