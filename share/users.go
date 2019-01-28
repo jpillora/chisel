@@ -125,29 +125,25 @@ func (u *UserIndex) loadUserIndex() error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return errors.New("Invalid JSON: " + err.Error())
 	}
-	users := NewUsers()
 	for auth, remotes := range raw {
-		u := &User{}
-		u.Name, u.Pass = ParseAuth(auth)
-		if u.Name == "" {
+		user := &User{}
+		user.Name, user.Pass = ParseAuth(auth)
+		if user.Name == "" {
 			return errors.New("Invalid user:pass string")
 		}
 		for _, r := range remotes {
 			if r == "" || r == "*" {
-				u.Addrs = append(u.Addrs, UserAllowAll)
+				user.Addrs = append(user.Addrs, UserAllowAll)
 			} else {
 				re, err := regexp.Compile(r)
 				if err != nil {
 					return errors.New("Invalid address regex")
 				}
-				u.Addrs = append(u.Addrs, re)
+				user.Addrs = append(user.Addrs, re)
 			}
 
 		}
-		users.AddUser(u)
+		u.Users.AddUser(user)
 	}
-	u.Lock()
-	u.Users = users
-	u.Unlock()
 	return nil
 }
