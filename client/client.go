@@ -28,6 +28,7 @@ type Config struct {
 	Server           string
 	HTTPProxy        string
 	Remotes          []string
+	HostHeader       string
 }
 
 //Client represents a client instance
@@ -198,7 +199,13 @@ func (c *Client) connectionLoop() {
 				return c.httpProxyURL, nil
 			}
 		}
-		wsConn, _, err := d.Dial(c.server, nil)
+		hostHeader := http.Header{}
+		if c.config.HostHeader == "" {
+			hostHeader = nil
+		} else {
+			hostHeader = http.Header{"Host": {c.config.HostHeader}}
+		}
+		wsConn, _, err := d.Dial(c.server, hostHeader)
 		if err != nil {
 			connerr = err
 			continue

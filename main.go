@@ -263,6 +263,8 @@ var clientHelp = `
     --proxy, An optional HTTP CONNECT proxy which will be used reach
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
+
+    --hostname, An optional HOST header to send, can be left blank.
 ` + commonHelp
 
 func client(args []string) {
@@ -276,6 +278,7 @@ func client(args []string) {
 	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
 	proxy := flags.String("proxy", "", "")
 	pid := flags.Bool("pid", false, "")
+	hostname := flags.String("hostname", "", "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
@@ -299,6 +302,7 @@ func client(args []string) {
 		HTTPProxy:        *proxy,
 		Server:           args[0],
 		Remotes:          args[1:],
+		HostHeader:       *hostname,
 	})
 	if err != nil {
 		log.Fatal(err)
