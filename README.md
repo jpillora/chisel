@@ -218,6 +218,14 @@ $ chisel client --help
     For example, http://admin:password@my-server.com:8081
              or: socks://admin:password@my-server.com:1080
 
+    --skip-tls-verification, Don't verify the server's TLS certificate
+    chain and host name (if TLS is used for transport connections to
+    server). If set, client accepts any TLS certificate presented by
+    the server and any host name in that certificate. This influences
+    only transport https (wss) connections. Chisel server's public key
+    may be still verified (see --fingerprint) after inner connection
+    is established.
+
     --hostname, Optionally set the 'Host' header (defaults to the host
     defined in the endpoint url).
 

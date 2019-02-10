@@ -266,6 +266,14 @@ var clientHelp = `
     For example, http://admin:password@my-server.com:8081
              or: socks://admin:password@my-server.com:1080
 
+    --skip-tls-verification, Don't verify the server's TLS certificate
+    chain and host name (if TLS is used for transport connections to
+    server). If set, client accepts any TLS certificate presented by
+    the server and any host name in that certificate. This influences
+    only transport https (wss) connections. Chisel server's public key
+    may be still verified (see --fingerprint) after inner connection
+    is established.
+
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 ` + commonHelp
@@ -280,6 +288,7 @@ func client(args []string) {
 	maxRetryCount := flags.Int("max-retry-count", -1, "")
 	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
 	proxy := flags.String("proxy", "", "")
+	skipTlsVerification := flags.Bool("skip-tls-verification", false, "")
 	pid := flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
 	verbose := flags.Bool("v", false, "")
@@ -297,15 +306,16 @@ func client(args []string) {
 		*auth = os.Getenv("AUTH")
 	}
 	c, err := chclient.NewClient(&chclient.Config{
-		Fingerprint:      *fingerprint,
-		Auth:             *auth,
-		KeepAlive:        *keepalive,
-		MaxRetryCount:    *maxRetryCount,
-		MaxRetryInterval: *maxRetryInterval,
-		Proxy:            *proxy,
-		Server:           args[0],
-		Remotes:          args[1:],
-		HostHeader:       *hostname,
+		Fingerprint:         *fingerprint,
+		Auth:                *auth,
+		KeepAlive:           *keepalive,
+		MaxRetryCount:       *maxRetryCount,
+		MaxRetryInterval:    *maxRetryInterval,
+		Proxy:               *proxy,
+		SkipTlsVerification: *skipTlsVerification,
+		Server:              args[0],
+		Remotes:             args[1:],
+		HostHeader:          *hostname,
 	})
 	if err != nil {
 		log.Fatal(err)

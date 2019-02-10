@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -20,16 +21,17 @@ import (
 
 //Config represents a client configuration
 type Config struct {
-	shared           *chshare.Config
-	Fingerprint      string
-	Auth             string
-	KeepAlive        time.Duration
-	MaxRetryCount    int
-	MaxRetryInterval time.Duration
-	Server           string
-	Proxy            string
-	Remotes          []string
-	HostHeader       string
+	shared              *chshare.Config
+	Fingerprint         string
+	Auth                string
+	KeepAlive           time.Duration
+	MaxRetryCount       int
+	MaxRetryInterval    time.Duration
+	Server              string
+	SkipTlsVerification bool
+	Proxy               string
+	Remotes             []string
+	HostHeader          string
 }
 
 //Client represents a client instance
@@ -218,6 +220,9 @@ func (c *Client) connectionLoop() {
 					return c.proxyURL, nil
 				}
 			}
+		}
+		if c.config.SkipTlsVerification {
+			d.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 		wsHeaders := http.Header{}
 		if c.config.HostHeader != "" {
