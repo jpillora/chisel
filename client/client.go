@@ -35,14 +35,14 @@ type Config struct {
 //Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config       *Config
-	sshConfig    *ssh.ClientConfig
-	sshConn      ssh.Conn
-	proxyURL     *url.URL
-	server       string
-	running      bool
-	runningc     chan error
-	connStats    chshare.ConnStats
+	config    *Config
+	sshConfig *ssh.ClientConfig
+	sshConn   ssh.Conn
+	proxyURL  *url.URL
+	server    string
+	running   bool
+	runningc  chan error
+	connStats chshare.ConnStats
 }
 
 //NewClient creates a new client instance
@@ -201,7 +201,7 @@ func (c *Client) connectionLoop() {
 				var auth *proxy.Auth = nil
 				if c.proxyURL.User != nil {
 					pass, _ := c.proxyURL.User.Password()
-					auth = &proxy.Auth {
+					auth = &proxy.Auth{
 						User:     c.proxyURL.User.Username(),
 						Password: pass,
 					}
