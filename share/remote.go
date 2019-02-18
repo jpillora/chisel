@@ -105,7 +105,7 @@ func isHost(s string) bool {
 	return true
 }
 
-//implement Stringer
+// implement Stringer
 func (r *Remote) String() string {
 	tag := ""
 	if r.Reverse {
