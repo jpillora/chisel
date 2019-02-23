@@ -124,7 +124,7 @@ var serverHelp = `
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
 
-    --socks5, Allow clients to access the server-outbound SOCKS5 proxy. See
+    --socks5, Allow clients to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
 
     --reverse, Allow clients to specify reverse port forwarding remotes
@@ -266,12 +266,6 @@ var clientHelp = `
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
-
-    --socks5, Start a client-outbound SOCKS5 server on 127.0.0.1:1081.
-    Combine this option with a reverse port forward remote to expose the
-    client network to the chisel server. For example, the following
-    remote R:127.0.0.1:5000:127.0.0.1:1081 would allow the sever to
-    access the client network via socks5://127.0.0.1:5000.
 ` + commonHelp
 
 func client(args []string) {
@@ -286,7 +280,6 @@ func client(args []string) {
 	proxy := flags.String("proxy", "", "")
 	pid := flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
-	socks5 := flags.Bool("socks5", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
@@ -311,7 +304,6 @@ func client(args []string) {
 		Server:           args[0],
 		Remotes:          args[1:],
 		HostHeader:       *hostname,
-		Socks5:           *socks5,
 	})
 	if err != nil {
 		log.Fatal(err)

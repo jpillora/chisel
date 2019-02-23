@@ -2,7 +2,6 @@ package chserver
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -179,22 +178,9 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		//handle stream type
 		connID := s.connStats.New()
 		if socks {
-			go s.handleSocksStream(clientLog.Fork("socksconn#%d", connID), stream)
+			go chshare.HandleSocksStream(clientLog.Fork("socksconn#%d", connID), s.socksServer, &s.connStats, stream)
 		} else {
 			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote)
 		}
-	}
-}
-
-func (s *Server) handleSocksStream(l *chshare.Logger, src io.ReadWriteCloser) {
-	conn := chshare.NewRWCConn(src)
-	s.connStats.Open()
-	l.Debugf("%s Opening", s.connStats)
-	err := s.socksServer.ServeConn(conn)
-	s.connStats.Close()
-	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("%s: Closed (error: %s)", s.connStats, err)
-	} else {
-		l.Debugf("%s: Closed", s.connStats)
 	}
 }

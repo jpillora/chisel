@@ -4,17 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
-	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
-	socks5 "github.com/armon/go-socks5"
+	"github.com/armon/go-socks5"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
@@ -33,7 +30,6 @@ type Config struct {
 	HTTPProxy        string
 	Remotes          []string
 	HostHeader       string
-	Socks5           bool
 }
 
 //Client represents a client instance
@@ -74,10 +70,14 @@ func NewClient(config *Config) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	shared := &chshare.Config{}
+	createSocksServer := false
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
+		}
+		if r.Socks && r.Reverse {
+			createSocksServer = true
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}
@@ -108,18 +108,12 @@ func NewClient(config *Config) (*Client, error) {
 		Timeout:         30 * time.Second,
 	}
 
-	if config.Socks5 {
+	if createSocksServer {
 		socksConfig := &socks5.Config{}
-		if client.Debug {
-			socksConfig.Logger = log.New(os.Stdout, "[client socks]", log.Ldate|log.Ltime)
-		} else {
-			socksConfig.Logger = log.New(ioutil.Discard, "", 0)
-		}
 		client.socksServer, err = socks5.New(socksConfig)
 		if err != nil {
 			return nil, err
 		}
-		client.Infof("client-side SOCKS5 server enabled")
 	}
 
 	return client, nil
@@ -160,10 +154,6 @@ func (c *Client) Start(ctx context.Context) error {
 				return err
 			}
 		}
-	}
-	// start socks server
-	if c.socksServer != nil {
-		go c.socksServer.ListenAndServe("tcp", "127.0.0.1:1081")
 	}
 	c.Infof("Connecting to %s%s\n", c.server, via)
 	//optional keepalive loop
@@ -296,6 +286,7 @@ func (c *Client) Close() error {
 func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		remote := string(ch.ExtraData())
+		socks := remote == "socks"
 		stream, reqs, err := ch.Accept()
 		if err != nil {
 			c.Debugf("Failed to accept stream: %s", err)
@@ -303,6 +294,11 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		}
 		go ssh.DiscardRequests(reqs)
 		l := c.Logger.Fork("conn#%d", c.connStats.New())
-		go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		if socks {
+			go chshare.HandleSocksStream(l, c.socksServer, &c.connStats, stream)
+		} else {
+			go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		}
+
 	}
 }
