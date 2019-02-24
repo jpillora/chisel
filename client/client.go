@@ -287,6 +287,11 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		remote := string(ch.ExtraData())
 		socks := remote == "socks"
+		if socks && c.socksServer == nil {
+			c.Debugf("Denied socks request, please enable client socks remote.")
+			ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled on the client")
+			continue
+		}
 		stream, reqs, err := ch.Accept()
 		if err != nil {
 			c.Debugf("Failed to accept stream: %s", err)
