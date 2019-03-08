@@ -142,6 +142,7 @@ func server(args []string) {
 	authfile := flags.String("authfile", "", "")
 	auth := flags.String("auth", "", "")
 	proxy := flags.String("proxy", "", "")
+	upstreamProxy := flags.String("upstream-proxy", "", "")
 	socks5 := flags.Bool("socks5", false, "")
 	reverse := flags.Bool("reverse", false, "")
 	pid := flags.Bool("pid", false, "")
@@ -172,12 +173,13 @@ func server(args []string) {
 		*key = os.Getenv("CHISEL_KEY")
 	}
 	s, err := chserver.NewServer(&chserver.Config{
-		KeySeed:  *key,
-		AuthFile: *authfile,
-		Auth:     *auth,
-		Proxy:    *proxy,
-		Socks5:   *socks5,
-		Reverse:  *reverse,
+		KeySeed:       *key,
+		AuthFile:      *authfile,
+		Auth:          *auth,
+		Proxy:         *proxy,
+		UpstreamProxy: *upstreamProxy,
+		Socks5:        *socks5,
+		Reverse:       *reverse,
 	})
 	if err != nil {
 		log.Fatal(err)

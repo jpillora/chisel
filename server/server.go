@@ -1,14 +1,17 @@
 package chserver
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 
 	socks5 "github.com/armon/go-socks5"
 	"github.com/gorilla/websocket"
@@ -20,27 +23,30 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed  string
-	AuthFile string
-	Auth     string
-	Proxy    string
-	Socks5   bool
-	Reverse  bool
+	KeySeed       string
+	AuthFile      string
+	Auth          string
+	Proxy         string
+	UpstreamProxy string
+	Socks5        bool
+	Reverse       bool
 }
 
 // Server respresent a chisel service
 type Server struct {
 	*chshare.Logger
-	connStats    chshare.ConnStats
-	fingerprint  string
-	httpServer   *chshare.HTTPServer
-	reverseProxy *httputil.ReverseProxy
-	sessCount    int32
-	sessions     *chshare.Users
-	socksServer  *socks5.Server
-	sshConfig    *ssh.ServerConfig
-	users        *chshare.UserIndex
-	reverseOk    bool
+	connStats        chshare.ConnStats
+	fingerprint      string
+	httpServer       *chshare.HTTPServer
+	reverseProxy     *httputil.ReverseProxy
+	upstreamProxyUrl *url.URL
+	upstreamDial     chshare.FnDial
+	sessCount        int32
+	sessions         *chshare.Users
+	socksServer      *socks5.Server
+	sshConfig        *ssh.ServerConfig
+	users            *chshare.UserIndex
+	reverseOk        bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -103,6 +109,30 @@ func NewServer(config *Config) (*Server, error) {
 			r.Host = u.Host
 		}
 	}
+	//setup upstream dial
+	if config.UpstreamProxy != "" {
+		if !strings.Contains(config.UpstreamProxy, "://") {
+			config.UpstreamProxy = "socks5://" + config.UpstreamProxy
+		}
+		proxyURL, err := url.Parse(config.UpstreamProxy)
+		if err != nil {
+			return nil, err
+		}
+		if proxyURL.Host == "" {
+			return nil, s.Errorf("Missing upstream proxy host (%s)", proxyURL)
+		}
+		if proxyURL.Scheme == "" || strings.HasPrefix(proxyURL.Scheme, "socks") {
+			// SOCKS5 proxy
+			dial, err := chshare.NewSocks5Dial(proxyURL)
+			if err != nil {
+				return nil, err
+			}
+			s.upstreamProxyUrl = proxyURL
+			s.upstreamDial = dial
+		} else {
+			return nil, s.Errorf("Only SOCKS5 upstream proxy is supported (%s)", proxyURL)
+		}
+	}
 	//setup socks server (not listening on any port!)
 	if config.Socks5 {
 		socksConfig := &socks5.Config{}
@@ -110,6 +140,11 @@ func NewServer(config *Config) (*Server, error) {
 			socksConfig.Logger = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
 		} else {
 			socksConfig.Logger = log.New(ioutil.Discard, "", 0)
+		}
+		if s.upstreamDial != nil {
+			socksConfig.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return s.upstreamDial(network, addr)
+			}
 		}
 		s.socksServer, err = socks5.New(socksConfig)
 		if err != nil {
@@ -141,6 +176,9 @@ func (s *Server) Start(host, port string) error {
 	}
 	if s.reverseProxy != nil {
 		s.Infof("Reverse proxy enabled")
+	}
+	if s.upstreamProxyUrl != nil {
+		s.Infof("Upstream proxy: " + s.upstreamProxyUrl.String())
 	}
 	s.Infof("Listening on %s:%s...", host, port)
 	h := http.Handler(http.HandlerFunc(s.handleClientHandler))

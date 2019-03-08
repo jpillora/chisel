@@ -295,6 +295,6 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		}
 		go ssh.DiscardRequests(reqs)
 		l := c.Logger.Fork("conn#%d", c.connStats.New())
-		go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		go chshare.HandleTCPStream(l, &c.connStats, stream, remote, net.Dial)
 	}
 }

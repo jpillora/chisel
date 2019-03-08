@@ -181,7 +181,8 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		if socks {
 			go s.handleSocksStream(clientLog.Fork("socksconn#%d", connID), stream)
 		} else {
-			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote)
+			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote,
+				s.upstreamDial)
 		}
 	}
 }
