@@ -16,7 +16,6 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/proxy"
 )
 
 //Config represents a client configuration
@@ -200,20 +199,12 @@ func (c *Client) connectionLoop() {
 		if c.proxyURL != nil {
 			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
 				// SOCKS5 proxy
-				var auth *proxy.Auth = nil
-				if c.proxyURL.User != nil {
-					pass, _ := c.proxyURL.User.Password()
-					auth = &proxy.Auth{
-						User:     c.proxyURL.User.Username(),
-						Password: pass,
-					}
-				}
-				socksDialer, err := proxy.SOCKS5("tcp", c.proxyURL.Host, auth, proxy.Direct)
+				dial, err := chshare.NewSocks5Dial(c.proxyURL)
 				if err != nil {
 					connerr = err
 					continue
 				}
-				d.NetDial = socksDialer.Dial
+				d.NetDial = dial
 			} else {
 				// CONNECT proxy
 				d.Proxy = func(*http.Request) (*url.URL, error) {
