@@ -124,6 +124,12 @@ var serverHelp = `
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
 
+    --upstream-proxy, An optional SOCKS5 proxy which will be used to
+    reach any user endpoint, asked by connected clients (both in tunnel
+    and socks5 client mode). Authentication can be specified inside the URL.
+    For example, admin:password@my-server.com:1080
+             or: socks://admin:password@my-server.com:1080
+
     --socks5, Allow clients to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
 
