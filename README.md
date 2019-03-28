@@ -216,6 +216,9 @@ $ chisel client --help
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
 
+    --header, Set a custom header in the form "HeaderName: HeaderContent".
+	  Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
+
     --hostname, Optionally set the 'Host' header (defaults to the host
     defined in the endpoint url).
 

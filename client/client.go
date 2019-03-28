@@ -13,7 +13,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
+	chshare "github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -28,7 +28,7 @@ type Config struct {
 	Server           string
 	HTTPProxy        string
 	Remotes          []string
-	HostHeader       string
+	Headers          http.Header
 }
 
 //Client represents a client instance
@@ -199,13 +199,7 @@ func (c *Client) connectionLoop() {
 				return c.httpProxyURL, nil
 			}
 		}
-		wsHeaders := http.Header{}
-		if c.config.HostHeader != "" {
-			wsHeaders = http.Header{
-				"Host": {c.config.HostHeader},
-			}
-		}
-		wsConn, _, err := d.Dial(c.server, wsHeaders)
+		wsConn, _, err := d.Dial(c.server, c.config.Headers)
 		if err != nil {
 			connerr = err
 			continue
