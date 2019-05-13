@@ -1,0 +1,24 @@
+name: chisel
+version: '1.0'
+summary: A fast TCP tunnel over HTTP
+description: |
+  A fast TCP tunnel over HTTP. 
+grade: stable
+confinement: strict
+base: core18
+parts:
+  chisel:
+    plugin: go
+    source: https://github.com/jpillora/chisel.git
+    go-importpath: github.com/jpillora/chisel
+    build-packages:
+      - build-essential
+apps:
+  chisel:
+    command: bin/chisel
+    daemon: simple
+    restart-condition: on-abnormal
+    plugs:
+      - home
+      - network
+      - network-bind
