@@ -160,6 +160,11 @@ func (s *Server) Close() error {
 	return s.httpServer.Close()
 }
 
+// GetFingerprint is used to access the server fingerprint
+func (s *Server) GetFingerprint() string {
+	return s.fingerprint
+}
+
 // authUser is responsible for validating the ssh user / password combination
 func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 	// check if user authenication is enable and it not allow all
