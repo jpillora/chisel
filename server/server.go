@@ -183,3 +183,14 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	s.sessions.Set(string(c.SessionID()), user)
 	return nil, nil
 }
+
+// AddUser adds a new user into the server user index
+func (s *Server) AddUser(user, pass, addrs string) {
+	u := &chshare.User{Name: user, Pass: pass, Addrs: []*regexp.Regexp{regexp.MustCompile(addrs)}}
+	s.users.AddUser(u)
+}
+
+// DeleteUser removes a user from the server user index
+func (s *Server) DeleteUser(user string) {
+	s.users.Del(user)
+}
