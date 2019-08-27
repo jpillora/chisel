@@ -200,6 +200,12 @@ func (c *Client) connectionLoop() {
 		if c.proxyURL != nil {
 			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
 				// SOCKS5 proxy
+				if c.proxyURL.Scheme != "socks" && c.proxyURL.Scheme != "socks5h" {
+					c.Infof(
+						"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+						c.proxyURL.Scheme)
+					break
+				}
 				var auth *proxy.Auth = nil
 				if c.proxyURL.User != nil {
 					pass, _ := c.proxyURL.User.Password()
