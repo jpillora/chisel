@@ -124,6 +124,12 @@ var serverHelp = `
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
 
+    --upstream-proxy, An optional SOCKS5 proxy which will be used to
+    reach any user endpoint, asked by connected clients (both in tunnel
+    and socks5 client mode). Authentication can be specified inside the URL.
+    For example, admin:password@my-server.com:1080
+             or: socks://admin:password@my-server.com:1080
+
     --socks5, Allow clients to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
 
@@ -142,6 +148,7 @@ func server(args []string) {
 	authfile := flags.String("authfile", "", "")
 	auth := flags.String("auth", "", "")
 	proxy := flags.String("proxy", "", "")
+	upstreamProxy := flags.String("upstream-proxy", "", "")
 	socks5 := flags.Bool("socks5", false, "")
 	reverse := flags.Bool("reverse", false, "")
 	pid := flags.Bool("pid", false, "")
@@ -172,12 +179,13 @@ func server(args []string) {
 		*key = os.Getenv("CHISEL_KEY")
 	}
 	s, err := chserver.NewServer(&chserver.Config{
-		KeySeed:  *key,
-		AuthFile: *authfile,
-		Auth:     *auth,
-		Proxy:    *proxy,
-		Socks5:   *socks5,
-		Reverse:  *reverse,
+		KeySeed:       *key,
+		AuthFile:      *authfile,
+		Auth:          *auth,
+		Proxy:         *proxy,
+		UpstreamProxy: *upstreamProxy,
+		Socks5:        *socks5,
+		Reverse:       *reverse,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -260,9 +268,19 @@ var clientHelp = `
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --proxy, An optional HTTP CONNECT proxy which will be used reach
-    the chisel server. Authentication can be specified inside the URL.
+    --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
+    used to reach the chisel server. Authentication can be specified
+    inside the URL.
     For example, http://admin:password@my-server.com:8081
+             or: socks://admin:password@my-server.com:1080
+
+    --skip-tls-verification, Don't verify the server's TLS certificate
+    chain and host name (if TLS is used for transport connections to
+    server). If set, client accepts any TLS certificate presented by
+    the server and any host name in that certificate. This influences
+    only transport https (wss) connections. Chisel server's public key
+    may be still verified (see --fingerprint) after inner connection
+    is established.
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
@@ -278,6 +296,7 @@ func client(args []string) {
 	maxRetryCount := flags.Int("max-retry-count", -1, "")
 	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
 	proxy := flags.String("proxy", "", "")
+	skipTlsVerification := flags.Bool("skip-tls-verification", false, "")
 	pid := flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
 	verbose := flags.Bool("v", false, "")
@@ -295,15 +314,16 @@ func client(args []string) {
 		*auth = os.Getenv("AUTH")
 	}
 	c, err := chclient.NewClient(&chclient.Config{
-		Fingerprint:      *fingerprint,
-		Auth:             *auth,
-		KeepAlive:        *keepalive,
-		MaxRetryCount:    *maxRetryCount,
-		MaxRetryInterval: *maxRetryInterval,
-		HTTPProxy:        *proxy,
-		Server:           args[0],
-		Remotes:          args[1:],
-		HostHeader:       *hostname,
+		Fingerprint:         *fingerprint,
+		Auth:                *auth,
+		KeepAlive:           *keepalive,
+		MaxRetryCount:       *maxRetryCount,
+		MaxRetryInterval:    *maxRetryInterval,
+		Proxy:               *proxy,
+		SkipTlsVerification: *skipTlsVerification,
+		Server:              args[0],
+		Remotes:             args[1:],
+		HostHeader:          *hostname,
 	})
 	if err != nil {
 		log.Fatal(err)

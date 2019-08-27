@@ -11,6 +11,6 @@ require (
 	github.com/jpillora/sizestr v0.0.0-20160130011556-e2ea2fa42fb9
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
 	golang.org/x/crypto v0.0.0-20181015023909-0c41d7ab0a0e
-	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f // indirect
+	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f
 	golang.org/x/sys v0.0.0-20181019160139-8e24a49d80f8 // indirect
 )

@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -19,29 +20,30 @@ import (
 
 //Config represents a client configuration
 type Config struct {
-	shared           *chshare.Config
-	Fingerprint      string
-	Auth             string
-	KeepAlive        time.Duration
-	MaxRetryCount    int
-	MaxRetryInterval time.Duration
-	Server           string
-	HTTPProxy        string
-	Remotes          []string
-	HostHeader       string
+	shared              *chshare.Config
+	Fingerprint         string
+	Auth                string
+	KeepAlive           time.Duration
+	MaxRetryCount       int
+	MaxRetryInterval    time.Duration
+	Server              string
+	SkipTlsVerification bool
+	Proxy               string
+	Remotes             []string
+	HostHeader          string
 }
 
 //Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config       *Config
-	sshConfig    *ssh.ClientConfig
-	sshConn      ssh.Conn
-	httpProxyURL *url.URL
-	server       string
-	running      bool
-	runningc     chan error
-	connStats    chshare.ConnStats
+	config    *Config
+	sshConfig *ssh.ClientConfig
+	sshConn   ssh.Conn
+	proxyURL  *url.URL
+	server    string
+	running   bool
+	runningc  chan error
+	connStats chshare.ConnStats
 }
 
 //NewClient creates a new client instance
@@ -85,8 +87,8 @@ func NewClient(config *Config) (*Client, error) {
 	}
 	client.Info = true
 
-	if p := config.HTTPProxy; p != "" {
-		client.httpProxyURL, err = url.Parse(p)
+	if p := config.Proxy; p != "" {
+		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
 		}
@@ -129,8 +131,8 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 //Start client and does not block
 func (c *Client) Start(ctx context.Context) error {
 	via := ""
-	if c.httpProxyURL != nil {
-		via = " via " + c.httpProxyURL.String()
+	if c.proxyURL != nil {
+		via = " via " + c.proxyURL.String()
 	}
 	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
@@ -193,11 +195,31 @@ func (c *Client) connectionLoop() {
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
-		//optionally CONNECT proxy
-		if c.httpProxyURL != nil {
-			d.Proxy = func(*http.Request) (*url.URL, error) {
-				return c.httpProxyURL, nil
+		//optionally proxy
+		if c.proxyURL != nil {
+			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
+				// SOCKS5 proxy
+				if c.proxyURL.Scheme != "socks" && c.proxyURL.Scheme != "socks5h" {
+					c.Infof(
+						"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+						c.proxyURL.Scheme)
+					break
+				}
+				dial, err := chshare.NewSocks5Dial(c.proxyURL)
+				if err != nil {
+					connerr = err
+					continue
+				}
+				d.NetDial = dial
+			} else {
+				// CONNECT proxy
+				d.Proxy = func(*http.Request) (*url.URL, error) {
+					return c.proxyURL, nil
+				}
 			}
+		}
+		if c.config.SkipTlsVerification {
+			d.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 		wsHeaders := http.Header{}
 		if c.config.HostHeader != "" {
@@ -279,6 +301,6 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		}
 		go ssh.DiscardRequests(reqs)
 		l := c.Logger.Fork("conn#%d", c.connStats.New())
-		go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		go chshare.HandleTCPStream(l, &c.connStats, stream, remote, net.Dial)
 	}
 }
