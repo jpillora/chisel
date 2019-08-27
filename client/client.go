@@ -199,6 +199,12 @@ func (c *Client) connectionLoop() {
 		if c.proxyURL != nil {
 			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
 				// SOCKS5 proxy
+				if c.proxyURL.Scheme != "socks" && c.proxyURL.Scheme != "socks5h" {
+					c.Infof(
+						"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+						c.proxyURL.Scheme)
+					break
+				}
 				dial, err := chshare.NewSocks5Dial(c.proxyURL)
 				if err != nil {
 					connerr = err
