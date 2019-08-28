@@ -218,6 +218,9 @@ $ chisel client --help
     For example, http://admin:password@my-server.com:8081
              or: socks://admin:password@my-server.com:1080
 
+    --header, Set a custom header in the form "HeaderName: HeaderContent".
+	  Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
+
     --hostname, Optionally set the 'Host' header (defaults to the host
     defined in the endpoint url).
 

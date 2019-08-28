@@ -5,12 +5,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
+<<<<<<< HEAD
 	"github.com/aus/chisel/client"
 	"github.com/aus/chisel/server"
 	chshare "github.com/aus/chisel/share"
+=======
+	chclient "github.com/jpillora/chisel/client"
+	chserver "github.com/jpillora/chisel/server"
+	chshare "github.com/jpillora/chisel/share"
+>>>>>>> butterflyfx/custom-headers
 )
 
 var help = `
@@ -192,6 +200,32 @@ func server(args []string) {
 	}
 }
 
+type headerFlags struct {
+	http.Header
+}
+
+func (flag *headerFlags) String() string {
+	out := ""
+	for k, v := range flag.Header {
+		out += fmt.Sprintf("%s: %s\n", k, v)
+	}
+	return out
+}
+
+func (flag *headerFlags) Set(arg string) error {
+	index := strings.Index(arg, ":")
+	if index < 0 {
+		return fmt.Errorf(`Invalid header (%s). Should be in the format "HeaderName: HeaderContent"`, arg)
+	}
+	if flag.Header == nil {
+		flag.Header = http.Header{}
+	}
+	key := arg[0:index]
+	value := arg[index+1 : len(arg)]
+	flag.Header.Set(key, strings.TrimSpace(value))
+	return nil
+}
+
 var clientHelp = `
   Usage: chisel client [options] <server> <remote> [remote] [remote] ...
 
@@ -269,13 +303,15 @@ var clientHelp = `
     inside the URL.
     For example, http://admin:password@my-server.com:8081
              or: socks://admin:password@my-server.com:1080
+	
+    --header, Set a custom header in the form "HeaderName: HeaderContent".
+    Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 ` + commonHelp
 
-func client(args []string) {
-
+func parseClientFlags(args []string) (config chclient.Config, pid *bool, verbose *bool) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 
 	fingerprint := flags.String("fingerprint", "", "")
@@ -284,9 +320,13 @@ func client(args []string) {
 	maxRetryCount := flags.Int("max-retry-count", -1, "")
 	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
 	proxy := flags.String("proxy", "", "")
-	pid := flags.Bool("pid", false, "")
+	pid = flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
-	verbose := flags.Bool("v", false, "")
+	headers := headerFlags{
+		Header: http.Header{},
+	}
+	flags.Var(&headers, "header", "")
+	verbose = flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(1)
@@ -300,7 +340,11 @@ func client(args []string) {
 	if *auth == "" {
 		*auth = os.Getenv("AUTH")
 	}
-	c, err := chclient.NewClient(&chclient.Config{
+	hostHeader := *hostname
+	if hostHeader != "" {
+		headers.Header.Set("Host", hostHeader)
+	}
+	config = chclient.Config{
 		Fingerprint:      *fingerprint,
 		Auth:             *auth,
 		KeepAlive:        *keepalive,
@@ -309,8 +353,15 @@ func client(args []string) {
 		Proxy:            *proxy,
 		Server:           args[0],
 		Remotes:          args[1:],
-		HostHeader:       *hostname,
-	})
+		Headers:          headers.Header,
+	}
+	return
+}
+
+func client(args []string) {
+	config, pid, verbose := parseClientFlags(args)
+	c, err := chclient.NewClient(&config)
+
 	if err != nil {
 		log.Fatal(err)
 	}
