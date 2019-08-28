@@ -15,10 +15,6 @@ import (
 	chshare "github.com/aus/chisel/share"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-<<<<<<< HEAD
-=======
-	chshare "github.com/jpillora/chisel/share"
->>>>>>> butterflyfx/custom-headers
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
 )

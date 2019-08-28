@@ -10,15 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-<<<<<<< HEAD
-	"github.com/aus/chisel/client"
-	"github.com/aus/chisel/server"
+	chclient "github.com/aus/chisel/client"
+	chserver "github.com/aus/chisel/server"
 	chshare "github.com/aus/chisel/share"
-=======
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
-	chshare "github.com/jpillora/chisel/share"
->>>>>>> butterflyfx/custom-headers
 )
 
 var help = `
