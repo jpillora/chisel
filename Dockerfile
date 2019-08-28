@@ -8,7 +8,7 @@ ADD . /src
 WORKDIR /src
 RUN go build \
     -mod vendor \
-    -ldflags "-X github.com/jpillora/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
+    -ldflags "-X github.com/aus/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
     -o chisel
 # container stage
 FROM alpine

@@ -8,9 +8,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jpillora/chisel/client"
-	"github.com/jpillora/chisel/server"
-	chshare "github.com/jpillora/chisel/share"
+	"github.com/aus/chisel/client"
+	"github.com/aus/chisel/server"
+	chshare "github.com/aus/chisel/share"
 )
 
 var help = `
