@@ -31,6 +31,7 @@ type Config struct {
 	Proxy            string
 	Remotes          []string
 	HostHeader       string
+	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 //Client represents a client instance
@@ -207,6 +208,7 @@ func (c *Client) connectionLoop() {
 			WriteBufferSize:  1024,
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
+			NetDialContext:   c.config.DialContext,
 		}
 		//optionally proxy
 		if c.proxyURL != nil {
