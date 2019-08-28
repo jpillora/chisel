@@ -43,11 +43,6 @@ func DecodeRemote(s string) (*Remote, error) {
 		p := parts[i]
 		//last part "socks"?
 		if i == len(parts)-1 && p == "socks" {
-			if reverse {
-				// TODO allow reverse+socks by having client
-				// automatically start local SOCKS5 server
-				return nil, errors.New("'socks' incompatible with reverse port forwarding")
-			}
 			r.Socks = true
 			continue
 		}

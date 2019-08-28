@@ -224,6 +224,8 @@ var clientHelp = `
       socks
       5000:socks
       R:2222:localhost:22
+      R:socks
+      R:5000:socks
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
@@ -235,6 +237,8 @@ var clientHelp = `
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
+    Reverse remotes specifying "R:socks" will terminate a connection
+    at the client's internal SOCKS5 proxy.
 
   Options:
 
