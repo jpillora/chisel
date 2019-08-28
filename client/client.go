@@ -36,15 +36,15 @@ type Config struct {
 //Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config       *Config
-	sshConfig    *ssh.ClientConfig
-	sshConn      ssh.Conn
-	httpProxyURL *url.URL
-	server       string
-	running      bool
-	runningc     chan error
-	connStats    chshare.ConnStats
-	socksServer  *socks5.Server
+	config      *Config
+	sshConfig   *ssh.ClientConfig
+	sshConn     ssh.Conn
+	proxyURL    *url.URL
+	server      string
+	running     bool
+	runningc    chan error
+	connStats   chshare.ConnStats
+	socksServer *socks5.Server
 }
 
 //NewClient creates a new client instance
