@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/armon/go-socks5"
+	chshare "github.com/aus/chisel/share"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/aus/chisel/share"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/proxy"
 )
 
 //Config represents a client configuration
@@ -27,7 +28,7 @@ type Config struct {
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
 	Server           string
-	HTTPProxy        string
+	Proxy            string
 	Remotes          []string
 	HostHeader       string
 }
@@ -91,8 +92,8 @@ func NewClient(config *Config) (*Client, error) {
 	}
 	client.Info = true
 
-	if p := config.HTTPProxy; p != "" {
-		client.httpProxyURL, err = url.Parse(p)
+	if p := config.Proxy; p != "" {
+		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
 		}
@@ -143,8 +144,8 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 //Start client and does not block
 func (c *Client) Start(ctx context.Context) error {
 	via := ""
-	if c.httpProxyURL != nil {
-		via = " via " + c.httpProxyURL.String()
+	if c.proxyURL != nil {
+		via = " via " + c.proxyURL.String()
 	}
 	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
@@ -207,10 +208,35 @@ func (c *Client) connectionLoop() {
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
-		//optionally CONNECT proxy
-		if c.httpProxyURL != nil {
-			d.Proxy = func(*http.Request) (*url.URL, error) {
-				return c.httpProxyURL, nil
+		//optionally proxy
+		if c.proxyURL != nil {
+			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
+				// SOCKS5 proxy
+				if c.proxyURL.Scheme != "socks" && c.proxyURL.Scheme != "socks5h" {
+					c.Infof(
+						"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+						c.proxyURL.Scheme)
+					break
+				}
+				var auth *proxy.Auth = nil
+				if c.proxyURL.User != nil {
+					pass, _ := c.proxyURL.User.Password()
+					auth = &proxy.Auth{
+						User:     c.proxyURL.User.Username(),
+						Password: pass,
+					}
+				}
+				socksDialer, err := proxy.SOCKS5("tcp", c.proxyURL.Host, auth, proxy.Direct)
+				if err != nil {
+					connerr = err
+					continue
+				}
+				d.NetDial = socksDialer.Dial
+			} else {
+				// CONNECT proxy
+				d.Proxy = func(*http.Request) (*url.URL, error) {
+					return c.proxyURL, nil
+				}
 			}
 		}
 		wsHeaders := http.Header{}

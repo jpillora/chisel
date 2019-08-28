@@ -26,5 +26,7 @@ golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/internal/subtle
 # golang.org/x/net v0.0.0-20181017193950-04a2e542c03f
 golang.org/x/net/context
+golang.org/x/net/internal/socks
+golang.org/x/net/proxy
 # golang.org/x/sys v0.0.0-20181019160139-8e24a49d80f8
 golang.org/x/sys/unix

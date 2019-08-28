@@ -264,9 +264,11 @@ var clientHelp = `
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --proxy, An optional HTTP CONNECT proxy which will be used reach
-    the chisel server. Authentication can be specified inside the URL.
+    --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
+    used to reach the chisel server. Authentication can be specified
+    inside the URL.
     For example, http://admin:password@my-server.com:8081
+             or: socks://admin:password@my-server.com:1080
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
@@ -304,7 +306,7 @@ func client(args []string) {
 		KeepAlive:        *keepalive,
 		MaxRetryCount:    *maxRetryCount,
 		MaxRetryInterval: *maxRetryInterval,
-		HTTPProxy:        *proxy,
+		Proxy:            *proxy,
 		Server:           args[0],
 		Remotes:          args[1:],
 		HostHeader:       *hostname,
