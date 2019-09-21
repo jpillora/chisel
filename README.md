@@ -212,7 +212,7 @@ $ chisel client --help
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --proxy, An optional HTTP CONNECT proxy which will be used reach
+    --proxy, An optional HTTP CONNECT proxy which will be used to reach
     the chisel server. Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
 
