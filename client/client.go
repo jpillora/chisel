@@ -14,7 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
+	"github.com/alfonso-presa/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 
