@@ -111,6 +111,27 @@ func TestRemoteDecode(t *testing.T) {
 			},
 			"R:[::]:3000:[::1]:3000",
 		},
+		{
+			"3306:unix:///tmp/mysql.sock",
+			Remote {
+				LocalPort: "3306",
+				RemoteHost: "unix",
+				RemotePort: "/tmp/mysql.sock",
+				Uds: true,
+			},
+			"0.0.0.0:3306:unix:///tmp/mysql.sock",
+		},
+		{
+			"R:3306:unix:///tmp/mysql.sock",
+			Remote {
+				LocalPort: "3306",
+				RemoteHost: "unix",
+				RemotePort: "/tmp/mysql.sock",
+				Reverse: true,
+				Uds: true,
+			},
+			"R:0.0.0.0:3306:unix:///tmp/mysql.sock",
+		},
 	} {
 		//expected defaults
 		expected := test.Output

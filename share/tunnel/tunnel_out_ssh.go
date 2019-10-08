@@ -39,6 +39,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	remote := string(ch.ExtraData())
 	//extract protocol
 	hostPort, proto := settings.L4Proto(remote)
+	uds := strings.HasPrefix(remote, settings.UdsPrefix)
 	udp := proto == "udp"
 	socks := hostPort == "socks"
 	if socks && t.socksServer == nil {
@@ -59,7 +60,10 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
-	if socks {
+	if uds {
+		socketFile := strings.TrimPrefix(hostPort, settings.UdsPrefix)
+		err = t.handleUnixDomainSocket(l, stream, socketFile)
+	} else if socks {
 		err = t.handleSocks(stream)
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)
@@ -80,6 +84,16 @@ func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 
 func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
 	dst, err := net.Dial("tcp", hostPort)
+	if err != nil {
+		return err
+	}
+	s, r := cio.Pipe(src, dst)
+	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
+	return nil
+}
+
+func (t *Tunnel) handleUnixDomainSocket(l *cio.Logger, src io.ReadWriteCloser, remote string) error {
+	dst, err := net.Dial("unix", remote)
 	if err != nil {
 		return err
 	}

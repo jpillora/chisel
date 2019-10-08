@@ -28,11 +28,12 @@ type Config struct {
 	Proxy     string
 	Socks5    bool
 	Reverse   bool
+	Uds       bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
 }
 
-// Server respresent a chisel service
+// Server represents a chisel service
 type Server struct {
 	*cio.Logger
 	config       *Config

@@ -123,7 +123,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		//confirm reverse tunnels are allowed
 		if r.Reverse && !s.config.Reverse {
 			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
-			failed(s.Errorf("Reverse port forwaring not enabled on server"))
+			failed(s.Errorf("Reverse port forwarding not enabled on server"))
+			return
+		}
+		if r.Uds && !s.config.Uds {
+			l.Debugf("Denied unix domain socket forwarding request, please enable --uds")
+			failed(s.Errorf("Unix domain socket not enabled on server"))
 			return
 		}
 		//confirm reverse tunnel is available

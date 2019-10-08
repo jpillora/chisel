@@ -142,6 +142,9 @@ var serverHelp = `
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
+    --uds, Allow clients to connect to unix domain sockets on remote targets.
+    This mode is only supported by the *nix family (linux, osx, etc...).
+
     --tls-key, Enables TLS and provides optional path to a PEM-encoded
     TLS private key. When this flag is set, you must also set --tls-cert,
     and you cannot set --tls-domain.
@@ -161,7 +164,7 @@ var serverHelp = `
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
     holding multiple PEM encode CA certificate bundle files, which is used to 
     validate client connections. The provided CA certificates will be used 
-    instead of the system roots. This is commonly used to implement mutual-TLS. 
+    instead of the system roots. This is commonly used to implement mutual-TLS.
 ` + commonHelp
 
 func server(args []string) {
@@ -177,6 +180,7 @@ func server(args []string) {
 	flags.StringVar(&config.Proxy, "backend", "", "")
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
+	flags.BoolVar(&config.Uds, "uds", false, "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")

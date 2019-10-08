@@ -31,14 +31,21 @@ import (
 //   1.1.1.1:53/udp
 //     local  127.0.0.1:53/udp
 //     remote 1.1.1.1:53/udp
+//   3306:unix:///tmp/mysql.sock ->
+//     local  127.0.0.1:3306
+//     remote (local sock) /tmp/mysql.sock
+//   R:unix:///tmp/mysql.sock:3306 ->
+//     local  (local sock) /tmp/mysql.sock
+//     remote 127.0.0.1:3306
 
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Socks, Reverse, Stdio               bool
+	Socks, Uds, Reverse, Stdio          bool
 }
 
 const revPrefix = "R:"
+const UdsPrefix = "unix://"
 
 func DecodeRemote(s string) (*Remote, error) {
 	reverse := false
@@ -79,6 +86,12 @@ func DecodeRemote(s string) (*Remote, error) {
 				r.RemotePort = p
 			}
 			r.LocalPort = p
+			continue
+		}
+		//last part unix://path/to/unix/domain/socket
+		if i == len(parts)-1 && i > 0 && isUds(parts[i-1][1]+":"+p) {
+			r.RemotePort = strings.TrimPrefix(p, "//")
+			r.Uds = true
 			continue
 		}
 		if !r.Socks && (r.RemotePort == "" && r.LocalPort == "") {
@@ -132,6 +145,14 @@ func DecodeRemote(s string) (*Remote, error) {
 	return r, nil
 }
 
+func isUds(s string) bool {
+	if !strings.HasPrefix(s, UdsPrefix) {
+		return false
+	}
+	_, err := url.Parse(s)
+	return err == nil
+}
+
 func isPort(s string) bool {
 	n, err := strconv.Atoi(s)
 	if err != nil {
@@ -145,15 +166,12 @@ func isPort(s string) bool {
 
 func isHost(s string) bool {
 	_, err := url.Parse("//" + s)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 
-//L4Proto extacts the layer-4 protocol from the given string
+//L4Proto extracts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
@@ -212,7 +230,11 @@ func (r Remote) Remote() string {
 	if r.RemoteHost == "" {
 		r.RemoteHost = "127.0.0.1"
 	}
-	return r.RemoteHost + ":" + r.RemotePort
+	joiner := ":"
+	if r.Uds {
+		joiner += "//"
+	}
+	return r.RemoteHost + joiner + r.RemotePort
 }
 
 //UserAddr is checked when checking if a
