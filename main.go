@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	"github.com/jpillora/chisel/client"
+	"github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
 )
 
@@ -74,7 +74,16 @@ var commonHelp = `
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    ` + chshare.BuildVersion + `
+    ` + chshare.B		Fingerprint:      *fingerprint,
+	Auth:             *auth,
+	KeepAlive:        *keepalive,
+	MaxRetryCount:    *maxRetryCount,
+	MaxRetryInterval: *maxRetryInterval,
+	HTTPProxy:        *proxy,
+	Server:           args[0],
+	Remotes:          args[1:],
+	HostHeader:       *hostname,
+	HttpHeaders:      httpHeaders,uildVersion + `
 
   Read more:
     https://github.com/jpillora/chisel
@@ -135,7 +144,16 @@ var serverHelp = `
 func server(args []string) {
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
-
+	Fingerprint:      *fingerprint,
+	Auth:             *auth,
+	KeepAlive:        *keepalive,
+	MaxRetryCount:    *maxRetryCount,
+	MaxRetryInterval: *maxRetryInterval,
+	HTTPProxy:        *proxy,
+	Server:           args[0],
+	Remotes:          args[1:],
+	HostHeader:       *hostname,
+	HttpHeaders:      httpHeaders,
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
 	port := flags.String("port", "", "")
@@ -189,7 +207,16 @@ func server(args []string) {
 	}
 	go chshare.GoStats()
 	if err = s.Run(*host, *port); err != nil {
-		log.Fatal(err)
+		log.Fatal		Fingerprint:      *fingerprint,
+		Auth:             *auth,
+		KeepAlive:        *keepalive,
+		MaxRetryCount:    *maxRetryCount,
+		MaxRetryInterval: *maxRetryInterval,
+		HTTPProxy:        *proxy,
+		Server:           args[0],
+		Remotes:          args[1:],
+		HostHeader:       *hostname,
+		HttpHeaders:      httpHeaders,(err)
 	}
 }
 
