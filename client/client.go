@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -26,6 +27,7 @@ type Config struct {
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
 	Server           string
+	SkipTlsVerification bool
 	HTTPProxy        string
 	Remotes          []string
 	HostHeader       string
@@ -199,6 +201,9 @@ func (c *Client) connectionLoop() {
 			d.Proxy = func(*http.Request) (*url.URL, error) {
 				return c.httpProxyURL, nil
 			}
+		}
+		if c.config.SkipTlsVerification {
+			d.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 		wsHeaders := http.Header{}
 		if c.config.HttpHeaders != nil {

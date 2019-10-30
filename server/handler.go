@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jpillora/chisel/share"
+	"github.com/alfonso-presa/chisel/share"
 )
 
 // handleClientHandler is the main http websocket handler for the chisel server
