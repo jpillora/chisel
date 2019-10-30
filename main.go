@@ -7,9 +7,10 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
-	"github.com/jpillora/chisel/client"
-	"github.com/jpillora/chisel/server"
+	chclient "github.com/jpillora/chisel/client"
+	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
 )
 
@@ -265,8 +266,24 @@ var clientHelp = `
     For example, http://admin:password@my-server.com:8081
 
     --hostname, Optionally set the 'Host' header (defaults to the host
-    found in the server url).
+	found in the server url).
+
+    --custom-http-header, Custom http header in the form of "name=value".
+    You may add as much as you need.
 ` + commonHelp
+
+type customHeaders []string
+
+func (i *customHeaders) String() string {
+	return "Headers list"
+}
+
+func (i *customHeaders) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var myHeaders customHeaders
 
 func client(args []string) {
 
@@ -281,11 +298,17 @@ func client(args []string) {
 	pid := flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
 	verbose := flags.Bool("v", false, "")
+	flags.Var(&myHeaders, "custom-http-header", "Custom http header in the form of `name=value`. Can add as much as you need")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(1)
 	}
 	flags.Parse(args)
+	httpHeaders := make(map[string]string)
+	for _, header := range myHeaders {
+		parts := strings.SplitN(header, "=", 2)
+		httpHeaders[parts[0]] = parts[1]
+	}
 	//pull out options, put back remaining args
 	args = flags.Args()
 	if len(args) < 2 {
@@ -304,6 +327,7 @@ func client(args []string) {
 		Server:           args[0],
 		Remotes:          args[1:],
 		HostHeader:       *hostname,
+		HttpHeaders:      httpHeaders,
 	})
 	if err != nil {
 		log.Fatal(err)
