@@ -112,6 +112,12 @@ $ chisel server --help
     access, in the form of <user:pass>. This is equivalent to creating an
     authfile with {"<user:pass>": [""]}.
 
+    --tls-cert-file, An optional file containing the default x509 Certificate
+    for HTTPS. (CA cert, if any, concatenated after server cert).
+
+    --tls-key-file, An optional file containing the default x509 private key
+    matching "--tls-cert-file".
+
     --proxy, Specifies another HTTP server to proxy requests to when
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
@@ -200,6 +206,10 @@ $ chisel client --help
     the credentials inside the server's --authfile. defaults to the
     AUTH environment variable.
 
+    --ca-file, An optional root certificate bundle used to verify the
+    chisel server. Only valid when connecting to the server with
+    "https" or "wss".
+
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
@@ -217,7 +227,7 @@ $ chisel client --help
     For example, http://admin:password@my-server.com:8081
 
     --hostname, Optionally set the 'Host' header (defaults to the host
-    defined in the endpoint url).
+    found in the server url).
 
     --pid Generate pid file in current working directory
 

@@ -2,8 +2,11 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,7 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
+	chshare "github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -22,6 +25,7 @@ type Config struct {
 	shared           *chshare.Config
 	Fingerprint      string
 	Auth             string
+	CAFile           string
 	KeepAlive        time.Duration
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
@@ -38,6 +42,7 @@ type Client struct {
 	sshConfig    *ssh.ClientConfig
 	sshConn      ssh.Conn
 	httpProxyURL *url.URL
+	tlsConfig    *tls.Config
 	server       string
 	running      bool
 	runningc     chan error
@@ -100,6 +105,24 @@ func NewClient(config *Config) (*Client, error) {
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
 		Timeout:         30 * time.Second,
+	}
+
+	if config.CAFile != "" {
+		if u.Scheme != "https" && u.Scheme != "wss" {
+			return nil, fmt.Errorf(`must use "https" or "wss" when using "--ca-file"`)
+		}
+
+		data, err := ioutil.ReadFile(config.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not read certificate authority: %s", err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(data) {
+			return nil, fmt.Errorf("could not append certificate data")
+		}
+
+		client.tlsConfig = &tls.Config{RootCAs: certPool}
 	}
 
 	return client, nil
@@ -191,6 +214,7 @@ func (c *Client) connectionLoop() {
 			ReadBufferSize:   1024,
 			WriteBufferSize:  1024,
 			HandshakeTimeout: 45 * time.Second,
+			TLSClientConfig:  c.tlsConfig,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
 		//optionally CONNECT proxy

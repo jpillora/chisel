@@ -27,6 +27,16 @@ func NewHTTPServer() *HTTPServer {
 }
 
 func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler) error {
+	return h.listenAndServe(addr, handler, h.Serve)
+}
+
+func (h *HTTPServer) GoListenAndServeTLS(addr string, handler http.Handler, certFile, privateKeyFile string) error {
+	return h.listenAndServe(addr, handler, func(l net.Listener) error {
+		return h.ServeTLS(l, certFile, privateKeyFile)
+	})
+}
+
+func (h *HTTPServer) listenAndServe(addr string, handler http.Handler, serveFunc func(l net.Listener) error) error {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -34,8 +44,9 @@ func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler) error {
 	h.isRunning = true
 	h.Handler = handler
 	h.listener = l
+
 	go func() {
-		h.closeWith(h.Serve(l))
+		h.closeWith(serveFunc(l))
 	}()
 	return nil
 }
