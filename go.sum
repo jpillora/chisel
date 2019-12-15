@@ -16,6 +16,9 @@ github.com/jpillora/sizestr v0.0.0-20160130011556-e2ea2fa42fb9 h1:0c9jcgBtHRtDU/
 github.com/jpillora/sizestr v0.0.0-20160130011556-e2ea2fa42fb9/go.mod h1:1ffp+CRe0eAwwRb0/BownUAjMBsmTLwgAvRbfj9dRwE=
 github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce h1:fb190+cK2Xz/dvi9Hv8eCYJYvIGUTN2/KLq1pT6CjEc=
 github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce/go.mod h1:o8v6yHRoik09Xen7gje4m9ERNah1d1PPsVq1VEx9vE4=
+github.com/tredoe/goutil v0.0.0-20161130132832-0a73aea41b0b/go.mod h1:dp4VPOLeEFYbsf1ikgd+uytWDnpCdMiTHMg6mh7hHuQ=
+github.com/tredoe/osutil v0.0.0-20191018075336-e272fdda81c8 h1:kKa/vDK8CCEnDLug5cfYRHZZJ2JKu4/wyHmjkzaOLk0=
+github.com/tredoe/osutil v0.0.0-20191018075336-e272fdda81c8/go.mod h1:w7hqLjZRokyWIpiEXWj6pXIHOg/2tSWSBsoYfdc9bjw=
 golang.org/x/crypto v0.0.0-20181015023909-0c41d7ab0a0e h1:IzypfodbhbnViNUO/MEh0FzCUooG97cIGfdggUrUSyU=
 golang.org/x/crypto v0.0.0-20181015023909-0c41d7ab0a0e/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20181017193950-04a2e542c03f h1:4pRM7zYwpBjCnfA1jRmhItLxYJkaEnsmuAcRtA347DA=

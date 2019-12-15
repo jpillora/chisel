@@ -2,6 +2,8 @@ package chserver
 
 import (
 	"errors"
+	"github.com/tredoe/osutil/user/crypt/sha256_crypt"
+	"github.com/tredoe/osutil/user/crypt/sha512_crypt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	socks5 "github.com/armon/go-socks5"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/requestlog"
+	"github.com/tredoe/osutil/user/crypt"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/jpillora/chisel/share"
@@ -71,6 +74,8 @@ func NewServer(config *Config) (*Server, error) {
 			s.users.AddUser(u)
 		}
 	}
+	//register crypts
+	s.registerCrypt()
 	//generate private key (optionally using seed)
 	key, _ := chshare.GenerateKey(config.KeySeed)
 	//convert into ssh.PrivateKey
@@ -165,6 +170,12 @@ func (s *Server) GetFingerprint() string {
 	return s.fingerprint
 }
 
+// register
+func (s *Server) registerCrypt() {
+	crypt.RegisterCrypt(crypt.SHA256, sha256_crypt.New, "$5$")
+	crypt.RegisterCrypt(crypt.SHA512, sha512_crypt.New, "$6$")
+}
+
 // authUser is responsible for validating the ssh user / password combination
 func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 	// check if user authenication is enable and it not allow all
@@ -174,7 +185,8 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
+	enc := crypt.NewFromHash(string(password))
+	if !found || (enc == nil && user.Pass != string(password)) || (enc != nil && enc.Verify(string(password), []byte(user.Pass)) != nil) {
 		s.Debugf("Login failed for user: %s", n)
 		return nil, errors.New("Invalid authentication for username: %s")
 	}

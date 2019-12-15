@@ -10,6 +10,7 @@ require (
 	github.com/jpillora/requestlog v0.0.0-20181015073026-df8817be5f82
 	github.com/jpillora/sizestr v0.0.0-20160130011556-e2ea2fa42fb9
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
+	github.com/tredoe/osutil v0.0.0-20191018075336-e272fdda81c8
 	golang.org/x/crypto v0.0.0-20181015023909-0c41d7ab0a0e
 	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f // indirect
 	golang.org/x/sys v0.0.0-20181019160139-8e24a49d80f8 // indirect
