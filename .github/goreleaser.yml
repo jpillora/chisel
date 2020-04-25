@@ -12,9 +12,14 @@ builds:
       - amd64
       - arm
       - arm64
+      - mips
+      - mipsle
     goarm:
       - 6
       - 7
+    gomips:
+      - hardfloat
+      - softfloat
 archives:
   - format: gz
     files:
