@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"runtime"
 	"strconv"
+	"strings"
 
-	"github.com/jpillora/chisel/client"
-	"github.com/jpillora/chisel/server"
+	chclient "github.com/jpillora/chisel/client"
+	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
 )
 
@@ -73,7 +76,7 @@ var commonHelp = `
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    ` + chshare.BuildVersion + `
+    ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
 
   Read more:
     https://github.com/jpillora/chisel
@@ -192,6 +195,32 @@ func server(args []string) {
 	}
 }
 
+type headerFlags struct {
+	http.Header
+}
+
+func (flag *headerFlags) String() string {
+	out := ""
+	for k, v := range flag.Header {
+		out += fmt.Sprintf("%s: %s\n", k, v)
+	}
+	return out
+}
+
+func (flag *headerFlags) Set(arg string) error {
+	index := strings.Index(arg, ":")
+	if index < 0 {
+		return fmt.Errorf(`Invalid header (%s). Should be in the format "HeaderName: HeaderContent"`, arg)
+	}
+	if flag.Header == nil {
+		flag.Header = http.Header{}
+	}
+	key := arg[0:index]
+	value := arg[index+1:]
+	flag.Header.Set(key, strings.TrimSpace(value))
+	return nil
+}
+
 var clientHelp = `
   Usage: chisel client [options] <server> <remote> [remote] [remote] ...
 
@@ -224,6 +253,8 @@ var clientHelp = `
       socks
       5000:socks
       R:2222:localhost:22
+      R:socks
+      R:5000:socks
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
@@ -235,6 +266,9 @@ var clientHelp = `
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
+    Reverse remotes specifying "R:socks" will listen on the server's
+    default socks port (1080) and terminate the connection at the
+    client's internal SOCKS5 proxy.
 
   Options:
 
@@ -260,26 +294,31 @@ var clientHelp = `
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --proxy, An optional HTTP CONNECT proxy which will be used reach
-    the chisel server. Authentication can be specified inside the URL.
+    --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
+    used to reach the chisel server. Authentication can be specified
+    inside the URL.
     For example, http://admin:password@my-server.com:8081
+             or: socks://admin:password@my-server.com:1080
+
+    --header, Set a custom header in the form "HeaderName: HeaderContent".
+    Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 ` + commonHelp
 
 func client(args []string) {
-
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
-
-	fingerprint := flags.String("fingerprint", "", "")
-	auth := flags.String("auth", "", "")
-	keepalive := flags.Duration("keepalive", 0, "")
-	maxRetryCount := flags.Int("max-retry-count", -1, "")
-	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
-	proxy := flags.String("proxy", "", "")
-	pid := flags.Bool("pid", false, "")
+	config := chclient.Config{Headers: http.Header{}}
+	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
+	flags.StringVar(&config.Auth, "auth", "", "")
+	flags.DurationVar(&config.KeepAlive, "keepalive", 0, "")
+	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
+	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
+	flags.StringVar(&config.Proxy, "proxy", "", "")
+	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
+	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
@@ -291,20 +330,18 @@ func client(args []string) {
 	if len(args) < 2 {
 		log.Fatalf("A server and least one remote is required")
 	}
-	if *auth == "" {
-		*auth = os.Getenv("AUTH")
+	config.Server = args[0]
+	config.Remotes = args[1:]
+	//default auth
+	if config.Auth == "" {
+		config.Auth = os.Getenv("AUTH")
 	}
-	c, err := chclient.NewClient(&chclient.Config{
-		Fingerprint:      *fingerprint,
-		Auth:             *auth,
-		KeepAlive:        *keepalive,
-		MaxRetryCount:    *maxRetryCount,
-		MaxRetryInterval: *maxRetryInterval,
-		HTTPProxy:        *proxy,
-		Server:           args[0],
-		Remotes:          args[1:],
-		HostHeader:       *hostname,
-	})
+	//move hostname onto headers
+	if *hostname != "" {
+		config.Headers.Set("Host", *hostname)
+	}
+	//ready
+	c, err := chclient.NewClient(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
