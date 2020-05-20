@@ -13,12 +13,12 @@ Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single exec
 - [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
 - [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
 - Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
-- Client can create multiple tunnel endpoints over one TCP connection
-- Client can optionally pass through SOCKS or HTTP CONNECT proxies
+- Clients can create multiple tunnel endpoints over one TCP connection
+- Clients can optionally pass through SOCKS or HTTP CONNECT proxies
 - Reverse port forwarding (Connections go through the server and out the client)
 - Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 - Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
-- Client optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
+- Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
 
 ### Install
 
@@ -68,7 +68,7 @@ $ chisel --help
 
    Usage: chisel [command] [--help]
 
-   Version: X.Y.Z
+   Version: 1.X.X
 
    Commands:
      server - runs chisel in server mode
@@ -135,7 +135,7 @@ $ chisel server --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14)
+    1.X.X (go1.14)
 
   Read more:
     https://github.com/jpillora/chisel
@@ -241,7 +241,7 @@ $ chisel client --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14)
+    1.X.X (go1.14)
 
   Read more:
     https://github.com/jpillora/chisel
