@@ -221,7 +221,7 @@ func (c *Client) connectionLoop() {
 						c.proxyURL.Scheme)
 					break
 				}
-				var auth *proxy.Auth = nil
+				var auth *proxy.Auth
 				if c.proxyURL.User != nil {
 					pass, _ := c.proxyURL.User.Password()
 					auth = &proxy.Auth{
