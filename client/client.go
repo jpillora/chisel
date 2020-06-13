@@ -12,10 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/armon/go-socks5"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	chshare "github.com/jpillora/chisel/share"
+
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/proxy"
 )
 
 //Config represents a client configuration
@@ -27,22 +30,24 @@ type Config struct {
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
 	Server           string
-	HTTPProxy        string
+	Proxy            string
 	Remotes          []string
-	HostHeader       string
+	Headers          http.Header
+	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 //Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config       *Config
-	sshConfig    *ssh.ClientConfig
-	sshConn      ssh.Conn
-	httpProxyURL *url.URL
-	server       string
-	running      bool
-	runningc     chan error
-	connStats    chshare.ConnStats
+	config      *Config
+	sshConfig   *ssh.ClientConfig
+	sshConn     ssh.Conn
+	proxyURL    *url.URL
+	server      string
+	running     bool
+	runningc    chan error
+	connStats   chshare.ConnStats
+	socksServer *socks5.Server
 }
 
 //NewClient creates a new client instance
@@ -70,6 +75,7 @@ func NewClient(config *Config) (*Client, error) {
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	shared := &chshare.Config{}
 	stdioCnt := 0
+	createSocksServer := false
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
@@ -80,6 +86,8 @@ func NewClient(config *Config) (*Client, error) {
 		}
 		if stdioCnt > 1 {
 			return nil, errors.New("Only one stdio is allowed")
+		if r.Socks && r.Reverse {
+			createSocksServer = true
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}
@@ -93,8 +101,8 @@ func NewClient(config *Config) (*Client, error) {
 	}
 	client.Info = true
 
-	if p := config.HTTPProxy; p != "" {
-		client.httpProxyURL, err = url.Parse(p)
+	if p := config.Proxy; p != "" {
+		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
 		}
@@ -108,6 +116,14 @@ func NewClient(config *Config) (*Client, error) {
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
 		Timeout:         30 * time.Second,
+	}
+
+	if createSocksServer {
+		socksConfig := &socks5.Config{}
+		client.socksServer, err = socks5.New(socksConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return client, nil
@@ -137,8 +153,8 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 //Start client and does not block
 func (c *Client) Start(ctx context.Context) error {
 	via := ""
-	if c.httpProxyURL != nil {
-		via = " via " + c.httpProxyURL.String()
+	if c.proxyURL != nil {
+		via = " via " + c.proxyURL.String()
 	}
 	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
@@ -200,20 +216,40 @@ func (c *Client) connectionLoop() {
 			WriteBufferSize:  1024,
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
+			NetDialContext:   c.config.DialContext,
 		}
-		//optionally CONNECT proxy
-		if c.httpProxyURL != nil {
-			d.Proxy = func(*http.Request) (*url.URL, error) {
-				return c.httpProxyURL, nil
+		//optionally proxy
+		if c.proxyURL != nil {
+			if strings.HasPrefix(c.proxyURL.Scheme, "socks") {
+				// SOCKS5 proxy
+				if c.proxyURL.Scheme != "socks" && c.proxyURL.Scheme != "socks5h" {
+					c.Infof(
+						"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+						c.proxyURL.Scheme)
+					break
+				}
+				var auth *proxy.Auth
+				if c.proxyURL.User != nil {
+					pass, _ := c.proxyURL.User.Password()
+					auth = &proxy.Auth{
+						User:     c.proxyURL.User.Username(),
+						Password: pass,
+					}
+				}
+				socksDialer, err := proxy.SOCKS5("tcp", c.proxyURL.Host, auth, proxy.Direct)
+				if err != nil {
+					connerr = err
+					continue
+				}
+				d.NetDial = socksDialer.Dial
+			} else {
+				// CONNECT proxy
+				d.Proxy = func(*http.Request) (*url.URL, error) {
+					return c.proxyURL, nil
+				}
 			}
 		}
-		wsHeaders := http.Header{}
-		if c.config.HostHeader != "" {
-			wsHeaders = http.Header{
-				"Host": {c.config.HostHeader},
-			}
-		}
-		wsConn, _, err := d.Dial(c.server, wsHeaders)
+		wsConn, _, err := d.Dial(c.server, c.config.Headers)
 		if err != nil {
 			connerr = err
 			continue
@@ -280,6 +316,12 @@ func (c *Client) Close() error {
 func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		remote := string(ch.ExtraData())
+		socks := remote == "socks"
+		if socks && c.socksServer == nil {
+			c.Debugf("Denied socks request, please enable client socks remote.")
+			ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled on the client")
+			continue
+		}
 		stream, reqs, err := ch.Accept()
 		if err != nil {
 			c.Debugf("Failed to accept stream: %s", err)
@@ -287,6 +329,10 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		}
 		go ssh.DiscardRequests(reqs)
 		l := c.Logger.Fork("conn#%d", c.connStats.New())
-		go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		if socks {
+			go chshare.HandleSocksStream(l, c.socksServer, &c.connStats, stream)
+		} else {
+			go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+		}
 	}
 }

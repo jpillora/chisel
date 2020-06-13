@@ -12,6 +12,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/armon/go-socks5"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
@@ -55,4 +56,17 @@ func HandleTCPStream(l *Logger, connStats *ConnStats, src io.ReadWriteCloser, re
 	s, r := Pipe(src, dst)
 	connStats.Close()
 	l.Debugf("%s: Close (sent %s received %s)", connStats, sizestr.ToString(s), sizestr.ToString(r))
+}
+
+func HandleSocksStream(l *Logger, server *socks5.Server, connStats *ConnStats, src io.ReadWriteCloser) {
+	conn := NewRWCConn(src)
+	connStats.Open()
+	l.Debugf("%s Opening", connStats)
+	err := server.ServeConn(conn)
+	connStats.Close()
+	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
+		l.Debugf("%s: Closed (error: %s)", connStats, err)
+	} else {
+		l.Debugf("%s: Closed", connStats)
+	}
 }

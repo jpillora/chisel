@@ -1,3 +1,6 @@
+# test this goreleaser config with:
+# - cd chisel/
+# - goreleaser --skip-publish --rm-dist --config .github/goreleaser.yml
 builds:
   - env:
       - CGO_ENABLED=0
@@ -12,9 +15,23 @@ builds:
       - amd64
       - arm
       - arm64
+      - ppc64
+      - ppc64le
+      - mips
+      - mipsle
+      - mips64
+      - mips64le
+      - mips64p32
+      - mips64p32le
+      - ppc
+      - s390
+      - s390x
     goarm:
       - 6
       - 7
+    gomips:
+      - hardfloat
+      - softfloat
 archives:
   - format: gz
     files:
