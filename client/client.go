@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -68,10 +69,17 @@ func NewClient(config *Config) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	shared := &chshare.Config{}
+	stdioCnt := 0
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
+		}
+		if r.Stdio {
+			stdioCnt++
+		}
+		if stdioCnt > 1 {
+			return nil, errors.New("Only one stdio is allowed")
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}

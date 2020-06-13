@@ -224,6 +224,7 @@ var clientHelp = `
       socks
       5000:socks
       R:2222:localhost:22
+      stdio:example.com:22
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
@@ -235,6 +236,13 @@ var clientHelp = `
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
+
+    When stdio is used as local-host, the tunnel will connect standard
+    input/output of this program with the remote. This is useful when 
+    combined with ssh ProxyCommand. You can use
+      ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
+          user@example.com
+    to connect to an SSH server through the tunnel.
 
   Options:
 

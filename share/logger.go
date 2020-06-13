@@ -20,7 +20,7 @@ func NewLogger(prefix string) *Logger {
 func NewLoggerFlag(prefix string, flag int) *Logger {
 	l := &Logger{
 		prefix: prefix,
-		logger: log.New(os.Stdout, "", flag),
+		logger: log.New(os.Stderr, "", flag),
 		Info:   false,
 		Debug:  false,
 	}

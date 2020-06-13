@@ -20,10 +20,16 @@ import (
 //   192.168.0.1:3000:google.com:80 ->
 //     local  192.168.0.1:3000
 //     remote google.com:80
+//   127.0.0.1:1080:socks
+//     local  127.0.0.1:1080
+//     remote socks
+//   stdio:example.com:22
+//     local  stdio
+//     remote example.com:22
 
 type Remote struct {
 	LocalHost, LocalPort, RemoteHost, RemotePort string
-	Socks, Reverse                               bool
+	Socks, Reverse, Stdio                        bool
 }
 
 const revPrefix = "R:"
@@ -49,6 +55,10 @@ func DecodeRemote(s string) (*Remote, error) {
 				return nil, errors.New("'socks' incompatible with reverse port forwarding")
 			}
 			r.Socks = true
+			continue
+		}
+		if i == 0 && p == "stdio" {
+			r.Stdio = true
 			continue
 		}
 		if isPort(p) {
@@ -85,6 +95,9 @@ func DecodeRemote(s string) (*Remote, error) {
 	if !r.Socks && r.RemoteHost == "" {
 		r.RemoteHost = "0.0.0.0"
 	}
+	if r.Stdio && r.Reverse {
+		return nil, errors.New("stdio cannot be used with reverse tunnel")
+	}
 	return r, nil
 }
 
@@ -111,7 +124,14 @@ func (r *Remote) String() string {
 	if r.Reverse {
 		tag = revPrefix
 	}
-	return tag + r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote()
+	return tag + r.Local() + "=>" + r.Remote()
+}
+
+func (r *Remote) Local() string {
+	if r.Stdio {
+		return "stdio"
+	}
+	return r.LocalHost + ":" + r.LocalPort
 }
 
 func (r *Remote) Remote() string {
