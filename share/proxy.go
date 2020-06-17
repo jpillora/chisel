@@ -31,15 +31,31 @@ func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCP
 }
 
 func (p *TCPProxy) Start(ctx context.Context) error {
+	if p.remote.Stdio {
+		go p.listenStdio(ctx)
+		return nil
+	}
 	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
 	if err != nil {
 		return fmt.Errorf("%s: %s", p.Logger.Prefix(), err)
 	}
-	go p.listen(ctx, l)
+	go p.listenNet(ctx, l)
 	return nil
 }
 
-func (p *TCPProxy) listen(ctx context.Context, l net.Listener) {
+func (p *TCPProxy) listenStdio(ctx context.Context) {
+	for {
+		p.accept(Stdio)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// the connection is not ready yet, keep waiting
+		}
+	}
+}
+
+func (p *TCPProxy) listenNet(ctx context.Context, l net.Listener) {
 	p.Infof("Listening")
 	done := make(chan struct{})
 	go func() {

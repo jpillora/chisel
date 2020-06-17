@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -74,6 +75,7 @@ func NewClient(config *Config) (*Client, error) {
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	shared := &chshare.Config{}
 	createSocksServer := false
+	hasStdio := false
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
@@ -81,6 +83,12 @@ func NewClient(config *Config) (*Client, error) {
 		}
 		if r.Socks && r.Reverse {
 			createSocksServer = true
+		}
+		if r.Stdio {
+			if hasStdio {
+				return nil, errors.New("Only one stdio is allowed")
+			}
+			hasStdio = true
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}

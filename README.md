@@ -19,6 +19,7 @@ Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single exec
 - Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
 - Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
 - Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
+- Client connections over stdio which supports `ssh -o ProxyCommand` providing SSH over HTTP
 
 ### Install
 
@@ -178,6 +179,7 @@ $ chisel client --help
       R:2222:localhost:22
       R:socks
       R:5000:socks
+      stdio:example.com:22
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
@@ -192,6 +194,13 @@ $ chisel client --help
     Reverse remotes specifying "R:socks" will listen on the server's
     default socks port (1080) and terminate the connection at the
     client's internal SOCKS5 proxy.
+
+    When stdio is used as local-host, the tunnel will connect standard
+    input/output of this program with the remote. This is useful when 
+    combined with ssh ProxyCommand. You can use
+      ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
+          user@example.com
+    to connect to an SSH server through the tunnel.
 
   Options:
 

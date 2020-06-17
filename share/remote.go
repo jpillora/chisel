@@ -20,10 +20,16 @@ import (
 //   192.168.0.1:3000:google.com:80 ->
 //     local  192.168.0.1:3000
 //     remote google.com:80
+//   127.0.0.1:1080:socks
+//     local  127.0.0.1:1080
+//     remote socks
+//   stdio:example.com:22
+//     local  stdio
+//     remote example.com:22
 
 type Remote struct {
 	LocalHost, LocalPort, RemoteHost, RemotePort string
-	Socks, Reverse                               bool
+	Socks, Reverse, Stdio                        bool
 }
 
 const revPrefix = "R:"
@@ -41,9 +47,14 @@ func DecodeRemote(s string) (*Remote, error) {
 	r := &Remote{Reverse: reverse}
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i]
-		//last part "socks"?
+		//remote portion is socks?
 		if i == len(parts)-1 && p == "socks" {
 			r.Socks = true
+			continue
+		}
+		//local portion is stdio?
+		if i == 0 && p == "stdio" {
+			r.Stdio = true
 			continue
 		}
 		if isPort(p) {
@@ -80,6 +91,9 @@ func DecodeRemote(s string) (*Remote, error) {
 	if !r.Socks && r.RemoteHost == "" {
 		r.RemoteHost = "0.0.0.0"
 	}
+	if r.Stdio && r.Reverse {
+		return nil, errors.New("stdio cannot be reversed")
+	}
 	return r, nil
 }
 
@@ -106,7 +120,14 @@ func (r *Remote) String() string {
 	if r.Reverse {
 		tag = revPrefix
 	}
-	return tag + r.LocalHost + ":" + r.LocalPort + "=>" + r.Remote()
+	return tag + r.Local() + "=>" + r.Remote()
+}
+
+func (r *Remote) Local() string {
+	if r.Stdio {
+		return "stdio"
+	}
+	return r.LocalHost + ":" + r.LocalPort
 }
 
 func (r *Remote) Remote() string {
