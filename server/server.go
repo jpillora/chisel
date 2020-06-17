@@ -43,9 +43,7 @@ type Server struct {
 }
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 // NewServer creates and returns a new chisel server
@@ -71,7 +69,10 @@ func NewServer(config *Config) (*Server, error) {
 		}
 	}
 	//generate private key (optionally using seed)
-	key, _ := chshare.GenerateKey(config.KeySeed)
+	key, err := chshare.GenerateKey(config.KeySeed)
+	if err != nil {
+		log.Fatal("Failed to generate key")
+	}
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(key)
 	if err != nil {
@@ -180,7 +181,7 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 		return nil, errors.New("Invalid authentication for username: %s")
 	}
 	// insert the user session map
-	// @note: this should probably have a lock on it given the map isn't thread-safe??
+	// TODO this should probably have a lock on it given the map isn't thread-safe
 	s.sessions.Set(string(c.SessionID()), user)
 	return nil, nil
 }

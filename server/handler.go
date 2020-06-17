@@ -125,11 +125,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	//set up reverse port forwarding
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(req.Context())
 	defer cancel()
 	for i, r := range c.Remotes {
 		if r.Reverse {
-			proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
+			getConn := func() ssh.Conn { return sshConn }
+			proxy := chshare.NewL4Proxy(s.Logger, getConn, i, r)
 			if err := proxy.Start(ctx); err != nil {
 				failed(s.Errorf("%s", err))
 				return
@@ -159,7 +160,10 @@ func (s *Server) handleSSHRequests(clientLog *chshare.Logger, reqs <-chan *ssh.R
 
 func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.NewChannel) {
 	for ch := range chans {
-		remote := string(ch.ExtraData())
+		remote, proto := chshare.L4Proto(string(ch.ExtraData()))
+		if proto == "" {
+			proto = "tcp"
+		}
 		socks := remote == "socks"
 		//dont accept socks when --socks5 isn't enabled
 		if socks && s.socksServer == nil {
@@ -179,7 +183,7 @@ func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.N
 		if socks {
 			go chshare.HandleSocksStream(clientLog.Fork("socksconn#%d", connID), s.socksServer, &s.connStats, stream)
 		} else {
-			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote)
+			go chshare.HandleL4Stream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote, "tcp")
 		}
 	}
 }

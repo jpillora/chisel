@@ -160,7 +160,8 @@ func (c *Client) Start(ctx context.Context) error {
 	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
 		if !r.Reverse {
-			proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
+			getConn := func() ssh.Conn { return c.sshConn }
+			proxy := chshare.NewL4Proxy(c.Logger, getConn, i, r)
 			if err := proxy.Start(ctx); err != nil {
 				return err
 			}
@@ -213,8 +214,6 @@ func (c *Client) connectionLoop() {
 			chshare.SleepSignal(d)
 		}
 		d := websocket.Dialer{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 			NetDialContext:   c.config.DialContext,
@@ -316,7 +315,10 @@ func (c *Client) Close() error {
 
 func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
-		remote := string(ch.ExtraData())
+		remote, proto := chshare.L4Proto(string(ch.ExtraData()))
+		if proto == "" {
+			proto = "tcp"
+		}
 		socks := remote == "socks"
 		if socks && c.socksServer == nil {
 			c.Debugf("Denied socks request, please enable client socks remote.")
@@ -333,7 +335,7 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		if socks {
 			go chshare.HandleSocksStream(l, c.socksServer, &c.connStats, stream)
 		} else {
-			go chshare.HandleTCPStream(l, &c.connStats, stream, remote)
+			go chshare.HandleL4Stream(l, &c.connStats, stream, remote, proto)
 		}
 	}
 }

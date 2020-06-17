@@ -12,7 +12,7 @@ import (
 
 type GetSSHConn func() ssh.Conn
 
-type TCPProxy struct {
+type L4Proxy struct {
 	*Logger
 	ssh    GetSSHConn
 	id     int
@@ -20,9 +20,9 @@ type TCPProxy struct {
 	remote *Remote
 }
 
-func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCPProxy {
+func NewL4Proxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *L4Proxy {
 	id := index + 1
-	return &TCPProxy{
+	return &L4Proxy{
 		Logger: logger.Fork("proxy#%d:%s", id, remote),
 		ssh:    ssh,
 		id:     id,
@@ -30,20 +30,18 @@ func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCP
 	}
 }
 
-func (p *TCPProxy) Start(ctx context.Context) error {
+func (p *L4Proxy) Start(ctx context.Context) error {
 	if p.remote.Stdio {
 		go p.listenStdio(ctx)
 		return nil
 	}
-	l, err := net.Listen("tcp4", p.remote.LocalHost+":"+p.remote.LocalPort)
-	if err != nil {
-		return fmt.Errorf("%s: %s", p.Logger.Prefix(), err)
+	if p.remote.LocalProto == "udp" {
+		return p.listenUDP(ctx)
 	}
-	go p.listenNet(ctx, l)
-	return nil
+	return p.listenTCP(ctx)
 }
 
-func (p *TCPProxy) listenStdio(ctx context.Context) {
+func (p *L4Proxy) listenStdio(ctx context.Context) {
 	for {
 		p.accept(Stdio)
 		select {
@@ -55,7 +53,59 @@ func (p *TCPProxy) listenStdio(ctx context.Context) {
 	}
 }
 
-func (p *TCPProxy) listenNet(ctx context.Context, l net.Listener) {
+func (p *L4Proxy) listenUDP(ctx context.Context) error {
+	addr, err := net.ResolveUDPAddr("udp", p.remote.LocalHost+":"+p.remote.LocalPort)
+	if err != nil {
+		return err
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return err
+	}
+	panic("TODO")
+	return nil
+}
+
+func (p *L4Proxy) listenUDPInner(ctx context.Context, conn *net.UDPConn) {
+	p.Infof("Listening")
+	go func() {
+		select {
+		case <-ctx.Done():
+			conn.Close()
+			p.Infof("Closed")
+		}
+	}()
+	//TODO
+	//keep single ssh channel open,
+	//pass all messages through
+	const maxMTU = 9012
+	buff := make([]byte, maxMTU)
+	for {
+		n, err := conn.Read(buff)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.Infof("Connection error: %s", err)
+			break
+		}
+		b := buff[:n]
+		p.Infof("Message: %s", string(b))
+	}
+
+}
+
+func (p *L4Proxy) listenTCP(ctx context.Context) error {
+	l, err := net.Listen("tcp", p.remote.LocalHost+":"+p.remote.LocalPort)
+	if err != nil {
+		return fmt.Errorf("%s: %s", p.Logger.Prefix(), err)
+	}
+	go p.listenTCPInner(ctx, l)
+	return nil
+
+}
+
+func (p *L4Proxy) listenTCPInner(ctx context.Context, l net.Listener) {
 	p.Infof("Listening")
 	done := make(chan struct{})
 	go func() {
@@ -82,7 +132,7 @@ func (p *TCPProxy) listenNet(ctx context.Context, l net.Listener) {
 	}
 }
 
-func (p *TCPProxy) accept(src io.ReadWriteCloser) {
+func (p *L4Proxy) accept(src io.ReadWriteCloser) {
 	defer src.Close()
 	p.count++
 	cid := p.count
@@ -104,3 +154,9 @@ func (p *TCPProxy) accept(src io.ReadWriteCloser) {
 	s, r := Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
 }
+
+//TCPProxy makes this package backward compatible
+type TCPProxy = L4Proxy
+
+//NewTCPProxy makes this package backward compatible
+var NewTCPProxy = NewL4Proxy

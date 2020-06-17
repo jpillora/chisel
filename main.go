@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
@@ -293,8 +294,8 @@ var clientHelp = `
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
-    specify a time with a unit, for example '30s' or '2m'. Defaults
-    to '0s' (disabled).
+    specify a time with a unit, for example '5s' or '2m'. Defaults
+    to '25s' (set to 0s to disable).
 
     --max-retry-count, Maximum number of times to retry before exiting.
     Defaults to unlimited.
@@ -320,7 +321,7 @@ func client(args []string) {
 	config := chclient.Config{Headers: http.Header{}}
 	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
 	flags.StringVar(&config.Auth, "auth", "", "")
-	flags.DurationVar(&config.KeepAlive, "keepalive", 0, "")
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
