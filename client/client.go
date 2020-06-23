@@ -41,7 +41,7 @@ type Client struct {
 	*chshare.Logger
 	config      *Config
 	sshConfig   *ssh.ClientConfig
-	sshConn     ssh.Conn
+	sshConn     chan ssh.Conn
 	proxyURL    *url.URL
 	server      string
 	running     bool
@@ -99,6 +99,7 @@ func NewClient(config *Config) (*Client, error) {
 		server:   u.String(),
 		running:  true,
 		runningc: make(chan error, 1),
+		sshConn: make(chan ssh.Conn, 1),
 	}
 	client.Info = true
 
@@ -160,7 +161,7 @@ func (c *Client) Start(ctx context.Context) error {
 	//prepare non-reverse proxies
 	for i, r := range c.config.shared.Remotes {
 		if !r.Reverse {
-			proxy := chshare.NewTCPProxy(c.Logger, func() ssh.Conn { return c.sshConn }, i, r)
+			proxy := chshare.NewTCPProxy(c.Logger, c.sshConn, i, r)
 			if err := proxy.Start(ctx); err != nil {
 				return err
 			}
@@ -179,9 +180,9 @@ func (c *Client) Start(ctx context.Context) error {
 func (c *Client) keepAliveLoop() {
 	for c.running {
 		time.Sleep(c.config.KeepAlive)
-		if c.sshConn != nil {
-			c.sshConn.SendRequest("ping", true, nil)
-		}
+		sshConn := <-c.sshConn
+		sshConn.SendRequest("ping", true, nil)
+		go func() { c.sshConn <- sshConn }()
 	}
 }
 
@@ -284,12 +285,12 @@ func (c *Client) connectionLoop() {
 		c.Infof("Connected (Latency %s)", time.Since(t0))
 		//connected
 		b.Reset()
-		c.sshConn = sshConn
+		c.sshConn <- sshConn
 		go ssh.DiscardRequests(reqs)
 		go c.connectStreams(chans)
 		err = sshConn.Wait()
 		//disconnected
-		c.sshConn = nil
+		<-c.sshConn
 		if err != nil && err != io.EOF {
 			connerr = err
 			continue
@@ -308,10 +309,10 @@ func (c *Client) Wait() error {
 //Close manually stops the client
 func (c *Client) Close() error {
 	c.running = false
-	if c.sshConn == nil {
-		return nil
-	}
-	return c.sshConn.Close()
+	sshConn := <-c.sshConn
+	err := sshConn.Close()
+	go func() { c.sshConn <- sshConn }()
+	return err
 }
 
 func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
