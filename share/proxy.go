@@ -5,22 +5,21 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
 
-type GetSSHConn func() ssh.Conn
-
 type TCPProxy struct {
 	*Logger
-	ssh    GetSSHConn
+	ssh    chan ssh.Conn
 	id     int
 	count  int
 	remote *Remote
 }
 
-func NewTCPProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) *TCPProxy {
+func NewTCPProxy(logger *Logger, ssh chan ssh.Conn, index int, remote *Remote) *TCPProxy {
 	id := index + 1
 	return &TCPProxy{
 		Logger: logger.Fork("proxy#%d:%s", id, remote),
@@ -44,15 +43,12 @@ func (p *TCPProxy) Start(ctx context.Context) error {
 }
 
 func (p *TCPProxy) listenStdio(ctx context.Context) {
-	for {
-		p.accept(Stdio)
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			// the connection is not ready yet, keep waiting
-		}
-	}
+	go func() {
+		<-ctx.Done()
+		os.Exit(0)
+	}()
+	p.accept(Stdio)
+	os.Exit(0)
 }
 
 func (p *TCPProxy) listenNet(ctx context.Context, l net.Listener) {
@@ -88,13 +84,10 @@ func (p *TCPProxy) accept(src io.ReadWriteCloser) {
 	cid := p.count
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
-	sshConn := p.ssh()
-	if sshConn == nil {
-		l.Debugf("No remote connection")
-		return
-	}
+	sshConn := <-p.ssh
 	//ssh request for tcp connection for this proxy's remote
 	dst, reqs, err := sshConn.OpenChannel("chisel", []byte(p.remote.Remote()))
+	go func() { p.ssh <- sshConn }()
 	if err != nil {
 		l.Infof("Stream error: %s", err)
 		return

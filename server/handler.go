@@ -129,7 +129,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	for i, r := range c.Remotes {
 		if r.Reverse {
-			proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
+			sshConnChan := make(chan ssh.Conn)
+			sshConnChan <-sshConn
+			proxy := chshare.NewTCPProxy(s.Logger, sshConnChan, i, r)
 			if err := proxy.Start(ctx); err != nil {
 				failed(s.Errorf("%s", err))
 				return
