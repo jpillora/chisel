@@ -11,6 +11,7 @@ import (
 	"github.com/jpillora/sizestr"
 )
 
+//TODO move to signal.go
 //GoStats prints statistics to
 //stdout on SIGUSR2 (posix-only)
 func GoStats() {

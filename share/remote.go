@@ -165,12 +165,33 @@ func (r *Remote) Local() string {
 	if r.Stdio {
 		return "stdio"
 	}
-	return r.LocalHost + ":" + r.LocalPort + "/" + r.LocalProto
+	return r.LocalHost + ":" + r.LocalPort
 }
 
 func (r *Remote) Remote() string {
 	if r.Socks {
 		return "socks"
 	}
-	return r.RemoteHost + ":" + r.RemotePort + "/" + r.RemoteProto
+	return r.RemoteHost + ":" + r.RemotePort
+}
+
+func (r *Remote) Access() string {
+	if r.Reverse {
+		return "R:" + r.LocalHost + ":" + r.LocalPort
+	}
+	return r.RemoteHost + ":" + r.RemotePort
+}
+
+type Remotes []*Remote
+
+//Filter out forward reversed/non-reversed remotes
+func (rs Remotes) Reversed(reverse bool) Remotes {
+	subset := Remotes{}
+	for _, r := range rs {
+		match := r.Reverse == reverse
+		if match {
+			subset = append(subset, r)
+		}
+	}
+	return subset
 }

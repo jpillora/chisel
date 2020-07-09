@@ -1,7 +1,6 @@
 package chshare
 
 import (
-	"log"
 	"net"
 	"time"
 
@@ -26,17 +25,13 @@ func (c *wsConn) Read(dst []byte) (int, error) {
 	ldst := len(dst)
 	//use buffer or read new message
 	var src []byte
-	if l := len(c.buff); l > 0 {
+	if len(c.buff) > 0 {
 		src = c.buff
 		c.buff = nil
-	} else {
-		t, msg, err := c.Conn.ReadMessage()
-		if err != nil {
-			return 0, err
-		} else if t != websocket.BinaryMessage {
-			log.Printf("<WARNING> non-binary msg")
-		}
+	} else if _, msg, err := c.Conn.ReadMessage(); err == nil {
 		src = msg
+	} else {
+		return 0, err
 	}
 	//copy src->dest
 	var n int

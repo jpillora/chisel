@@ -114,7 +114,7 @@ func makeFileServer() *chshare.HTTPServer {
 	}
 
 	s := chshare.NewHTTPServer()
-	s.SetKeepAlivesEnabled(false)
+	s.Server.SetKeepAlivesEnabled(false)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rsize, _ := strconv.Atoi(r.URL.Path[1:])
 		for rsize >= bsize {
