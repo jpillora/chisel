@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
@@ -89,6 +90,8 @@ func setup(t *testing.T, s *chserver.Config, c *chclient.Config) context.CancelF
 		<-ctx.Done()
 		f.Close()
 	}()
+	//wait a bit...
+	time.Sleep(500 * time.Millisecond)
 	//ready
 	return teardown
 }
