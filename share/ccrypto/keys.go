@@ -1,4 +1,4 @@
-package chshare
+package ccrypto
 
 import (
 	"crypto/ecdsa"

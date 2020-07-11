@@ -1,4 +1,4 @@
-package chshare
+package config
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	Version string
-	Remotes Remotes
+	Remotes
 }
 
 func DecodeConfig(b []byte) (*Config, error) {

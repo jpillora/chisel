@@ -1,10 +1,12 @@
-package chshare
+package tunnel
 
 import (
 	"io"
 	"net"
 	"strings"
 
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
@@ -62,15 +64,15 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 }
 
 func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
-	return t.socksServer.ServeConn(NewRWCConn(src))
+	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
 }
 
-func (t *Tunnel) handleTCP(l *Logger, src io.ReadWriteCloser, remote string) error {
+func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, remote string) error {
 	dst, err := net.Dial("tcp", remote)
 	if err != nil {
 		return err
 	}
-	s, r := Pipe(src, dst)
+	s, r := cio.Pipe(src, dst)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil
 }

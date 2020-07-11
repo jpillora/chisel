@@ -1,6 +1,7 @@
 package chserver
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/ccrypto"
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/config"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
 )
@@ -26,15 +31,15 @@ type Config struct {
 
 // Server respresent a chisel service
 type Server struct {
-	*chshare.Logger
+	*cio.Logger
 	config       *Config
 	fingerprint  string
-	httpServer   *chshare.HTTPServer
+	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     *chshare.Users
+	sessions     *config.Users
 	sshConfig    *ssh.ServerConfig
-	users        *chshare.UserIndex
+	users        *config.UserIndex
 }
 
 var upgrader = websocket.Upgrader{
@@ -42,29 +47,29 @@ var upgrader = websocket.Upgrader{
 }
 
 // NewServer creates and returns a new chisel server
-func NewServer(config *Config) (*Server, error) {
+func NewServer(c *Config) (*Server, error) {
 	server := &Server{
-		config:     config,
-		httpServer: chshare.NewHTTPServer(),
-		Logger:     chshare.NewLogger("server"),
-		sessions:   chshare.NewUsers(),
+		config:     c,
+		httpServer: cnet.NewHTTPServer(),
+		Logger:     cio.NewLogger("server"),
+		sessions:   config.NewUsers(),
 	}
 	server.Info = true
-	server.users = chshare.NewUserIndex(server.Logger)
-	if config.AuthFile != "" {
-		if err := server.users.LoadUsers(config.AuthFile); err != nil {
+	server.users = config.NewUserIndex(server.Logger)
+	if c.AuthFile != "" {
+		if err := server.users.LoadUsers(c.AuthFile); err != nil {
 			return nil, err
 		}
 	}
-	if config.Auth != "" {
-		u := &chshare.User{Addrs: []*regexp.Regexp{chshare.UserAllowAll}}
-		u.Name, u.Pass = chshare.ParseAuth(config.Auth)
+	if c.Auth != "" {
+		u := &config.User{Addrs: []*regexp.Regexp{config.UserAllowAll}}
+		u.Name, u.Pass = config.ParseAuth(c.Auth)
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
 	}
 	//generate private key (optionally using seed)
-	key, err := chshare.GenerateKey(config.KeySeed)
+	key, err := ccrypto.GenerateKey(c.KeySeed)
 	if err != nil {
 		log.Fatal("Failed to generate key")
 	}
@@ -74,7 +79,7 @@ func NewServer(config *Config) (*Server, error) {
 		log.Fatal("Failed to parse key")
 	}
 	//fingerprint this key
-	server.fingerprint = chshare.FingerprintKey(private.PublicKey())
+	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
 	//create ssh config
 	server.sshConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",
@@ -82,8 +87,8 @@ func NewServer(config *Config) (*Server, error) {
 	}
 	server.sshConfig.AddHostKey(private)
 	//setup reverse proxy
-	if config.Proxy != "" {
-		u, err := url.Parse(config.Proxy)
+	if c.Proxy != "" {
+		u, err := url.Parse(c.Proxy)
 		if err != nil {
 			return nil, err
 		}
@@ -100,13 +105,14 @@ func NewServer(config *Config) (*Server, error) {
 		}
 	}
 	//print when reverse tunnelling is enabled
-	if config.Reverse {
+	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
 	}
 	return server, nil
 }
 
-// Run is responsible for starting the chisel service
+// Run is responsible for starting the chisel service.
+// Internally this calls Start then Wait.
 func (s *Server) Run(host, port string) error {
 	if err := s.Start(host, port); err != nil {
 		return err
@@ -116,6 +122,12 @@ func (s *Server) Run(host, port string) error {
 
 // Start is responsible for kicking off the http server
 func (s *Server) Start(host, port string) error {
+	return s.StartContext(nil, host, port)
+}
+
+// StartContext is responsible for kicking off the http server,
+// and can be closed by cancelling the provided context
+func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	s.Infof("Fingerprint %s", s.fingerprint)
 	if s.users.Len() > 0 {
 		s.Infof("User authenication enabled")
@@ -130,7 +142,7 @@ func (s *Server) Start(host, port string) error {
 		o.TrustProxy = true
 		h = requestlog.WrapWith(h, o)
 	}
-	return s.httpServer.GoListenAndServe(host+":"+port, h)
+	return s.httpServer.GoListenAndServeContext(ctx, host+":"+port, h)
 }
 
 // Wait waits for the http server to close
@@ -177,7 +189,7 @@ func (s *Server) AddUser(user, pass string, addrs ...string) error {
 		}
 		authorizedAddrs = append(authorizedAddrs, authorizedAddr)
 	}
-	s.users.AddUser(&chshare.User{
+	s.users.AddUser(&config.User{
 		Name:  user,
 		Pass:  pass,
 		Addrs: authorizedAddrs,

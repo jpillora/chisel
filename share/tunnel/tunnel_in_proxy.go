@@ -1,28 +1,34 @@
-package chshare
+package tunnel
 
 import (
 	"context"
 	"io"
 	"net"
 
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/config"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
 
+//GetSSHConn blocks then returns once
+//an active SSH connection is ready
 type GetSSHConn func() ssh.Conn
 
+//Proxy is the inbound portion of a Tunnel
 type Proxy struct {
-	*Logger
+	*cio.Logger
 	ssh    GetSSHConn
 	id     int
 	count  int
-	remote *Remote
+	remote *config.Remote
 	dialer net.Dialer
 	tcp    *net.TCPListener
 	udp    *udpListener
 }
 
-func NewProxy(logger *Logger, ssh GetSSHConn, index int, remote *Remote) (*Proxy, error) {
+//NewProxy creates a Proxy
+func NewProxy(logger *cio.Logger, ssh GetSSHConn, index int, remote *config.Remote) (*Proxy, error) {
 	id := index + 1
 	p := &Proxy{
 		Logger: logger.Fork("proxy#%d: %s", id, remote),
@@ -78,7 +84,7 @@ func (p *Proxy) Run(ctx context.Context) error {
 
 func (p *Proxy) runStdio(ctx context.Context) {
 	for {
-		p.pipeRemote(Stdio)
+		p.pipeRemote(cio.Stdio)
 		select {
 		case <-ctx.Done():
 			return
@@ -95,7 +101,7 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			p.tcp.Close()
-			p.Infof("Closed")
+			p.Debugf("Closed")
 		case <-done:
 		}
 	}()
@@ -134,7 +140,7 @@ func (p *Proxy) pipeRemote(src io.ReadWriteCloser) {
 	}
 	go ssh.DiscardRequests(reqs)
 	//then pipe
-	s, r := Pipe(src, dst)
+	s, r := cio.Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
 }
 

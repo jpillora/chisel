@@ -15,6 +15,12 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/ccrypto"
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/tunnel"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
@@ -23,7 +29,7 @@ import (
 
 //Config represents a client configuration
 type Config struct {
-	shared           *chshare.Config
+	shared           *config.Config
 	Fingerprint      string
 	Auth             string
 	KeepAlive        time.Duration
@@ -34,32 +40,31 @@ type Config struct {
 	Remotes          []string
 	Headers          http.Header
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
-	Parent           context.Context
 }
 
 //Client represents a client instance
 type Client struct {
-	*chshare.Logger
+	*cio.Logger
 	config    *Config
 	sshConfig *ssh.ClientConfig
 	proxyURL  *url.URL
 	server    string
-	connStats chshare.ConnStats
+	connStats cnet.ConnStats
 	stop      func()
 	eg        *errgroup.Group
-	tunnel    *chshare.Tunnel
+	tunnel    *tunnel.Tunnel
 }
 
 //NewClient creates a new client instance
-func NewClient(config *Config) (*Client, error) {
+func NewClient(c *Config) (*Client, error) {
 	//apply default scheme
-	if !strings.HasPrefix(config.Server, "http") {
-		config.Server = "http://" + config.Server
+	if !strings.HasPrefix(c.Server, "http") {
+		c.Server = "http://" + c.Server
 	}
-	if config.MaxRetryInterval < time.Second {
-		config.MaxRetryInterval = 5 * time.Minute
+	if c.MaxRetryInterval < time.Second {
+		c.MaxRetryInterval = 5 * time.Minute
 	}
-	u, err := url.Parse(config.Server)
+	u, err := url.Parse(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +78,12 @@ func NewClient(config *Config) (*Client, error) {
 	}
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
-	shared := &chshare.Config{}
+	shared := &config.Config{}
 	hasReverse := false
 	hasSocks := false
 	hasStdio := false
-	for _, s := range config.Remotes {
-		r, err := chshare.DecodeRemote(s)
+	for _, s := range c.Remotes {
+		r, err := config.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
@@ -96,23 +101,23 @@ func NewClient(config *Config) (*Client, error) {
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}
-	config.shared = shared
+	c.shared = shared
 	client := &Client{
-		Logger: chshare.NewLogger("client"),
-		config: config,
+		Logger: cio.NewLogger("client"),
+		config: c,
 		server: u.String(),
 	}
 	//set default log level
 	client.Logger.Info = true
 	//outbound proxy
-	if p := config.Proxy; p != "" {
+	if p := c.Proxy; p != "" {
 		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
 		}
 	}
 	//ssh auth and config
-	user, pass := chshare.ParseAuth(config.Auth)
+	user, pass := config.ParseAuth(c.Auth)
 	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
@@ -121,7 +126,7 @@ func NewClient(config *Config) (*Client, error) {
 		Timeout:         30 * time.Second,
 	}
 	//prepare client tunnel
-	client.tunnel = chshare.NewTunnel(chshare.TunnelConfig{
+	client.tunnel = tunnel.New(tunnel.Config{
 		Logger:   client.Logger,
 		Inbound:  true, //client always accepts inbound
 		Outbound: hasReverse,
@@ -142,7 +147,7 @@ func (c *Client) Run() error {
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	expect := c.config.Fingerprint
-	got := chshare.FingerprintKey(key)
+	got := ccrypto.FingerprintKey(key)
 	if expect != "" && !strings.HasPrefix(got, expect) {
 		return fmt.Errorf("Invalid fingerprint (%s)", got)
 	}
@@ -200,7 +205,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		}
 		d := b.Duration()
 		c.Infof("Retrying in %s...", d)
-		chshare.SleepSignal(d)
+		cos.SleepSignal(d)
 	}
 	c.Close()
 	return nil
@@ -229,7 +234,7 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	conn := chshare.NewWebSocketConn(wsConn)
+	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
@@ -248,7 +253,7 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 	// chisel client handshake (reverse of server handshake)
 	// send configuration
 	c.config.shared.Version = chshare.BuildVersion
-	conf, _ := chshare.EncodeConfig(c.config.shared)
+	conf, _ := config.EncodeConfig(c.config.shared)
 	c.Debugf("Sending config")
 	t0 := time.Now()
 	_, configerr, err := sshConn.SendRequest("config", true, conf)
@@ -297,7 +302,6 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 }
 
 //Wait blocks while the client is running.
-//Can only be called once.
 func (c *Client) Wait() error {
 	return c.eg.Wait()
 }

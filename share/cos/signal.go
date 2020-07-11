@@ -1,6 +1,6 @@
 //+build !windows
 
-package chshare
+package cos
 
 import (
 	"os"

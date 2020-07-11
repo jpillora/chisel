@@ -1,4 +1,4 @@
-package chshare
+package config
 
 import (
 	"regexp"

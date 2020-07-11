@@ -1,4 +1,4 @@
-package chshare
+package tunnel
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -37,7 +39,7 @@ import (
 //we must store these mappings (1111-6345, etc) in memory for a length
 //of time, so that when the exit node receives a response on 6345, it
 //knows to return it to 1111.
-func bindSSHUDP(l *Logger, ssh GetSSHConn, remote *Remote) (*udpListener, error) {
+func bindSSHUDP(l *cio.Logger, ssh GetSSHConn, remote *config.Remote) (*udpListener, error) {
 	l = l.Fork("udp")
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -58,9 +60,9 @@ func bindSSHUDP(l *Logger, ssh GetSSHConn, remote *Remote) (*udpListener, error)
 }
 
 type udpListener struct {
-	*Logger
+	*cio.Logger
 	ssh         GetSSHConn
-	remote      *Remote
+	remote      *config.Remote
 	inbound     *net.UDPConn
 	outboundMut sync.Mutex
 	outbound    *udpOutbound

@@ -1,6 +1,7 @@
-package chshare
+package tunnel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io/ioutil"
@@ -10,12 +11,16 @@ import (
 	"time"
 
 	"github.com/armon/go-socks5"
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
 
-type TunnelConfig struct {
-	*Logger
+//Config a Tunnel
+type Config struct {
+	*cio.Logger
 	Inbound   bool
 	Outbound  bool
 	Socks     bool
@@ -25,12 +30,12 @@ type TunnelConfig struct {
 //Tunnel represents an SSH tunnel with proxy capabilities.
 //Both chisel client and server are Tunnels.
 //chisel client has a single set of remotes, whereas
-//chisel server has multiple sets of remotes.
+//chisel server has multiple sets of remotes (one set per client).
 //Each remote has a 1:1 mapping to a proxy.
-//Proxies listen, send data over ssh, and the other end
+//Proxies listen, send data over ssh, and the other end of the ssh connection
 //communicates with the endpoint and returns the response.
 type Tunnel struct {
-	TunnelConfig
+	Config
 	//ssh connection
 	activeConnMut sync.RWMutex
 	activeConn    ssh.Conn
@@ -38,13 +43,13 @@ type Tunnel struct {
 	//proxies
 	proxyCount int
 	//internals
-	connStats   ConnStats
+	connStats   cnet.ConnStats
 	socksServer *socks5.Server
 }
 
-//NewTunnel from the given TunnelConfig
-func NewTunnel(c TunnelConfig) *Tunnel {
-	t := &Tunnel{TunnelConfig: c}
+//New Tunnel from the given Config
+func New(c Config) *Tunnel {
+	t := &Tunnel{Config: c}
 	//block getters
 	t.wgConn.Add(1)
 	//setup socks server (not listening on any port!)
@@ -55,10 +60,6 @@ func NewTunnel(c TunnelConfig) *Tunnel {
 		}
 		t.socksServer, _ = socks5.New(&socks5.Config{Logger: sl})
 		t.Infof("SOCKS5 endpoint enabled")
-	}
-	//setup ssh keepalive loop
-	if c.KeepAlive > 0 {
-		panic("TODO")
 	}
 	return t
 }
@@ -74,6 +75,10 @@ func (t *Tunnel) BindSSH(c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.
 	t.activeConnMut.Unlock()
 	//unblock getters
 	t.wgConn.Done()
+	//optional keepalive loop against this connection
+	if t.Config.KeepAlive > 0 {
+		go t.keepAliveLoop(c)
+	}
 	//block until closed
 	go t.handleSSHChannels(chans)
 	err := c.Wait()
@@ -96,7 +101,7 @@ func (t *Tunnel) getSSH() ssh.Conn {
 
 //BindRemotes converts the given remotes into proxies, and blocks
 //until the caller cancels the context or there is a proxy error.
-func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*Remote) error {
+func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*config.Remote) error {
 	if len(remotes) == 0 {
 		return nil
 	}
@@ -123,22 +128,15 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*Remote) error {
 	return eg.Wait()
 }
 
-// //optional keepalive loop
-// if c.config.KeepAlive > 0 {
-// 	go c.keepAliveLoop(ctx)
-// }
-
-// func (c *Client) keepAliveLoop(ctx context.Context) {
-// 	for c.running {
-// 		select {
-// 		case <-ctx.Done():
-// 			return
-// 		default:
-// 			//still open
-// 		}
-// 		time.Sleep(c.config.KeepAlive)
-// 		if c.sshConn != nil {
-// 			c.sshConn.SendRequest("ping", true, nil)
-// 		}
-// 	}
-// }
+func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
+	for {
+		time.Sleep(t.Config.KeepAlive)
+		_, resp, err := sshConn.SendRequest("ping", true, nil)
+		if err != nil {
+			break
+		}
+		if !bytes.Equal(resp, []byte("pong")) {
+			break
+		}
+	}
+}

@@ -7,6 +7,9 @@ import (
 	"time"
 
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/tunnel"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -53,7 +56,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		l.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
-	conn := chshare.NewWebSocketConn(wsConn)
+	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	l.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
@@ -62,7 +65,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// pull the users from the session map
-	var user *chshare.User
+	var user *config.User
 	if s.users.Len() > 0 {
 		sid := string(sshConn.SessionID())
 		u, ok := s.sessions.Get(sid)
@@ -92,7 +95,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		failed(s.Errorf("expecting config request"))
 		return
 	}
-	c, err := chshare.DecodeConfig(r.Payload)
+	c, err := config.DecodeConfig(r.Payload)
 	if err != nil {
 		failed(s.Errorf("invalid config"))
 		return
@@ -128,7 +131,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	//successfuly validated config!
 	r.Reply(true, nil)
 	//tunnel per ssh connection
-	tunnel := chshare.NewTunnel(chshare.TunnelConfig{
+	tunnel := tunnel.New(tunnel.Config{
 		Logger:   l,
 		Inbound:  s.config.Reverse,
 		Outbound: true, //server always accepts outbound

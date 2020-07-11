@@ -15,6 +15,7 @@ import (
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cos"
 )
 
 var help = `
@@ -190,7 +191,7 @@ func server(args []string) {
 	if *pid {
 		generatePidFile()
 	}
-	go chshare.GoStats()
+	go cos.GoStats()
 	if err = s.Run(*host, *port); err != nil {
 		log.Fatal(err)
 	}
@@ -358,7 +359,7 @@ func client(args []string) {
 	if *pid {
 		generatePidFile()
 	}
-	go chshare.GoStats()
+	go cos.GoStats()
 	if err = c.Run(); err != nil {
 		log.Fatal(err)
 	}

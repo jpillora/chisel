@@ -1,4 +1,4 @@
-package chshare
+package tunnel
 
 import (
 	"encoding/gob"
@@ -8,9 +8,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/jpillora/chisel/share/cio"
 )
 
-func (t *Tunnel) handleUDP(l *Logger, rwc io.ReadWriteCloser) error {
+func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
 	h := &udpHandler{
 		Logger: l,
 		udpOutbound: &udpOutbound{
@@ -31,7 +33,7 @@ func (t *Tunnel) handleUDP(l *Logger, rwc io.ReadWriteCloser) error {
 }
 
 type udpHandler struct {
-	*Logger
+	*cio.Logger
 	*udpOutbound
 	*udpConns
 	sent, recv int64

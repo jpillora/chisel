@@ -1,0 +1,46 @@
+on: [push, pull_request]
+name: CI
+jobs:
+  # ================
+  # TEST JOB
+  #   runs on every push and PR
+  #   runs 2x3 times (see matrix)
+  # ================
+  test:
+    name: Test
+    strategy:
+      matrix:
+        go-version: [1.13.x, 1.14.x]
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: go build -v .
+      - name: Test
+        run: go test -v ./...
+  # ================
+  # RELEASE JOB
+  #   runs after a success test
+  #   only runs on push "v*" tag
+  # ================
+  release:
+    name: Release
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: goreleaser
+        if: success()
+        uses: docker://goreleaser/goreleaser:latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: release --config .github/goreleaser.yml
