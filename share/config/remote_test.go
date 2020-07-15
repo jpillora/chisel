@@ -8,16 +8,18 @@ import (
 func TestRemoteDecode(t *testing.T) {
 	//test table
 	for i, test := range []struct {
-		Input  string
-		Output Remote
+		Input   string
+		Output  Remote
+		Encoded string
 	}{
 		{
 			"3000",
 			Remote{
 				LocalPort:  "3000",
-				RemoteHost: "localhost",
+				RemoteHost: "127.0.0.1",
 				RemotePort: "3000",
 			},
+			"0.0.0.0:3000:127.0.0.1:3000",
 		},
 		{
 			"google.com:80",
@@ -26,6 +28,7 @@ func TestRemoteDecode(t *testing.T) {
 				RemoteHost: "google.com",
 				RemotePort: "80",
 			},
+			"0.0.0.0:80:google.com:80",
 		},
 		{
 			"R:google.com:80",
@@ -35,6 +38,7 @@ func TestRemoteDecode(t *testing.T) {
 				RemotePort: "80",
 				Reverse:    true,
 			},
+			"R:0.0.0.0:80:google.com:80",
 		},
 		{
 			"socks",
@@ -43,6 +47,7 @@ func TestRemoteDecode(t *testing.T) {
 				LocalPort: "1080",
 				Socks:     true,
 			},
+			"127.0.0.1:1080:socks",
 		},
 		{
 			"127.0.0.1:1081:socks",
@@ -51,6 +56,7 @@ func TestRemoteDecode(t *testing.T) {
 				LocalPort: "1081",
 				Socks:     true,
 			},
+			"127.0.0.1:1081:socks",
 		},
 		{
 			"1.1.1.1:53/udp",
@@ -61,17 +67,19 @@ func TestRemoteDecode(t *testing.T) {
 				RemotePort:  "53",
 				RemoteProto: "udp",
 			},
+			"0.0.0.0:53:1.1.1.1:53/udp",
 		},
 		{
-			"localhost:5353/tcp:1.1.1.1:53/udp",
+			"localhost:5353:1.1.1.1:53/udp",
 			Remote{
 				LocalHost:   "localhost",
 				LocalPort:   "5353",
-				LocalProto:  "tcp",
+				LocalProto:  "udp",
 				RemoteHost:  "1.1.1.1",
 				RemotePort:  "53",
 				RemoteProto: "udp",
 			},
+			"localhost:5353:1.1.1.1:53/udp",
 		},
 	} {
 		//expected defaults
@@ -92,6 +100,9 @@ func TestRemoteDecode(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got, &expected) {
 			t.Fatalf("decode #%d '%s' expected\n  %#v\ngot\n  %#v", i+1, test.Input, expected, got)
+		}
+		if e := got.Encode(); test.Encoded != e {
+			t.Fatalf("encode #%d '%s' expected\n  %#v\ngot\n  %#v", i+1, test.Input, test.Encoded, e)
 		}
 	}
 }

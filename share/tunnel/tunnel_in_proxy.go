@@ -54,7 +54,7 @@ func (p *Proxy) listen() error {
 		p.Infof("Listening")
 		p.tcp = l
 	} else if p.remote.LocalProto == "udp" {
-		l, err := bindSSHUDP(p.Logger, p.ssh, p.remote)
+		l, err := listenUDP(p.Logger, p.ssh, p.remote)
 		if err != nil {
 			return err
 		}
@@ -74,9 +74,6 @@ func (p *Proxy) Run(ctx context.Context) error {
 	} else if p.remote.LocalProto == "tcp" {
 		return p.runTCP(ctx)
 	} else if p.remote.LocalProto == "udp" {
-		//udp doesnt accept connections,
-		//udp simply forwards all packets
-		//and therefore only needs to listen
 		return p.udp.run(ctx)
 	}
 	panic("should not get here")

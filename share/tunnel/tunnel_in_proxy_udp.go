@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//bindSSHUDP is a special listener which returns fake net.Conns.
+//listenUDP is a special listener which returns fake net.Conns.
 //we need these fake connections to distinguish between connections,
 //and ensure we can remain as stateless as possible.
 //
@@ -39,7 +39,7 @@ import (
 //we must store these mappings (1111-6345, etc) in memory for a length
 //of time, so that when the exit node receives a response on 6345, it
 //knows to return it to 1111.
-func bindSSHUDP(l *cio.Logger, ssh GetSSHConn, remote *config.Remote) (*udpListener, error) {
+func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *config.Remote) (*udpListener, error) {
 	l = l.Fork("udp")
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -70,6 +70,9 @@ type udpListener struct {
 }
 
 func (u *udpListener) run(ctx context.Context) error {
+	//udp doesnt accept connections,
+	//udp simply forwards all packets
+	//and therefore only needs to listen
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return u.runInbound(ctx)

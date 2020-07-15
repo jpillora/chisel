@@ -107,7 +107,7 @@ func DecodeRemote(s string) (*Remote, error) {
 			r.LocalHost = "0.0.0.0"
 		}
 		if r.RemoteHost == "" {
-			r.RemoteHost = "localhost"
+			r.RemoteHost = "127.0.0.1"
 		}
 	}
 	if r.RemoteProto == "" {
@@ -115,6 +115,9 @@ func DecodeRemote(s string) (*Remote, error) {
 	}
 	if r.LocalProto == "" {
 		r.LocalProto = r.RemoteProto
+	}
+	if r.LocalProto != r.RemoteProto {
+		return nil, errors.New("currently, local and remote protocols must match")
 	}
 	if r.Stdio && r.Reverse {
 		return nil, errors.New("stdio cannot be reversed")
@@ -153,7 +156,7 @@ func L4Proto(s string) (head, proto string) {
 }
 
 //implement Stringer
-func (r *Remote) String() string {
+func (r Remote) String() string {
 	tag := ""
 	if r.Reverse {
 		tag = revPrefix
@@ -161,21 +164,43 @@ func (r *Remote) String() string {
 	return tag + r.Local() + "=>" + r.Remote()
 }
 
-func (r *Remote) Local() string {
+//Encode remote to a string
+func (r Remote) Encode() string {
+	if r.LocalPort == "" {
+		r.LocalPort = r.RemotePort
+	}
+	local := r.Local()
+	remote := r.Remote()
+	if r.RemoteProto == "udp" {
+		remote += "/udp"
+	}
+	if r.Reverse {
+		return "R:" + local + ":" + remote
+	}
+	return local + ":" + remote
+}
+
+func (r Remote) Local() string {
 	if r.Stdio {
 		return "stdio"
+	}
+	if r.LocalHost == "" {
+		r.LocalHost = "127.0.0.1"
 	}
 	return r.LocalHost + ":" + r.LocalPort
 }
 
-func (r *Remote) Remote() string {
+func (r Remote) Remote() string {
 	if r.Socks {
 		return "socks"
+	}
+	if r.RemoteHost == "" {
+		r.RemoteHost = "0.0.0.0"
 	}
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-func (r *Remote) Access() string {
+func (r Remote) Access() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
 	}
@@ -194,4 +219,13 @@ func (rs Remotes) Reversed(reverse bool) Remotes {
 		}
 	}
 	return subset
+}
+
+//Encode back into strings
+func (rs Remotes) Encode() []string {
+	s := make([]string, len(rs))
+	for i, r := range rs {
+		s[i] = r.Encode()
+	}
+	return s
 }
