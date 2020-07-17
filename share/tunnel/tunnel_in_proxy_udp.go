@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -39,7 +39,7 @@ import (
 //we must store these mappings (1111-6345, etc) in memory for a length
 //of time, so that when the exit node receives a response on 6345, it
 //knows to return it to 1111.
-func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *config.Remote) (*udpListener, error) {
+func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *settings.Remote) (*udpListener, error) {
 	l = l.Fork("udp")
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -62,7 +62,7 @@ func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *config.Remote) (*udpListen
 type udpListener struct {
 	*cio.Logger
 	ssh         GetSSHConn
-	remote      *config.Remote
+	remote      *settings.Remote
 	inbound     *net.UDPConn
 	outboundMut sync.Mutex
 	outbound    *udpOutbound

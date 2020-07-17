@@ -13,7 +13,7 @@ import (
 	"github.com/armon/go-socks5"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -80,6 +80,7 @@ func (t *Tunnel) BindSSH(c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.
 		go t.keepAliveLoop(c)
 	}
 	//block until closed
+	go t.handleSSHRequests(reqs)
 	go t.handleSSHChannels(chans)
 	err := c.Wait()
 	//reblock getters
@@ -101,7 +102,7 @@ func (t *Tunnel) getSSH() ssh.Conn {
 
 //BindRemotes converts the given remotes into proxies, and blocks
 //until the caller cancels the context or there is a proxy error.
-func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*config.Remote) error {
+func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) error {
 	if len(remotes) == 0 {
 		return nil
 	}

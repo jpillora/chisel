@@ -1,4 +1,4 @@
-package config
+package settings
 
 import (
 	"encoding/json"
@@ -126,6 +126,7 @@ func (u *UserIndex) loadUserIndex() error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return errors.New("Invalid JSON: " + err.Error())
 	}
+	users := []*User{}
 	for auth, remotes := range raw {
 		user := &User{}
 		user.Name, user.Pass = ParseAuth(auth)
@@ -142,9 +143,15 @@ func (u *UserIndex) loadUserIndex() error {
 				}
 				user.Addrs = append(user.Addrs, re)
 			}
-
 		}
-		u.Users.AddUser(user)
+		users = append(users, user)
+	}
+	//swap
+	u.RWMutex.Lock()
+	u.inner = map[string]*User{}
+	u.RWMutex.Unlock()
+	for _, user := range users {
+		u.AddUser(user)
 	}
 	return nil
 }

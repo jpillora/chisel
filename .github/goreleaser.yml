@@ -1,5 +1,5 @@
 # test this goreleaser config with:
-# - cd chisel/
+# - cd chisel
 # - goreleaser --skip-publish --rm-dist --config .github/goreleaser.yml
 builds:
   - env:

@@ -8,25 +8,27 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"regexp"
+	"time"
 
 	"github.com/gorilla/websocket"
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
 )
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed  string
-	AuthFile string
-	Auth     string
-	Proxy    string
-	Socks5   bool
-	Reverse  bool
+	KeySeed   string
+	AuthFile  string
+	Auth      string
+	Proxy     string
+	Socks5    bool
+	Reverse   bool
+	KeepAlive time.Duration
 }
 
 // Server respresent a chisel service
@@ -37,9 +39,9 @@ type Server struct {
 	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     *config.Users
+	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
-	users        *config.UserIndex
+	users        *settings.UserIndex
 }
 
 var upgrader = websocket.Upgrader{
@@ -52,18 +54,18 @@ func NewServer(c *Config) (*Server, error) {
 		config:     c,
 		httpServer: cnet.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
-		sessions:   config.NewUsers(),
+		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
-	server.users = config.NewUserIndex(server.Logger)
+	server.users = settings.NewUserIndex(server.Logger)
 	if c.AuthFile != "" {
 		if err := server.users.LoadUsers(c.AuthFile); err != nil {
 			return nil, err
 		}
 	}
 	if c.Auth != "" {
-		u := &config.User{Addrs: []*regexp.Regexp{config.UserAllowAll}}
-		u.Name, u.Pass = config.ParseAuth(c.Auth)
+		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
+		u.Name, u.Pass = settings.ParseAuth(c.Auth)
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
@@ -189,7 +191,7 @@ func (s *Server) AddUser(user, pass string, addrs ...string) error {
 		}
 		authorizedAddrs = append(authorizedAddrs, authorizedAddr)
 	}
-	s.users.AddUser(&config.User{
+	s.users.AddUser(&settings.User{
 		Name:  user,
 		Pass:  pass,
 		Addrs: authorizedAddrs,

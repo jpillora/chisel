@@ -18,8 +18,8 @@ import (
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/config"
 	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
 
 	"golang.org/x/crypto/ssh"
@@ -29,7 +29,6 @@ import (
 
 //Config represents a client configuration
 type Config struct {
-	shared           *config.Config
 	Fingerprint      string
 	Auth             string
 	KeepAlive        time.Duration
@@ -46,6 +45,7 @@ type Config struct {
 type Client struct {
 	*cio.Logger
 	config    *Config
+	computed  settings.Config
 	sshConfig *ssh.ClientConfig
 	proxyURL  *url.URL
 	server    string
@@ -78,12 +78,19 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
-	shared := &config.Config{}
 	hasReverse := false
 	hasSocks := false
 	hasStdio := false
+	client := &Client{
+		Logger: cio.NewLogger("client"),
+		config: c,
+		computed: settings.Config{
+			Version: chshare.BuildVersion,
+		},
+		server: u.String(),
+	}
 	for _, s := range c.Remotes {
-		r, err := config.DecodeRemote(s)
+		r, err := settings.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
@@ -99,13 +106,7 @@ func NewClient(c *Config) (*Client, error) {
 			}
 			hasStdio = true
 		}
-		shared.Remotes = append(shared.Remotes, r)
-	}
-	c.shared = shared
-	client := &Client{
-		Logger: cio.NewLogger("client"),
-		config: c,
-		server: u.String(),
+		client.computed.Remotes = append(client.computed.Remotes, r)
 	}
 	//set default log level
 	client.Logger.Info = true
@@ -117,7 +118,7 @@ func NewClient(c *Config) (*Client, error) {
 		}
 	}
 	//ssh auth and config
-	user, pass := config.ParseAuth(c.Auth)
+	user, pass := settings.ParseAuth(c.Auth)
 	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
@@ -173,7 +174,7 @@ func (c *Client) Start(ctx context.Context) error {
 	})
 	//listen sockets
 	eg.Go(func() error {
-		clientInbound := c.config.shared.Remotes.Reversed(false)
+		clientInbound := c.computed.Remotes.Reversed(false)
 		return c.tunnel.BindRemotes(ctx, clientInbound)
 	})
 	return nil
@@ -252,11 +253,13 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 	defer sshConn.Close()
 	// chisel client handshake (reverse of server handshake)
 	// send configuration
-	c.config.shared.Version = chshare.BuildVersion
-	conf, _ := config.EncodeConfig(c.config.shared)
 	c.Debugf("Sending config")
 	t0 := time.Now()
-	_, configerr, err := sshConn.SendRequest("config", true, conf)
+	_, configerr, err := sshConn.SendRequest(
+		"config",
+		true,
+		settings.EncodeConfig(c.computed),
+	)
 	if err != nil {
 		c.Infof("Config verification failed")
 		return false, err
@@ -271,8 +274,8 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 }
 
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
+	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
-		// CONNECT proxy
 		d.Proxy = func(*http.Request) (*url.URL, error) {
 			return u, nil
 		}

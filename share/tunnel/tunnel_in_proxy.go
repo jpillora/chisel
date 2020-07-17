@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
@@ -21,14 +21,14 @@ type Proxy struct {
 	ssh    GetSSHConn
 	id     int
 	count  int
-	remote *config.Remote
+	remote *settings.Remote
 	dialer net.Dialer
 	tcp    *net.TCPListener
 	udp    *udpListener
 }
 
 //NewProxy creates a Proxy
-func NewProxy(logger *cio.Logger, ssh GetSSHConn, index int, remote *config.Remote) (*Proxy, error) {
+func NewProxy(logger *cio.Logger, ssh GetSSHConn, index int, remote *settings.Remote) (*Proxy, error) {
 	id := index + 1
 	p := &Proxy{
 		Logger: logger.Fork("proxy#%d: %s", id, remote),
@@ -140,9 +140,3 @@ func (p *Proxy) pipeRemote(src io.ReadWriteCloser) {
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
 }
-
-//TCPProxy makes this package backward compatible
-type TCPProxy = Proxy
-
-//NewTCPProxy makes this package backward compatible
-var NewTCPProxy = NewProxy

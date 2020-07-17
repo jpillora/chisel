@@ -1,4 +1,4 @@
-package config
+package settings
 
 import (
 	"reflect"

@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -29,6 +30,11 @@ func (t *Tunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
 }
 
 func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
+	if !t.Config.Outbound {
+		t.Debugf("Denied outbound connection")
+		ch.Reject(ssh.Prohibited, "Denied outbound connection")
+		return
+	}
 	remote := string(ch.ExtraData())
 	udp := remote == "udp"
 	socks := remote == "socks"
@@ -56,11 +62,11 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		err = t.handleTCP(l, stream, remote)
 	}
 	t.connStats.Close()
+	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("Close %s (error %s)", t.connStats.String(), err)
-	} else {
-		l.Debugf("Close %s", t.connStats.String())
+		errmsg = fmt.Sprintf(" (error %s)", err)
 	}
+	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
 }
 
 func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {

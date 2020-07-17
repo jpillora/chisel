@@ -140,15 +140,18 @@ func server(args []string) {
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
+	config := &chserver.Config{}
+	flags.StringVar(&config.KeySeed, "key", "", "")
+	flags.StringVar(&config.AuthFile, "authfile", "", "")
+	flags.StringVar(&config.Auth, "auth", "", "")
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
+	flags.StringVar(&config.Proxy, "proxy", "", "")
+	flags.BoolVar(&config.Socks5, "socks5", false, "")
+	flags.BoolVar(&config.Reverse, "reverse", false, "")
+
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
 	port := flags.String("port", "", "")
-	key := flags.String("key", "", "")
-	authfile := flags.String("authfile", "", "")
-	auth := flags.String("auth", "", "")
-	proxy := flags.String("proxy", "", "")
-	socks5 := flags.Bool("socks5", false, "")
-	reverse := flags.Bool("reverse", false, "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 
@@ -173,17 +176,10 @@ func server(args []string) {
 	if *port == "" {
 		*port = "8080"
 	}
-	if *key == "" {
-		*key = os.Getenv("CHISEL_KEY")
+	if config.KeySeed == "" {
+		config.KeySeed = os.Getenv("CHISEL_KEY")
 	}
-	s, err := chserver.NewServer(&chserver.Config{
-		KeySeed:  *key,
-		AuthFile: *authfile,
-		Auth:     *auth,
-		Proxy:    *proxy,
-		Socks5:   *socks5,
-		Reverse:  *reverse,
-	})
+	s, err := chserver.NewServer(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,8 +188,12 @@ func server(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-	if err = s.Run(*host, *port); err != nil {
+	ctx := cos.InterruptContext()
+	if err := s.StartContext(ctx, *host, *port); err != nil {
 		log.Fatal(err)
+	}
+	if err := s.Wait(); err != nil {
+		log.Fatal()
 	}
 }
 
@@ -360,7 +360,11 @@ func client(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-	if err = c.Run(); err != nil {
+	ctx := cos.InterruptContext()
+	if err := c.Start(ctx); err != nil {
 		log.Fatal(err)
+	}
+	if err := c.Wait(); err != nil {
+		log.Fatal()
 	}
 }

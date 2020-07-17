@@ -1,4 +1,4 @@
-package config
+package settings
 
 import (
 	"encoding/json"
@@ -19,6 +19,8 @@ func DecodeConfig(b []byte) (*Config, error) {
 	return c, nil
 }
 
-func EncodeConfig(c *Config) ([]byte, error) {
-	return json.Marshal(c)
+func EncodeConfig(c Config) []byte {
+	//Config doesn't have types that can fail to marshal
+	b, _ := json.Marshal(c)
+	return b
 }

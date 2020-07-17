@@ -8,7 +8,7 @@ import (
 
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/config"
+	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
@@ -65,7 +65,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// pull the users from the session map
-	var user *config.User
+	var user *settings.User
 	if s.users.Len() > 0 {
 		sid := string(sshConn.SessionID())
 		u, ok := s.sessions.Get(sid)
@@ -95,7 +95,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		failed(s.Errorf("expecting config request"))
 		return
 	}
-	c, err := config.DecodeConfig(r.Payload)
+	c, err := settings.DecodeConfig(r.Payload)
 	if err != nil {
 		failed(s.Errorf("invalid config"))
 		return
@@ -132,10 +132,11 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	r.Reply(true, nil)
 	//tunnel per ssh connection
 	tunnel := tunnel.New(tunnel.Config{
-		Logger:   l,
-		Inbound:  s.config.Reverse,
-		Outbound: true, //server always accepts outbound
-		Socks:    s.config.Socks5,
+		Logger:    l,
+		Inbound:   s.config.Reverse,
+		Outbound:  true, //server always accepts outbound
+		Socks:     s.config.Socks5,
+		KeepAlive: s.config.KeepAlive,
 	})
 	//bind
 	eg, ctx := errgroup.WithContext(req.Context())

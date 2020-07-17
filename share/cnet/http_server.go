@@ -5,7 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"sync"
+
+	"golang.org/x/sync/errgroup"
 )
 
 //HTTPServer extends net/http Server and
@@ -13,7 +14,7 @@ import (
 type HTTPServer struct {
 	*http.Server
 	serving   bool
-	waiter    sync.WaitGroup
+	waiter    *errgroup.Group
 	listenErr error
 }
 
@@ -27,27 +28,27 @@ func NewHTTPServer() *HTTPServer {
 }
 
 func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler) error {
-	return h.GoListenAndServeContext(nil, addr, handler)
+	return h.GoListenAndServeContext(context.Background(), addr, handler)
 }
 
 func (h *HTTPServer) GoListenAndServeContext(ctx context.Context, addr string, handler http.Handler) error {
+	if ctx == nil {
+		return errors.New("ctx must be set")
+	}
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 	h.Handler = handler
 	h.serving = true
-	h.waiter.Add(1)
+	h.waiter, ctx = errgroup.WithContext(ctx)
+	h.waiter.Go(func() error {
+		return h.Serve(l)
+	})
 	go func() {
-		h.listenErr = h.Serve(l)
-		h.waiter.Done()
+		<-ctx.Done()
+		h.Close()
 	}()
-	if ctx != nil {
-		go func() {
-			<-ctx.Done()
-			h.Close()
-		}()
-	}
 	return nil
 }
 
@@ -55,15 +56,16 @@ func (h *HTTPServer) Close() error {
 	if !h.serving {
 		return errors.New("not started yet")
 	}
-	err := h.Server.Close()
-	h.waiter.Wait()
-	return err
+	return h.Server.Close()
 }
 
 func (h *HTTPServer) Wait() error {
 	if !h.serving {
 		return errors.New("not started yet")
 	}
-	h.waiter.Wait()
-	return h.listenErr
+	err := h.waiter.Wait()
+	if err == http.ErrServerClosed {
+		err = nil //success
+	}
+	return err
 }

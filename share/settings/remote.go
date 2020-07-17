@@ -1,4 +1,4 @@
-package config
+package settings
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// short-hand conversions
+// short-hand conversions (see remote_test)
 //   3000 ->
 //     local  127.0.0.1:3000
 //     remote 127.0.0.1:3000
