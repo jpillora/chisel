@@ -137,6 +137,7 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 			break
 		}
 		if !bytes.Equal(resp, []byte("pong")) {
+			t.Debugf("strange ping response")
 			break
 		}
 	}

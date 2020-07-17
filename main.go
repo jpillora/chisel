@@ -122,8 +122,15 @@ var serverHelp = `
     remotes. This file will be automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
-    access, in the form of <user:pass>. This is equivalent to creating an
-    authfile with {"<user:pass>": [""]}.
+    access, in the form of <user:pass>. It is equivalent to creating an
+    authfile with {"<user:pass>": [""]}. If unset, it will use the
+    environment variable AUTH.
+
+    --keepalive, An optional keepalive interval. Since the underlying
+    transport is HTTP, in many instances we'll be traversing through
+    proxies, often these proxies will close idle connections. You must
+    specify a time with a unit, for example '5s' or '2m'. Defaults
+    to '25s' (set to 0s to disable).
 
     --proxy, Specifies another HTTP server to proxy requests to when
     chisel receives a normal HTTP request. Useful for hiding chisel in

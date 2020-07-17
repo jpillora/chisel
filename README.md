@@ -196,7 +196,7 @@ $ chisel client --help
     client's internal SOCKS5 proxy.
 
     When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when 
+    input/output of this program with the remote. This is useful when
     combined with ssh ProxyCommand. You can use
       ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
           user@example.com
@@ -281,13 +281,13 @@ docker run \
 2. Connect your chisel client (using server's fingerprint)
 
 ```sh
-chisel client --fingerprint ab:12:34 server-address:9312 socks
+chisel client --fingerprint ab:12:34 <server-address>:9312 socks
 ```
 
 3. Point your SOCKS5 clients (e.g. OS/Browser) to:
 
 ```
-localhost:1080
+<client-address>:1080
 ```
 
 4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
@@ -358,15 +358,15 @@ _direct_
 
 See more [test/](test/)
 
-### Known Issues
+### Caveats
 
-- WebSockets support is required
-  _ IaaS providers all will support WebSockets
-  _ Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
-  _ PaaS providers vary in their support for WebSockets
-  _ Heroku has full support
-  _ Openshift has full support though connections are only accepted on ports 8443 and 8080
-  _ Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
+Since WebSockets support is required:
+
+- IaaS providers all will support WebSockets (unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS)
+- PaaS providers vary in their support for WebSockets
+  - Heroku has full support
+  - Openshift has full support though connections are only accepted on ports 8443 and 8080
+  - Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
 
 ### Contributing
 
@@ -379,12 +379,10 @@ See more [test/](test/)
 ### Changelog
 
 - `1.0` - Initial release
-- `1.1` - Swapped out simple symmetric encryption for ECDSA SSH
+- `1.1` - Replaced simple symmetric encryption for ECDSA SSH
 - `1.2` - Added SOCKS5 (server) and HTTP CONNECT (client) support
 - `1.3` - Added reverse tunnelling support
-
-### Todo
-
-- Better, faster tests
-- Expose a stats page for proxy throughput
-- Treat client stdin/stdout as a socket
+- `1.4` - Added arbitrary HTTP header support
+- `1.5` - Added reverse SOCKS support (by @aus)
+- `1.6` - Added client stdio support (by @BoleynSu)
+- `1.7` - Added UDP support

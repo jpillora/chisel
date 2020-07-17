@@ -48,10 +48,20 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 	if err != nil {
 		return err
 	}
+	//however, we dont know if we must read...
+	//spawn up to <max-conns> go-routines to wait
+	//for a reply.
+	//TODO configurable
+	//TODO++ dont use go-routines, switch to pollable
+	//  array of listeners where all listeners are
+	//  sweeped periodically, removing the idle ones
+	const maxConns = 100
 	if !exists {
-		//however, we dont know if we must read...
-		//TODO limit concurrent reads
-		go h.handleRead(p, conn)
+		if h.udpConns.len() <= maxConns {
+			go h.handleRead(p, conn)
+		} else {
+			h.Debugf("exceeded max udp connections (%d)", maxConns)
+		}
 	}
 	n, err := conn.Write(p.Payload)
 	if err != nil {
@@ -114,6 +124,13 @@ func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
 		cs.m[id] = conn
 	}
 	return conn, ok, nil
+}
+
+func (cs *udpConns) len() int {
+	cs.Lock()
+	l := len(cs.m)
+	cs.Unlock()
+	return l
 }
 
 func (cs *udpConns) remove(id string) {

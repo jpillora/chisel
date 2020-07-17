@@ -10,7 +10,7 @@ import (
 func TestBase(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
-	teardown := setup(t,
+	teardown := simpleSetup(t,
 		&chserver.Config{},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
@@ -26,37 +26,23 @@ func TestBase(t *testing.T) {
 	}
 }
 
-func TestAuth(t *testing.T) {
-	tmpPort1 := availablePort()
-	tmpPort2 := availablePort()
+func TestReverse(t *testing.T) {
+	tmpPort := availablePort()
 	//setup server, client, fileserver
-	teardown := setup(t,
+	teardown := simpleSetup(t,
 		&chserver.Config{
-			KeySeed: "foobar",
-			Auth:    "../bench/userfile",
+			Reverse: true,
 		},
 		&chclient.Config{
-			Remotes: []string{
-				"0.0.0.0:" + tmpPort1 + ":127.0.0.1:$FILEPORT",
-				"0.0.0.0:" + tmpPort2 + ":localhost:$FILEPORT",
-			},
-			Auth: "foo:bar",
+			Remotes: []string{"R:" + tmpPort + ":$FILEPORT"},
 		})
 	defer teardown()
-	//test first remote
-	result, err := post("http://localhost:"+tmpPort1, "foo")
+	//test remote (this goes through the server and out the client)
+	result, err := post("http://localhost:"+tmpPort, "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result != "foo!" {
 		t.Fatalf("expected exclamation mark added")
-	}
-	//test second remote
-	result, err = post("http://localhost:"+tmpPort2, "bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result != "bar!" {
-		t.Fatalf("expected exclamation mark added again")
 	}
 }

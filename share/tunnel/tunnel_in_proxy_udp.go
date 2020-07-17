@@ -3,7 +3,6 @@ package tunnel
 import (
 	"context"
 	"encoding/gob"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -14,27 +13,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//listenUDP is a special listener which returns fake net.Conns.
-//we need these fake connections to distinguish between connections,
-//and ensure we can remain as stateless as possible.
-//
-//with chisel, we have 4 entities:
-//  src -> chisel-entry -> chisel-exit -> dst
-//
-//a given udp remote should create 2 listeners, one instantly
-//on the entry node, and a second on the exit node at tunnel establishment
-//time. this leaves us with:
-//
-//    chisel-entry listens 7777/udp =>
-//      ssh channel =>
-//        chisel-exit binds to endpoint:7777/udp
-//
-//tricky part is multiplexing lots of udp clients through the entry
-//node. each will listen on its own source-port for a response:
-//                                               (random)
-//    src-1 1111->...                        dst-1 6345->7777
-//    src-2 2222->... <-> entry <-> exit <-> dst-1 7543->7777
-//    src-3 3333->...                        dst-1 1444->7777
+//listenUDP is a special listener which forwards packets via
+//the bound ssh connection. tricky part is multiplexing lots of
+//udp clients through the entry node. each will listen on its
+//own source-port for a response:
+//                                                (random)
+//    src-1 1111->...                         dst-1 6345->7777
+//    src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
+//    src-3 3333->...    listener    handler  dst-1 1444->7777
 //
 //we must store these mappings (1111-6345, etc) in memory for a length
 //of time, so that when the exit node receives a response on 6345, it
@@ -89,6 +75,7 @@ func (u *udpListener) run(ctx context.Context) error {
 }
 
 func (u *udpListener) runInbound(ctx context.Context) error {
+	dstAddr := u.remote.Remote()
 	const maxMTU = 9012
 	buff := make([]byte, maxMTU)
 	for !isDone(ctx) {
@@ -104,7 +91,7 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		}
 		//send over channel, including source address
 		b := buff[:n]
-		if err := o.encode(addr.String(), u.remote.Remote(), b); err != nil {
+		if err := o.encode(addr.String(), dstAddr, b); err != nil {
 			return u.Errorf("encode error: %w", err)
 		}
 		//stats
@@ -130,12 +117,12 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 		if err != nil {
 			return u.Errorf("resolve error: %w", err)
 		}
-		_, err = u.inbound.WriteToUDP(p.Payload, addr)
+		n, err := u.inbound.WriteToUDP(p.Payload, addr)
 		if err != nil {
 			return u.Errorf("write error: %w", err)
 		}
 		//stats
-		atomic.AddInt64(&u.recv, int64(len(p.Payload)))
+		atomic.AddInt64(&u.recv, int64(n))
 	}
 	return nil
 }
@@ -152,7 +139,8 @@ func (u *udpListener) getOubound() (*udpOutbound, error) {
 	if sshConn == nil {
 		return nil, u.Errorf("ssh-conn nil")
 	}
-	//ssh request for udp packets for this proxy's remote
+	//ssh request for udp packets for this proxy's remote,
+	//just "udp" since the remote address is sent with each packet
 	rwc, reqs, err := sshConn.OpenChannel("chisel", []byte("udp"))
 	if err != nil {
 		return nil, u.Errorf("ssh-chan error: %s", err)
@@ -166,41 +154,4 @@ func (u *udpListener) getOubound() (*udpOutbound, error) {
 	}
 	u.outbound = o
 	return o, nil
-}
-
-type udpPacket struct {
-	Src     string
-	Dst     string
-	Payload []byte
-}
-
-func init() {
-	gob.Register(&udpPacket{})
-}
-
-type udpOutbound struct {
-	r *gob.Decoder
-	w *gob.Encoder
-	c io.Closer
-}
-
-func (o *udpOutbound) encode(src, dst string, b []byte) error {
-	return o.w.Encode(udpPacket{
-		Src:     src,
-		Dst:     dst,
-		Payload: b,
-	})
-}
-
-func (o *udpOutbound) decode(p *udpPacket) error {
-	return o.r.Decode(p)
-}
-
-func isDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-		return false
-	}
 }

@@ -117,6 +117,9 @@ func DecodeRemote(s string) (*Remote, error) {
 		r.LocalProto = r.RemoteProto
 	}
 	if r.LocalProto != r.RemoteProto {
+		//TODO support cross protocol
+		//tcp <-> udp, is faily straight forward
+		//udp <-> tcp, is trickier since udp is stateless and tcp is not
 		return nil, errors.New("currently, local and remote protocols must match")
 	}
 	if r.Stdio && r.Reverse {
@@ -157,11 +160,17 @@ func L4Proto(s string) (head, proto string) {
 
 //implement Stringer
 func (r Remote) String() string {
-	tag := ""
+	sb := strings.Builder{}
 	if r.Reverse {
-		tag = revPrefix
+		sb.WriteString(revPrefix)
 	}
-	return tag + r.Local() + "=>" + r.Remote()
+	sb.WriteString(strings.TrimPrefix(r.Local(), "0.0.0.0:"))
+	sb.WriteString("=>")
+	sb.WriteString(strings.TrimPrefix(r.Remote(), "127.0.0.1:"))
+	if r.RemoteProto == "udp" {
+		sb.WriteString("/udp")
+	}
+	return sb.String()
 }
 
 //Encode remote to a string
@@ -180,27 +189,31 @@ func (r Remote) Encode() string {
 	return local + ":" + remote
 }
 
+//Local is the decodable local portion
 func (r Remote) Local() string {
 	if r.Stdio {
 		return "stdio"
 	}
 	if r.LocalHost == "" {
-		r.LocalHost = "127.0.0.1"
+		r.LocalHost = "0.0.0.0"
 	}
 	return r.LocalHost + ":" + r.LocalPort
 }
 
+//Remote is the decodable remote portion
 func (r Remote) Remote() string {
 	if r.Socks {
 		return "socks"
 	}
 	if r.RemoteHost == "" {
-		r.RemoteHost = "0.0.0.0"
+		r.RemoteHost = "127.0.0.1"
 	}
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-func (r Remote) Access() string {
+//UserAddr is checked when checking if a
+//user has access to a given remote
+func (r Remote) UserAddr() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
 	}
