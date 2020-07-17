@@ -21,7 +21,7 @@ import (
 var help = `
   Usage: chisel [command] [--help]
 
-  Version: ` + chshare.BuildVersion + `
+  Version: ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
 
   Commands:
     server - runs chisel in server mode
@@ -315,7 +315,7 @@ var clientHelp = `
     used to reach the chisel server. Authentication can be specified
     inside the URL.
     For example, http://admin:password@my-server.com:8081
-             or: socks://admin:password@my-server.com:1080
+            or: socks://admin:password@my-server.com:1080
 
     --header, Set a custom header in the form "HeaderName: HeaderContent".
     Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
