@@ -184,7 +184,11 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	//connection loop!
 	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
 	for {
-		retry, err := c.connectionOnce(ctx)
+		connected, retry, err := c.connectionOnce(ctx)
+		//reset backoff after successful connections
+		if connected {
+			b.Reset()
+		}
 		//connection error
 		attempt := int(b.Attempt())
 		maxAttempt := c.config.MaxRetryCount
@@ -218,16 +222,17 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	return nil
 }
 
-//connectionOnce returning nil error means retry
-func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+//connectionOnce connects to the chisel server and blocks
+func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err error) {
+	//already closed?
 	select {
 	case <-ctx.Done():
-		return false, io.EOF
+		return false, false, io.EOF
 	default:
 		//still open
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	//prepare dialer
 	d := websocket.Dialer{
 		HandshakeTimeout: 45 * time.Second,
@@ -236,12 +241,12 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 	//optional proxy
 	if p := c.proxyURL; p != nil {
 		if err := c.setProxy(p, &d); err != nil {
-			return false, err
+			return false, false, err
 		}
 	}
 	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
 	if err != nil {
-		return true, err
+		return false, true, err
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
@@ -259,7 +264,7 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 			c.Infof("retriable: %s", err.Error())
 			retry = true
 		}
-		return retry, err
+		return false, retry, err
 	}
 	defer sshConn.Close()
 	// chisel client handshake (reverse of server handshake)
@@ -273,20 +278,20 @@ func (c *Client) connectionOnce(ctx context.Context) (retry bool, err error) {
 	)
 	if err != nil {
 		c.Infof("Config verification failed")
-		return false, err
+		return false, false, err
 	}
 	if len(configerr) > 0 {
-		return false, errors.New(string(configerr))
+		return false, false, errors.New(string(configerr))
 	}
 	c.Infof("Connected (Latency %s)", time.Since(t0))
-	defer c.Infof("Disconnected")
 	//connected, handover ssh connection for tunnel to use, and block
 	retry = true
 	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	if n, ok := err.(net.Error); ok && !n.Temporary() {
 		retry = false
 	}
-	return retry, err
+	c.Infof("Disconnected")
+	return true, retry, err
 }
 
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {

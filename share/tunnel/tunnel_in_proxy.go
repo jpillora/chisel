@@ -11,14 +11,15 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//GetSSHConn blocks then returns once
-//an active SSH connection is ready
-type GetSSHConn func() ssh.Conn
+//sshTunnel exposes a subset of Tunnel to subtypes
+type sshTunnel interface {
+	getSSH(ctx context.Context) ssh.Conn
+}
 
 //Proxy is the inbound portion of a Tunnel
 type Proxy struct {
 	*cio.Logger
-	ssh    GetSSHConn
+	sshTun sshTunnel
 	id     int
 	count  int
 	remote *settings.Remote
@@ -28,11 +29,11 @@ type Proxy struct {
 }
 
 //NewProxy creates a Proxy
-func NewProxy(logger *cio.Logger, ssh GetSSHConn, index int, remote *settings.Remote) (*Proxy, error) {
+func NewProxy(logger *cio.Logger, sshTun sshTunnel, index int, remote *settings.Remote) (*Proxy, error) {
 	id := index + 1
 	p := &Proxy{
 		Logger: logger.Fork("proxy#%s", remote.String()),
-		ssh:    ssh,
+		sshTun: sshTun,
 		id:     id,
 		remote: remote,
 	}
@@ -54,7 +55,7 @@ func (p *Proxy) listen() error {
 		p.Debugf("Listening")
 		p.tcp = l
 	} else if p.remote.LocalProto == "udp" {
-		l, err := listenUDP(p.Logger, p.ssh, p.remote)
+		l, err := listenUDP(p.Logger, p.sshTun, p.remote)
 		if err != nil {
 			return err
 		}
@@ -82,7 +83,7 @@ func (p *Proxy) Run(ctx context.Context) error {
 
 func (p *Proxy) runStdio(ctx context.Context) error {
 	for {
-		p.pipeRemote(cio.Stdio)
+		p.pipeRemote(ctx, cio.Stdio)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -114,17 +115,17 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 			close(done)
 			return err
 		}
-		go p.pipeRemote(src)
+		go p.pipeRemote(ctx, src)
 	}
 }
 
-func (p *Proxy) pipeRemote(src io.ReadWriteCloser) {
+func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	defer src.Close()
 	p.count++
 	cid := p.count
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
-	sshConn := p.ssh()
+	sshConn := p.sshTun.getSSH(ctx)
 	if sshConn == nil {
 		l.Debugf("No remote connection")
 		return

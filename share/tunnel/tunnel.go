@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/armon/go-socks5"
@@ -38,9 +37,9 @@ type Config struct {
 type Tunnel struct {
 	Config
 	//ssh connection
-	activeConnMut sync.RWMutex
-	activeConn    ssh.Conn
-	wgConn        sync.WaitGroup
+	activeConnMut  sync.RWMutex
+	activatingConn chan ssh.Conn
+	activeConn     ssh.Conn
 	//proxies
 	proxyCount int
 	//internals
@@ -48,16 +47,12 @@ type Tunnel struct {
 	socksServer *socks5.Server
 }
 
-var tid = uint64(0)
-
 //New Tunnel from the given Config
 func New(c Config) *Tunnel {
-	if c.Logger.Debug {
-		c.Logger = c.Logger.Fork("tun%d", atomic.AddUint64(&tid, 1))
+	c.Logger = c.Logger.Fork("tun")
+	t := &Tunnel{
+		Config: c,
 	}
-	t := &Tunnel{Config: c}
-	//block getters
-	t.wgConn.Add(1)
 	//setup socks server (not listening on any port!)
 	extra := ""
 	if c.Socks {
@@ -77,7 +72,9 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	//link ctx to ssh-conn
 	go func() {
 		<-ctx.Done()
-		c.Close()
+		if c.Close() == nil {
+			t.Debugf("SSH cancelled")
+		}
 	}()
 	//mark active
 	t.activeConnMut.Lock()
@@ -86,8 +83,15 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	}
 	t.activeConn = c
 	t.activeConnMut.Unlock()
-	//unblock getters
-	t.wgConn.Done()
+	//fetch chan
+	t.activeConnMut.RLock()
+	ch := t.activatingConn
+	t.activeConnMut.RUnlock()
+	//pass conn to getter, if any
+	if ch != nil {
+		ch <- c
+		close(ch) //only use once
+	}
 	//optional keepalive loop against this connection
 	if t.Config.KeepAlive > 0 {
 		go t.keepAliveLoop(c)
@@ -95,11 +99,9 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	//block until closed
 	go t.handleSSHRequests(reqs)
 	go t.handleSSHChannels(chans)
-	t.Debugf("Bound SSH")
+	t.Debugf("SSH connected")
 	err := c.Wait()
-	t.Debugf("Unbound SSH")
-	//reblock getters
-	t.wgConn.Add(1)
+	t.Debugf("SSH disconnected")
 	//mark inactive
 	t.activeConnMut.Lock()
 	t.activeConn = nil
@@ -107,12 +109,37 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	return err
 }
 
-func (t *Tunnel) getSSH() ssh.Conn {
-	t.wgConn.Wait() //TODO timeout?
+//getSSH can only have 1 caller
+func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
+	//cancelled already?
+	if isDone(ctx) {
+		return nil
+	}
 	t.activeConnMut.RLock()
 	c := t.activeConn
 	t.activeConnMut.RUnlock()
-	return c
+	//connected already?
+	if c != nil {
+		return c
+	}
+	//connecting...
+	t.activeConnMut.Lock()
+	if t.activatingConn != nil {
+		panic("multiple getters")
+	}
+	t.activatingConn = make(chan ssh.Conn)
+	t.activeConnMut.Unlock()
+	select {
+	case <-ctx.Done(): //cancelled
+		return nil
+	case <-time.After(35 * time.Second): //a bit longer than ssh timeout
+		return nil
+	case c := <-t.activatingConn:
+		t.activeConnMut.Lock()
+		t.activatingConn = nil
+		t.activeConnMut.Unlock()
+		return c
+	}
 }
 
 //BindRemotes converts the given remotes into proxies, and blocks
@@ -126,7 +153,7 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 	}
 	proxies := make([]*Proxy, len(remotes))
 	for i, remote := range remotes {
-		p, err := NewProxy(t.Logger, t.getSSH, t.proxyCount, remote)
+		p, err := NewProxy(t.Logger, t, t.proxyCount, remote)
 		if err != nil {
 			return err
 		}

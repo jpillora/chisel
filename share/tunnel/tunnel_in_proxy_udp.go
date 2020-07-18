@@ -6,6 +6,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
@@ -25,7 +26,7 @@ import (
 //we must store these mappings (1111-6345, etc) in memory for a length
 //of time, so that when the exit node receives a response on 6345, it
 //knows to return it to 1111.
-func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *settings.Remote) (*udpListener, error) {
+func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
 	l = l.Fork("udp")
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -38,7 +39,7 @@ func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *settings.Remote) (*udpList
 	//ready
 	u := &udpListener{
 		Logger:  l,
-		ssh:     ssh,
+		sshTun:  sshTun,
 		remote:  remote,
 		inbound: conn,
 	}
@@ -47,7 +48,7 @@ func listenUDP(l *cio.Logger, ssh GetSSHConn, remote *settings.Remote) (*udpList
 
 type udpListener struct {
 	*cio.Logger
-	ssh         GetSSHConn
+	sshTun      sshTunnel
 	remote      *settings.Remote
 	inbound     *net.UDPConn
 	outboundMut sync.Mutex
@@ -80,12 +81,16 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 	buff := make([]byte, maxMTU)
 	for !isDone(ctx) {
 		//read from inbound udp
+		u.inbound.SetReadDeadline(time.Now().Add(time.Second))
 		n, addr, err := u.inbound.ReadFromUDP(buff)
+		if e, ok := err.(net.Error); ok && (e.Timeout() || e.Temporary()) {
+			continue
+		}
 		if err != nil {
 			return u.Errorf("read error: %w", err)
 		}
 		//upsert ssh channel
-		o, err := u.getOubound()
+		o, err := u.getOubound(ctx)
 		if err != nil {
 			return u.Errorf("ssh-chan error: %w", err)
 		}
@@ -103,7 +108,7 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 func (u *udpListener) runOutbound(ctx context.Context) error {
 	for !isDone(ctx) {
 		//upsert ssh channel
-		o, err := u.getOubound()
+		o, err := u.getOubound(ctx)
 		if err != nil {
 			return u.Errorf("ssh-chan error: %w", err)
 		}
@@ -127,7 +132,7 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 	return nil
 }
 
-func (u *udpListener) getOubound() (*udpOutbound, error) {
+func (u *udpListener) getOubound(ctx context.Context) (*udpOutbound, error) {
 	u.outboundMut.Lock()
 	defer u.outboundMut.Unlock()
 	//cached
@@ -135,7 +140,7 @@ func (u *udpListener) getOubound() (*udpOutbound, error) {
 		return u.outbound, nil
 	}
 	//not cached, bind
-	sshConn := u.ssh()
+	sshConn := u.sshTun.getSSH(ctx)
 	if sshConn == nil {
 		return nil, u.Errorf("ssh-conn nil")
 	}

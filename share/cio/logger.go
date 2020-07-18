@@ -8,9 +8,11 @@ import (
 
 //Logger is pkg/log Logger with prefixing and 2 log levels
 type Logger struct {
+	Info, Debug bool
+	//internal
 	prefix      string
 	logger      *log.Logger
-	Info, Debug bool
+	info, debug *bool
 }
 
 func NewLogger(prefix string) *Logger {
@@ -28,13 +30,13 @@ func NewLoggerFlag(prefix string, flag int) *Logger {
 }
 
 func (l *Logger) Infof(f string, args ...interface{}) {
-	if l.Info {
+	if l.Info || (l.info != nil && *l.info) {
 		l.logger.Printf(l.prefix+": "+f, args...)
 	}
 }
 
 func (l *Logger) Debugf(f string, args ...interface{}) {
-	if l.Debug {
+	if l.Debug || (l.debug != nil && *l.debug) {
 		l.logger.Printf(l.prefix+": "+f, args...)
 	}
 }
@@ -48,7 +50,17 @@ func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {
 	args = append([]interface{}{l.prefix}, args...)
 	ll := NewLogger(fmt.Sprintf("%s: "+prefix, args...))
 	ll.Info = l.Info
+	if l.info != nil {
+		ll.info = l.info
+	} else {
+		ll.info = &l.Info
+	}
 	ll.Debug = l.Debug
+	if l.debug != nil {
+		ll.debug = l.debug
+	} else {
+		ll.debug = &l.Debug
+	}
 	return ll
 }
 

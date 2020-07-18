@@ -8,6 +8,7 @@ import (
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/cos"
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/chisel/share/tunnel"
 )
 
 const (
@@ -24,6 +25,7 @@ type (
 	HTTPServer = cnet.HTTPServer
 	ConnStats  = cnet.ConnStats
 	Logger     = cio.Logger
+	TCPProxy   = tunnel.Proxy
 )
 
 var (
@@ -45,15 +47,10 @@ var (
 	NewHTTPServer    = cnet.NewHTTPServer
 	GoStats          = cos.GoStats
 	SleepSignal      = cos.SleepSignal
+	NewTCPProxy      = tunnel.NewProxy
 )
 
 //EncodeConfig old version
 func EncodeConfig(c *settings.Config) ([]byte, error) {
 	return settings.EncodeConfig(*c), nil
 }
-
-// //TCPProxy makes this package backward compatible
-// type TCPProxy = Proxy
-
-// //NewTCPProxy makes this package backward compatible
-// var NewTCPProxy = NewProxy
