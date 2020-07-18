@@ -200,7 +200,7 @@ func server(args []string) {
 		log.Fatal(err)
 	}
 	if err := s.Wait(); err != nil {
-		log.Fatal()
+		log.Fatal(err)
 	}
 }
 
@@ -372,6 +372,6 @@ func client(args []string) {
 		log.Fatal(err)
 	}
 	if err := c.Wait(); err != nil {
-		log.Fatal()
+		log.Fatal(err)
 	}
 }

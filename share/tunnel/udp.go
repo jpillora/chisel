@@ -16,13 +16,13 @@ func init() {
 	gob.Register(&udpPacket{})
 }
 
-type udpOutbound struct {
+type udpChannel struct {
 	r *gob.Decoder
 	w *gob.Encoder
 	c io.Closer
 }
 
-func (o *udpOutbound) encode(src, dst string, b []byte) error {
+func (o *udpChannel) encode(src, dst string, b []byte) error {
 	return o.w.Encode(udpPacket{
 		Src:     src,
 		Dst:     dst,
@@ -30,7 +30,7 @@ func (o *udpOutbound) encode(src, dst string, b []byte) error {
 	})
 }
 
-func (o *udpOutbound) decode(p *udpPacket) error {
+func (o *udpChannel) decode(p *udpPacket) error {
 	return o.r.Decode(p)
 }
 

@@ -3,7 +3,10 @@ package tunnel
 import (
 	"context"
 	"encoding/gob"
+	"fmt"
+	"io"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,7 +55,7 @@ type udpListener struct {
 	remote      *settings.Remote
 	inbound     *net.UDPConn
 	outboundMut sync.Mutex
-	outbound    *udpOutbound
+	outbound    *udpChannel
 	sent, recv  int64
 }
 
@@ -90,13 +93,16 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 			return u.Errorf("read error: %w", err)
 		}
 		//upsert ssh channel
-		o, err := u.getOubound(ctx)
+		uc, err := u.getUDPChan(ctx)
 		if err != nil {
-			return u.Errorf("ssh-chan error: %w", err)
+			if strings.HasSuffix(err.Error(), "EOF") {
+				continue
+			}
+			return u.Errorf("inbound-udpchan: %w", err)
 		}
 		//send over channel, including source address
 		b := buff[:n]
-		if err := o.encode(addr.String(), dstAddr, b); err != nil {
+		if err := uc.encode(addr.String(), dstAddr, b); err != nil {
 			return u.Errorf("encode error: %w", err)
 		}
 		//stats
@@ -108,13 +114,19 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 func (u *udpListener) runOutbound(ctx context.Context) error {
 	for !isDone(ctx) {
 		//upsert ssh channel
-		o, err := u.getOubound(ctx)
+		uc, err := u.getUDPChan(ctx)
 		if err != nil {
-			return u.Errorf("ssh-chan error: %w", err)
+			if strings.HasSuffix(err.Error(), "EOF") {
+				continue
+			}
+			return u.Errorf("outbound-udpchan: %w", err)
 		}
 		//receive from channel, including source address
 		p := udpPacket{}
-		if err := o.decode(&p); err != nil {
+		if err := uc.decode(&p); err == io.EOF {
+			//outbound ssh disconnected, get new connection...
+			continue
+		} else if err != nil {
 			return u.Errorf("decode error: %w", err)
 		}
 		//write back to inbound udp
@@ -132,7 +144,7 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 	return nil
 }
 
-func (u *udpListener) getOubound(ctx context.Context) (*udpOutbound, error) {
+func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 	u.outboundMut.Lock()
 	defer u.outboundMut.Unlock()
 	//cached
@@ -142,21 +154,32 @@ func (u *udpListener) getOubound(ctx context.Context) (*udpOutbound, error) {
 	//not cached, bind
 	sshConn := u.sshTun.getSSH(ctx)
 	if sshConn == nil {
-		return nil, u.Errorf("ssh-conn nil")
+		return nil, fmt.Errorf("ssh-conn nil")
 	}
 	//ssh request for udp packets for this proxy's remote,
 	//just "udp" since the remote address is sent with each packet
 	rwc, reqs, err := sshConn.OpenChannel("chisel", []byte("udp"))
 	if err != nil {
-		return nil, u.Errorf("ssh-chan error: %s", err)
+		return nil, fmt.Errorf("ssh-chan error: %s", err)
 	}
 	go ssh.DiscardRequests(reqs)
+	//remove on disconnect
+	go u.unsetUDPChan(sshConn)
 	//ready
-	o := &udpOutbound{
+	o := &udpChannel{
 		r: gob.NewDecoder(rwc),
 		w: gob.NewEncoder(rwc),
 		c: rwc,
 	}
 	u.outbound = o
+	u.Debugf("aquired channel")
 	return o, nil
+}
+
+func (u *udpListener) unsetUDPChan(sshConn ssh.Conn) {
+	sshConn.Wait()
+	u.Debugf("lost channel")
+	u.outboundMut.Lock()
+	u.outbound = nil
+	u.outboundMut.Unlock()
 }

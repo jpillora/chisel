@@ -15,7 +15,7 @@ import (
 func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
 	h := &udpHandler{
 		Logger: l,
-		udpOutbound: &udpOutbound{
+		udpChannel: &udpChannel{
 			r: gob.NewDecoder(rwc),
 			w: gob.NewEncoder(rwc),
 			c: rwc,
@@ -34,7 +34,7 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
 
 type udpHandler struct {
 	*cio.Logger
-	*udpOutbound
+	*udpChannel
 	*udpConns
 	sent, recv int64
 }
@@ -92,7 +92,7 @@ func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 		}
 		b := buff[:n]
 		//encode back over ssh connection
-		err = h.udpOutbound.encode(p.Src, p.Dst, b)
+		err = h.udpChannel.encode(p.Src, p.Dst, b)
 		if err != nil {
 			h.Debugf("encode error: %s", err)
 			return
