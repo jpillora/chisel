@@ -25,7 +25,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cnet"
 
 	"time"
 )
@@ -105,7 +105,7 @@ func requestFile(port string, size int) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func makeFileServer() *chshare.HTTPServer {
+func makeFileServer() *cnet.HTTPServer {
 	bsize := 3 * MB
 	bytes := make([]byte, bsize)
 	//filling huge buffer
@@ -113,8 +113,8 @@ func makeFileServer() *chshare.HTTPServer {
 		bytes[i] = byte(i)
 	}
 
-	s := chshare.NewHTTPServer()
-	s.SetKeepAlivesEnabled(false)
+	s := cnet.NewHTTPServer()
+	s.Server.SetKeepAlivesEnabled(false)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rsize, _ := strconv.Atoi(r.URL.Path[1:])
 		for rsize >= bsize {

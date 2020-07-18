@@ -1,4 +1,4 @@
-package chshare
+package settings
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/jpillora/chisel/share/cio"
 )
 
 type Users struct {
@@ -58,13 +59,13 @@ func (u *Users) AddUser(user *User) {
 
 // UserIndex is a reloadable user source
 type UserIndex struct {
-	*Logger
+	*cio.Logger
 	*Users
 	configFile string
 }
 
 // NewUserIndex creates a source for users
-func NewUserIndex(logger *Logger) *UserIndex {
+func NewUserIndex(logger *cio.Logger) *UserIndex {
 	return &UserIndex{
 		Logger: logger.Fork("users"),
 		Users:  NewUsers(),
@@ -125,6 +126,7 @@ func (u *UserIndex) loadUserIndex() error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return errors.New("Invalid JSON: " + err.Error())
 	}
+	users := []*User{}
 	for auth, remotes := range raw {
 		user := &User{}
 		user.Name, user.Pass = ParseAuth(auth)
@@ -141,9 +143,15 @@ func (u *UserIndex) loadUserIndex() error {
 				}
 				user.Addrs = append(user.Addrs, re)
 			}
-
 		}
-		u.Users.AddUser(user)
+		users = append(users, user)
+	}
+	//swap
+	u.RWMutex.Lock()
+	u.inner = map[string]*User{}
+	u.RWMutex.Unlock()
+	for _, user := range users {
+		u.AddUser(user)
 	}
 	return nil
 }

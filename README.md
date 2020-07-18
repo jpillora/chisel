@@ -2,14 +2,14 @@
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel) [![CI](https://github.com/jpillora/chisel/workflows/CI/badge.svg)](https://github.com/jpillora/chisel/actions?workflow=CI)
 
-Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network. Chisel is very similar to [crowbar](https://github.com/q3k/crowbar) though achieves **much** higher [performance](#performance).
+Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
 ### Features
 
 - Easy to use
-- [Performant](#performance)\*
+- [Performant](./test/bench/perf.md)\*
 - [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
 - [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
 - Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
@@ -64,22 +64,31 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
 
 ### Usage
 
-```
+<!-- render these help texts by hand,
+  or use https://github.com/jpillora/md-tmpl
+    with $ md-tmpl -w README.md -->
+
+<!--tmpl,code=plain:echo "$ chisel --help" && go run main.go --help | cat -->
+``` plain 
 $ chisel --help
 
-   Usage: chisel [command] [--help]
+  Usage: chisel [command] [--help]
 
-   Version: 1.X.X
+  Version: 0.0.0-src (go1.14.3)
 
-   Commands:
-     server - runs chisel in server mode
-     client - runs chisel in client mode
+  Commands:
+    server - runs chisel in server mode
+    client - runs chisel in client mode
 
-   Read more:
-     https://github.com/jpillora/chisel
+  Read more:
+    https://github.com/jpillora/chisel
+
 ```
+<!--/tmpl-->
 
-```
+
+<!--tmpl,code=plain:echo "$ chisel server --help" && go run main.go server --help | cat -->
+``` plain 
 $ chisel server --help
 
   Usage: chisel server [options]
@@ -111,8 +120,15 @@ $ chisel server --help
     remotes. This file will be automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
-    access, in the form of <user:pass>. This is equivalent to creating an
-    authfile with {"<user:pass>": [""]}.
+    access, in the form of <user:pass>. It is equivalent to creating an
+    authfile with {"<user:pass>": [""]}. If unset, it will use the
+    environment variable AUTH.
+
+    --keepalive, An optional keepalive interval. Since the underlying
+    transport is HTTP, in many instances we'll be traversing through
+    proxies, often these proxies will close idle connections. You must
+    specify a time with a unit, for example '5s' or '2m'. Defaults
+    to '25s' (set to 0s to disable).
 
     --proxy, Specifies another HTTP server to proxy requests to when
     chisel receives a normal HTTP request. Useful for hiding chisel in
@@ -136,14 +152,17 @@ $ chisel server --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    1.X.X (go1.14)
+    0.0.0-src (go1.14.3)
 
   Read more:
     https://github.com/jpillora/chisel
 
 ```
+<!--/tmpl-->
 
-```
+
+<!--tmpl,code=plain:echo "$ chisel client --help" && go run main.go client --help | cat -->
+``` plain 
 $ chisel client --help
 
   Usage: chisel client [options] <server> <remote> [remote] [remote] ...
@@ -217,8 +236,8 @@ $ chisel client --help
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
-    specify a time with a unit, for example '30s' or '2m'. Defaults
-    to '0s' (disabled).
+    specify a time with a unit, for example '5s' or '2m'. Defaults
+    to '25s' (set to 0s to disable).
 
     --max-retry-count, Maximum number of times to retry before exiting.
     Defaults to unlimited.
@@ -230,7 +249,7 @@ $ chisel client --help
     used to reach the chisel server. Authentication can be specified
     inside the URL.
     For example, http://admin:password@my-server.com:8081
-             or: socks://admin:password@my-server.com:1080
+            or: socks://admin:password@my-server.com:1080
 
     --header, Set a custom header in the form "HeaderName: HeaderContent".
     Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
@@ -250,12 +269,13 @@ $ chisel client --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    1.X.X (go1.14)
+    0.0.0-src (go1.14.3)
 
   Read more:
     https://github.com/jpillora/chisel
 
 ```
+<!--/tmpl-->
 
 ### Security
 
@@ -281,92 +301,27 @@ docker run \
 2. Connect your chisel client (using server's fingerprint)
 
 ```sh
-chisel client --fingerprint ab:12:34 server-address:9312 socks
+chisel client --fingerprint ab:12:34 <server-address>:9312 socks
 ```
 
 3. Point your SOCKS5 clients (e.g. OS/Browser) to:
 
 ```
-localhost:1080
+<client-address>:1080
 ```
 
 4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
 
-### Performance
 
-With [crowbar](https://github.com/q3k/crowbar), a connection is tunneled by repeatedly querying the server with updates. This results in a large amount of HTTP and TCP connection overhead. Chisel overcomes this using WebSockets combined with [crypto/ssh](https://golang.org/x/crypto/ssh) to create hundreds of logical connections, resulting in **one** TCP connection per client.
+### Caveats
 
-In this simple benchmark, we have:
+Since WebSockets support is required:
 
-```
-					(direct)
-        .--------------->----------------.
-       /    chisel         chisel         \
-request--->client:2001--->server:2002---->fileserver:3000
-       \                                  /
-        '--> crowbar:4001--->crowbar:4002'
-             client           server
-```
-
-Note, we're using an in-memory "file" server on localhost for these tests
-
-_direct_
-
-```
-:3000 => 1 bytes in 1.291417ms
-:3000 => 10 bytes in 713.525µs
-:3000 => 100 bytes in 562.48µs
-:3000 => 1000 bytes in 595.445µs
-:3000 => 10000 bytes in 1.053298ms
-:3000 => 100000 bytes in 741.351µs
-:3000 => 1000000 bytes in 1.367143ms
-:3000 => 10000000 bytes in 8.601549ms
-:3000 => 100000000 bytes in 76.3939ms
-```
-
-`chisel`
-
-```
-:2001 => 1 bytes in 1.351976ms
-:2001 => 10 bytes in 1.106086ms
-:2001 => 100 bytes in 1.005729ms
-:2001 => 1000 bytes in 1.254396ms
-:2001 => 10000 bytes in 1.139777ms
-:2001 => 100000 bytes in 2.35437ms
-:2001 => 1000000 bytes in 11.502673ms
-:2001 => 10000000 bytes in 123.130246ms
-:2001 => 100000000 bytes in 966.48636ms
-```
-
-~100MB in **~1 second**
-
-`crowbar`
-
-```
-:4001 => 1 bytes in 3.335797ms
-:4001 => 10 bytes in 1.453007ms
-:4001 => 100 bytes in 1.811727ms
-:4001 => 1000 bytes in 1.621525ms
-:4001 => 10000 bytes in 5.20729ms
-:4001 => 100000 bytes in 38.461926ms
-:4001 => 1000000 bytes in 358.784864ms
-:4001 => 10000000 bytes in 3.603206487s
-:4001 => 100000000 bytes in 36.332395213s
-```
-
-~100MB in **36 seconds**
-
-See more [test/](test/)
-
-### Known Issues
-
-- WebSockets support is required
-  _ IaaS providers all will support WebSockets
-  _ Unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS.
-  _ PaaS providers vary in their support for WebSockets
-  _ Heroku has full support
-  _ Openshift has full support though connections are only accepted on ports 8443 and 8080
-  _ Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
+- IaaS providers all will support WebSockets (unless an unsupporting HTTP proxy has been forced in front of you, in which case I'd argue that you've been downgraded to PaaS)
+- PaaS providers vary in their support for WebSockets
+  - Heroku has full support
+  - Openshift has full support though connections are only accepted on ports 8443 and 8080
+  - Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
 
 ### Contributing
 
@@ -379,12 +334,10 @@ See more [test/](test/)
 ### Changelog
 
 - `1.0` - Initial release
-- `1.1` - Swapped out simple symmetric encryption for ECDSA SSH
+- `1.1` - Replaced simple symmetric encryption for ECDSA SSH
 - `1.2` - Added SOCKS5 (server) and HTTP CONNECT (client) support
 - `1.3` - Added reverse tunnelling support
-
-### Todo
-
-- Better, faster tests
-- Expose a stats page for proxy throughput
-- Treat client stdin/stdout as a socket
+- `1.4` - Added arbitrary HTTP header support
+- `1.5` - Added reverse SOCKS support (by @aus)
+- `1.6` - Added client stdio support (by @BoleynSu)
+- `1.7` - Added UDP support

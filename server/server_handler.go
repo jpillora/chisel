@@ -1,14 +1,17 @@
 package chserver
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/chisel/share/tunnel"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 )
 
 // handleClientHandler is the main http websocket handler for the chisel server
@@ -47,46 +50,52 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 // handleWebsocket is responsible for handling the websocket connection
 func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	id := atomic.AddInt32(&s.sessCount, 1)
-	clog := s.Fork("session#%d", id)
+	l := s.Fork("session#%d", id)
 	wsConn, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
-		clog.Debugf("Failed to upgrade (%s)", err)
+		l.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
-	conn := chshare.NewWebSocketConn(wsConn)
+	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
-	clog.Debugf("Handshaking...")
+	l.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
 		return
 	}
 	// pull the users from the session map
-	var user *chshare.User
+	var user *settings.User
 	if s.users.Len() > 0 {
 		sid := string(sshConn.SessionID())
-		user, _ = s.sessions.Get(sid)
+		u, ok := s.sessions.Get(sid)
+		if !ok {
+			panic("bug in ssh auth handler")
+		}
+		user = u
 		s.sessions.Del(sid)
 	}
-	//verify configuration
-	clog.Debugf("Verifying configuration")
-	//wait for request, with timeout
+	// chisel server handshake (reverse of client handshake)
+	// verify configuration
+	l.Debugf("Verifying configuration")
+	// wait for request, with timeout
 	var r *ssh.Request
 	select {
 	case r = <-reqs:
 	case <-time.After(10 * time.Second):
+		l.Debugf("Timeout waiting for configuration")
 		sshConn.Close()
 		return
 	}
 	failed := func(err error) {
-		clog.Debugf("Failed: %s", err)
+		l.Debugf("Failed: %s", err)
 		r.Reply(false, []byte(err.Error()))
 	}
 	if r.Type != "config" {
 		failed(s.Errorf("expecting config request"))
 		return
 	}
-	c, err := chshare.DecodeConfig(r.Payload)
+	c, err := settings.DecodeConfig(r.Payload)
 	if err != nil {
 		failed(s.Errorf("invalid config"))
 		return
@@ -97,13 +106,13 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		if v == "" {
 			v = "<unknown>"
 		}
-		clog.Infof("Client version (%s) differs from server version (%s)",
+		l.Infof("Client version (%s) differs from server version (%s)",
 			v, chshare.BuildVersion)
 	}
 	//confirm reverse tunnels are allowed
 	for _, r := range c.Remotes {
-		if r.Reverse && !s.reverseOk {
-			clog.Debugf("Denied reverse port forwarding request, please enable --reverse")
+		if r.Reverse && !s.config.Reverse {
+			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
 			failed(s.Errorf("Reverse port forwaring not enabled on server"))
 			return
 		}
@@ -112,74 +121,37 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	//access to the desired remotes
 	if user != nil {
 		for _, r := range c.Remotes {
-			var addr string
-			if r.Reverse {
-				addr = "R:" + r.LocalHost + ":" + r.LocalPort
-			} else {
-				addr = r.RemoteHost + ":" + r.RemotePort
-			}
+			addr := r.UserAddr()
 			if !user.HasAccess(addr) {
 				failed(s.Errorf("access to '%s' denied", addr))
 				return
 			}
 		}
 	}
-	//set up reverse port forwarding
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	for i, r := range c.Remotes {
-		if r.Reverse {
-			proxy := chshare.NewTCPProxy(s.Logger, func() ssh.Conn { return sshConn }, i, r)
-			if err := proxy.Start(ctx); err != nil {
-				failed(s.Errorf("%s", err))
-				return
-			}
-		}
-	}
-	//success!
+	//successfuly validated config!
 	r.Reply(true, nil)
-	//prepare connection logger
-	clog.Debugf("Open")
-	go s.handleSSHRequests(clog, reqs)
-	go s.handleSSHChannels(clog, chans)
-	sshConn.Wait()
-	clog.Debugf("Close")
-}
-
-func (s *Server) handleSSHRequests(clientLog *chshare.Logger, reqs <-chan *ssh.Request) {
-	for r := range reqs {
-		switch r.Type {
-		case "ping":
-			r.Reply(true, nil)
-		default:
-			clientLog.Debugf("Unknown request: %s", r.Type)
-		}
-	}
-}
-
-func (s *Server) handleSSHChannels(clientLog *chshare.Logger, chans <-chan ssh.NewChannel) {
-	for ch := range chans {
-		remote := string(ch.ExtraData())
-		socks := remote == "socks"
-		//dont accept socks when --socks5 isn't enabled
-		if socks && s.socksServer == nil {
-			clientLog.Debugf("Denied socks request, please enable --socks5")
-			ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled on the server")
-			continue
-		}
-		//accept rest
-		stream, reqs, err := ch.Accept()
-		if err != nil {
-			clientLog.Debugf("Failed to accept stream: %s", err)
-			continue
-		}
-		go ssh.DiscardRequests(reqs)
-		//handle stream type
-		connID := s.connStats.New()
-		if socks {
-			go chshare.HandleSocksStream(clientLog.Fork("socksconn#%d", connID), s.socksServer, &s.connStats, stream)
-		} else {
-			go chshare.HandleTCPStream(clientLog.Fork("conn#%d", connID), &s.connStats, stream, remote)
-		}
+	//tunnel per ssh connection
+	tunnel := tunnel.New(tunnel.Config{
+		Logger:    l,
+		Inbound:   s.config.Reverse,
+		Outbound:  true, //server always accepts outbound
+		Socks:     s.config.Socks5,
+		KeepAlive: s.config.KeepAlive,
+	})
+	//bind
+	eg, ctx := errgroup.WithContext(req.Context())
+	eg.Go(func() error {
+		//connected, handover ssh connection for tunnel to use, and block
+		return tunnel.BindSSH(ctx, sshConn, reqs, chans)
+	})
+	eg.Go(func() error {
+		serverInbound := c.Remotes.Reversed(true)
+		return tunnel.BindRemotes(ctx, serverInbound)
+	})
+	err = eg.Wait()
+	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
+		l.Debugf("Closed connection (%s)", err)
+	} else {
+		l.Debugf("Closed connection")
 	}
 }

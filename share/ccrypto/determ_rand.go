@@ -1,4 +1,4 @@
-package chshare
+package ccrypto
 
 // Deterministic crypto.Reader
 // overview: half the result is used as the output
@@ -18,17 +18,17 @@ func NewDetermRand(seed []byte) io.Reader {
 	for i := 0; i < DetermRandIter; i++ {
 		next, out = hash(next)
 	}
-	return &DetermRand{
+	return &determRand{
 		next: next,
 		out:  out,
 	}
 }
 
-type DetermRand struct {
+type determRand struct {
 	next, out []byte
 }
 
-func (d *DetermRand) Read(b []byte) (int, error) {
+func (d *determRand) Read(b []byte) (int, error) {
 	n := 0
 	l := len(b)
 	for n < l {
