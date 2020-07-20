@@ -120,7 +120,10 @@ func DecodeRemote(s string) (*Remote, error) {
 		//TODO support cross protocol
 		//tcp <-> udp, is faily straight forward
 		//udp <-> tcp, is trickier since udp is stateless and tcp is not
-		return nil, errors.New("currently, local and remote protocols must match")
+		return nil, errors.New("cross-protocol remotes are not supported yet")
+	}
+	if r.Socks && r.RemoteProto != "tcp" {
+		return nil, errors.New("only TCP SOCKS is supported")
 	}
 	if r.Stdio && r.Reverse {
 		return nil, errors.New("stdio cannot be reversed")

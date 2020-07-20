@@ -30,13 +30,13 @@ func NewLoggerFlag(prefix string, flag int) *Logger {
 }
 
 func (l *Logger) Infof(f string, args ...interface{}) {
-	if l.Info || (l.info != nil && *l.info) {
+	if l.IsInfo() {
 		l.logger.Printf(l.prefix+": "+f, args...)
 	}
 }
 
 func (l *Logger) Debugf(f string, args ...interface{}) {
-	if l.Debug || (l.debug != nil && *l.debug) {
+	if l.IsDebug() {
 		l.logger.Printf(l.prefix+": "+f, args...)
 	}
 }
@@ -49,6 +49,7 @@ func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {
 	//slip the parent prefix at the front
 	args = append([]interface{}{l.prefix}, args...)
 	ll := NewLogger(fmt.Sprintf("%s: "+prefix, args...))
+	//store link to parent settings too
 	ll.Info = l.Info
 	if l.info != nil {
 		ll.info = l.info
@@ -66,4 +67,12 @@ func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {
 
 func (l *Logger) Prefix() string {
 	return l.prefix
+}
+
+func (l *Logger) IsInfo() bool {
+	return l.Info || (l.info != nil && *l.info)
+}
+
+func (l *Logger) IsDebug() bool {
+	return l.Debug || (l.debug != nil && *l.debug)
 }

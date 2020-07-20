@@ -43,7 +43,7 @@ type Tunnel struct {
 	//proxies
 	proxyCount int
 	//internals
-	connStats   cnet.ConnStats
+	connStats   cnet.ConnCount
 	socksServer *socks5.Server
 }
 

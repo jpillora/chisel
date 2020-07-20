@@ -8,6 +8,7 @@ import (
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
@@ -36,18 +37,21 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		return
 	}
 	remote := string(ch.ExtraData())
-	udp := remote == "udp"
-	socks := remote == "socks"
+	//extract protocol
+	hostPort, proto := settings.L4Proto(remote)
+	udp := proto == "udp"
+	socks := hostPort == "socks"
 	if socks && t.socksServer == nil {
 		t.Debugf("Denied socks request, please enable socks")
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
 		return
 	}
-	stream, reqs, err := ch.Accept()
+	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)
 		return
 	}
+	stream := io.ReadWriteCloser(sshChan) //cnet.MeterRWC(t.Logger.Fork("sshchan"), sshChan)
 	defer stream.Close()
 	go ssh.DiscardRequests(reqs)
 	l := t.Logger.Fork("conn#%d", t.connStats.New())
@@ -57,9 +61,9 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	if socks {
 		err = t.handleSocks(stream)
 	} else if udp {
-		err = t.handleUDP(l, stream)
+		err = t.handleUDP(l, stream, hostPort)
 	} else {
-		err = t.handleTCP(l, stream, remote)
+		err = t.handleTCP(l, stream, hostPort)
 	}
 	t.connStats.Close()
 	errmsg := ""
@@ -73,8 +77,8 @@ func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
 }
 
-func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, remote string) error {
-	dst, err := net.Dial("tcp", remote)
+func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
+	dst, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		return err
 	}

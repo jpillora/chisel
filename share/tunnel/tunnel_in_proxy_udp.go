@@ -30,7 +30,6 @@ import (
 //of time, so that when the exit node receives a response on 6345, it
 //knows to return it to 1111.
 func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
-	l = l.Fork("udp")
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
 		return nil, l.Errorf("resolve: %s", err)
@@ -61,7 +60,7 @@ type udpListener struct {
 
 func (u *udpListener) run(ctx context.Context) error {
 	//udp doesnt accept connections,
-	//udp simply forwards all packets
+	//udp simply forwards packets
 	//and therefore only needs to listen
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -79,7 +78,6 @@ func (u *udpListener) run(ctx context.Context) error {
 }
 
 func (u *udpListener) runInbound(ctx context.Context) error {
-	dstAddr := u.remote.Remote()
 	const maxMTU = 9012
 	buff := make([]byte, maxMTU)
 	for !isDone(ctx) {
@@ -102,7 +100,10 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		}
 		//send over channel, including source address
 		b := buff[:n]
-		if err := uc.encode(addr.String(), dstAddr, b); err != nil {
+		if err := uc.encode(addr.String(), b); err != nil {
+			if strings.HasSuffix(err.Error(), "EOF") {
+				continue //dropped packet...
+			}
 			return u.Errorf("encode error: %w", err)
 		}
 		//stats
@@ -158,7 +159,8 @@ func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 	}
 	//ssh request for udp packets for this proxy's remote,
 	//just "udp" since the remote address is sent with each packet
-	rwc, reqs, err := sshConn.OpenChannel("chisel", []byte("udp"))
+	dstAddr := u.remote.Remote() + "/udp"
+	rwc, reqs, err := sshConn.OpenChannel("chisel", []byte(dstAddr))
 	if err != nil {
 		return nil, fmt.Errorf("ssh-chan error: %s", err)
 	}

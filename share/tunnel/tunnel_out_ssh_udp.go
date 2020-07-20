@@ -6,22 +6,23 @@ import (
 	"net"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/jpillora/chisel/share/cio"
 )
 
-func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
+func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort string) error {
 	h := &udpHandler{
-		Logger: l,
+		Logger:   l,
+		hostPort: hostPort,
 		udpChannel: &udpChannel{
 			r: gob.NewDecoder(rwc),
 			w: gob.NewEncoder(rwc),
 			c: rwc,
 		},
 		udpConns: &udpConns{
-			m: map[string]*udpConn{},
+			Logger: l,
+			m:      map[string]*udpConn{},
 		},
 	}
 	for {
@@ -34,9 +35,9 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
 
 type udpHandler struct {
 	*cio.Logger
+	hostPort string
 	*udpChannel
 	*udpConns
-	sent, recv int64
 }
 
 func (h *udpHandler) handleWrite(p *udpPacket) error {
@@ -44,7 +45,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 		return err
 	}
 	//dial now, we know we must write
-	conn, exists, err := h.udpConns.dial(p.Src, p.Dst)
+	conn, exists, err := h.udpConns.dial(p.Src, h.hostPort)
 	if err != nil {
 		return err
 	}
@@ -63,12 +64,10 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 			h.Debugf("exceeded max udp connections (%d)", maxConns)
 		}
 	}
-	n, err := conn.Write(p.Payload)
+	_, err = conn.Write(p.Payload)
 	if err != nil {
 		return err
 	}
-	//stats
-	atomic.AddInt64(&h.sent, int64(n))
 	return nil
 }
 
@@ -92,17 +91,16 @@ func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 		}
 		b := buff[:n]
 		//encode back over ssh connection
-		err = h.udpChannel.encode(p.Src, p.Dst, b)
+		err = h.udpChannel.encode(p.Src, b)
 		if err != nil {
 			h.Debugf("encode error: %s", err)
 			return
 		}
-		//stats
-		atomic.AddInt64(&h.recv, int64(n))
 	}
 }
 
 type udpConns struct {
+	*cio.Logger
 	sync.Mutex
 	m map[string]*udpConn
 }
@@ -118,9 +116,8 @@ func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
 		}
 		conn = &udpConn{
 			id:   id,
-			Conn: c,
+			Conn: c, // cnet.MeterConn(cs.Logger.Fork(addr), c),
 		}
-		conn.Conn = c
 		cs.m[id] = conn
 	}
 	return conn, ok, nil

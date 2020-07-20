@@ -16,12 +16,12 @@ func Pipe(src io.ReadWriteCloser, dst io.ReadWriteCloser) (int64, int64) {
 	}
 	wg.Add(2)
 	go func() {
-		received, _ = io.Copy(src, pipeVis("send", dst))
+		received, _ = io.Copy(src, dst)
 		o.Do(close)
 		wg.Done()
 	}()
 	go func() {
-		sent, _ = io.Copy(dst, pipeVis("recv", src))
+		sent, _ = io.Copy(dst, src)
 		o.Do(close)
 		wg.Done()
 	}()

@@ -49,7 +49,7 @@ type Client struct {
 	sshConfig *ssh.ClientConfig
 	proxyURL  *url.URL
 	server    string
-	connStats cnet.ConnStats
+	connCount cnet.ConnCount
 	stop      func()
 	eg        *errgroup.Group
 	tunnel    *tunnel.Tunnel

@@ -23,7 +23,7 @@ type (
 	Users      = settings.Users
 	UserIndex  = settings.UserIndex
 	HTTPServer = cnet.HTTPServer
-	ConnStats  = cnet.ConnStats
+	ConnStats  = cnet.ConnCount
 	Logger     = cio.Logger
 	TCPProxy   = tunnel.Proxy
 )
