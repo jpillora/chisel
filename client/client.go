@@ -2,9 +2,12 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -38,7 +41,13 @@ type Config struct {
 	Proxy            string
 	Remotes          []string
 	Headers          http.Header
+	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+}
+
+type TLSConfig struct {
+	SkipVerify bool
+	CA         string
 }
 
 //Client represents a client instance
@@ -47,6 +56,7 @@ type Client struct {
 	config    *Config
 	computed  settings.Config
 	sshConfig *ssh.ClientConfig
+	tlsConfig *tls.Config
 	proxyURL  *url.URL
 	server    string
 	connCount cnet.ConnCount
@@ -68,16 +78,16 @@ func NewClient(c *Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	//swap to websockets scheme
+	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	//apply default port
 	if !regexp.MustCompile(`:\d+$`).MatchString(u.Host) {
-		if u.Scheme == "https" || u.Scheme == "wss" {
+		if u.Scheme == "wss" {
 			u.Host = u.Host + ":443"
 		} else {
 			u.Host = u.Host + ":80"
 		}
 	}
-	//swap to websockets scheme
-	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	hasReverse := false
 	hasSocks := false
 	hasStdio := false
@@ -87,8 +97,31 @@ func NewClient(c *Config) (*Client, error) {
 		computed: settings.Config{
 			Version: chshare.BuildVersion,
 		},
-		server: u.String(),
+		server:    u.String(),
+		tlsConfig: nil,
 	}
+	//set default log level
+	client.Logger.Info = true
+	//configure tls
+	if u.Scheme == "wss" {
+		tc := &tls.Config{}
+		if c.TLS.SkipVerify {
+			client.Infof("TLS verification disabled")
+			tc.InsecureSkipVerify = true
+		} else if c.TLS.CA != "" {
+			rootCAs := x509.NewCertPool()
+			if b, err := ioutil.ReadFile(c.TLS.CA); err != nil {
+				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
+			} else if ok := rootCAs.AppendCertsFromPEM(b); !ok {
+				return nil, fmt.Errorf("Failed to decode PEM: %s", c.TLS.CA)
+			} else {
+				client.Infof("TLS verification using CA %s", c.TLS.CA)
+				tc.RootCAs = rootCAs
+			}
+		}
+		client.tlsConfig = tc
+	}
+	//validate remotes
 	for _, s := range c.Remotes {
 		r, err := settings.DecodeRemote(s)
 		if err != nil {
@@ -112,8 +145,6 @@ func NewClient(c *Config) (*Client, error) {
 		}
 		client.computed.Remotes = append(client.computed.Remotes, r)
 	}
-	//set default log level
-	client.Logger.Info = true
 	//outbound proxy
 	if p := c.Proxy; p != "" {
 		client.proxyURL, err = url.Parse(p)
@@ -241,6 +272,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	d := websocket.Dialer{
 		HandshakeTimeout: 45 * time.Second,
 		Subprotocols:     []string{chshare.ProtocolVersion},
+		TLSClientConfig:  c.tlsConfig,
 	}
 	//optional proxy
 	if p := c.proxyURL; p != nil {

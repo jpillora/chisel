@@ -354,6 +354,18 @@ var clientHelp = `
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
+
+    --tls-ca, An optional root certificate bundle used to verify the
+    chisel server. Only valid when connecting to the server with
+    "https" or "wss". By default, the operating system CAs will be used.
+
+    --tls-skip-verify, Skip server TLS certificate verification of
+    chain and host name (if TLS is used for transport connections to
+    server). If set, client accepts any TLS certificate presented by
+    the server and any host name in that certificate. This only affects
+    transport https (wss) connection. Chisel server's public key
+    may be still verified (see --fingerprint) after inner connection
+    is established.
 ` + commonHelp
 
 func client(args []string) {
@@ -365,6 +377,8 @@ func client(args []string) {
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
+	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")

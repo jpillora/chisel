@@ -226,9 +226,9 @@ func (r Remote) UserAddr() string {
 
 //CanListen checks if the port can be listened on
 func (r Remote) CanListen() bool {
+	//valid protocols
 	switch r.LocalProto {
 	case "tcp":
-		//valid
 		conn, err := net.Listen("tcp", r.Local())
 		if err == nil {
 			conn.Close()

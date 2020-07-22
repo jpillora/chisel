@@ -86,7 +86,7 @@ func NewUserIndex(logger *cio.Logger) *UserIndex {
 // LoadUsers is responsible for loading users from a file
 func (u *UserIndex) LoadUsers(configFile string) error {
 	u.configFile = configFile
-	u.Infof("Loading the configuraion from: %s", configFile)
+	u.Infof("Loading configuration file %s", configFile)
 	if err := u.loadUserIndex(); err != nil {
 		return err
 	}
