@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"regexp"
 	"sync"
 
@@ -103,15 +102,11 @@ func (u *UserIndex) addWatchEvents() error {
 	if err != nil {
 		return err
 	}
-	configDir := filepath.Dir(u.configFile)
-	if err := watcher.Add(configDir); err != nil {
+	if err := watcher.Add(u.configFile); err != nil {
 		return err
 	}
 	go func() {
 		for e := range watcher.Events {
-			if e.Name != u.configFile {
-				continue
-			}
 			if e.Op&fsnotify.Write != fsnotify.Write {
 				continue
 			}
