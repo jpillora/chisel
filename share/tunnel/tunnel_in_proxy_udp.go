@@ -13,6 +13,7 @@ import (
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -59,6 +60,7 @@ type udpListener struct {
 }
 
 func (u *udpListener) run(ctx context.Context) error {
+	defer u.inbound.Close()
 	//udp doesnt accept connections,
 	//udp simply forwards packets
 	//and therefore only needs to listen
@@ -73,7 +75,7 @@ func (u *udpListener) run(ctx context.Context) error {
 		u.Debugf("listen: %s", err)
 		return err
 	}
-	u.Debugf("sent %d, received %d", u.sent, u.recv)
+	u.Debugf("Close (sent %s received %s)", sizestr.ToString(u.sent), sizestr.ToString(u.recv))
 	return nil
 }
 

@@ -106,6 +106,10 @@ func NewClient(c *Config) (*Client, error) {
 			}
 			hasStdio = true
 		}
+		//confirm non-reverse tunnel is available
+		if !r.Reverse && !r.CanListen() {
+			return nil, fmt.Errorf("Remote %s cannot listen", r.String())
+		}
 		client.computed.Remotes = append(client.computed.Remotes, r)
 	}
 	//set default log level

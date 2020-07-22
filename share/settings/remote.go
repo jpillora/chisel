@@ -2,6 +2,7 @@ package settings
 
 import (
 	"errors"
+	"net"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -221,6 +222,33 @@ func (r Remote) UserAddr() string {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
 	}
 	return r.RemoteHost + ":" + r.RemotePort
+}
+
+//CanListen checks if the port can be listened on
+func (r Remote) CanListen() bool {
+	switch r.LocalProto {
+	case "tcp":
+		//valid
+		conn, err := net.Listen("tcp", r.Local())
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		return false
+	case "udp":
+		addr, err := net.ResolveUDPAddr("udp", r.Local())
+		if err != nil {
+			return false
+		}
+		conn, err := net.ListenUDP(r.LocalProto, addr)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		return false
+	}
+	//invalid
+	return false
 }
 
 type Remotes []*Remote

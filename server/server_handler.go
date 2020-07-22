@@ -109,23 +109,27 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		l.Infof("Client version (%s) differs from server version (%s)",
 			v, chshare.BuildVersion)
 	}
-	//confirm reverse tunnels are allowed
+	//validate remotes
 	for _, r := range c.Remotes {
-		if r.Reverse && !s.config.Reverse {
-			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
-			failed(s.Errorf("Reverse port forwaring not enabled on server"))
-			return
-		}
-	}
-	//if user is provided, ensure they have
-	//access to the desired remotes
-	if user != nil {
-		for _, r := range c.Remotes {
+		//if user is provided, ensure they have
+		//access to the desired remotes
+		if user != nil {
 			addr := r.UserAddr()
 			if !user.HasAccess(addr) {
 				failed(s.Errorf("access to '%s' denied", addr))
 				return
 			}
+		}
+		//confirm reverse tunnels are allowed
+		if r.Reverse && !s.config.Reverse {
+			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
+			failed(s.Errorf("Reverse port forwaring not enabled on server"))
+			return
+		}
+		//confirm reverse tunnel is available
+		if r.Reverse && !r.CanListen() {
+			failed(s.Errorf("Remote %s cannot listen", r.String()))
+			return
 		}
 	}
 	//successfuly validated config!
