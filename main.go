@@ -141,6 +141,22 @@ var serverHelp = `
 
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
+
+    --tls-key, Enables TLS and provides optional path to a PEM-encoded
+    TLS private key. When this flag is set, you must also set --tls-cert,
+    and you cannot set --tls-domain.
+
+    --tls-cert, Enables TLS and provides optional path to a PEM-encoded
+    TLS certificate. When this flag is set, you must also set --tls-key,
+    and you cannot set --tls-domain.
+
+    --tls-domain, Enables TLS and automatically acquires a TLS key and
+    certificate using LetsEncypt. Setting --tls-domain requires port 443.
+    You may specify multiple --tls-domain flags to serve multiple domains.
+    The resulting files are cached in the "$HOME/.cache/chisel" directory.
+    You can modify this path by setting the CHISEL_LE_CACHE variable,
+    or disable caching by setting this variable to "-". You can optionally
+    provide a certificate notification email by setting CHISEL_LE_EMAIL.
 ` + commonHelp
 
 func server(args []string) {
@@ -155,6 +171,9 @@ func server(args []string) {
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
+	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
+	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
+	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -202,6 +221,19 @@ func server(args []string) {
 	if err := s.Wait(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+type multiFlag struct {
+	values *[]string
+}
+
+func (flag multiFlag) String() string {
+	return strings.Join(*flag.values, ", ")
+}
+
+func (flag multiFlag) Set(arg string) error {
+	*flag.values = append(*flag.values, arg)
+	return nil
 }
 
 type headerFlags struct {

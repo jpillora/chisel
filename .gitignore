@@ -4,6 +4,7 @@
 chisel
 bin/
 release/
+tmp/
 *.orig
 debug
 

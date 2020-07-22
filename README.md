@@ -74,7 +74,7 @@ $ chisel --help
 
   Usage: chisel [command] [--help]
 
-  Version: 0.0.0-src (go1.14.3)
+  Version: 0.0.0-src (go1.14.5)
 
   Commands:
     server - runs chisel in server mode
@@ -140,6 +140,22 @@ $ chisel server --help
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
+    --tls-key, Enables TLS and provides optional path to a PEM-encoded
+    TLS private key. When this flag is set, you must also set --tls-cert,
+    and you cannot set --tls-domain.
+
+    --tls-cert, Enables TLS and provides optional path to a PEM-encoded
+    TLS certificate. When this flag is set, you must also set --tls-key,
+    and you cannot set --tls-domain.
+
+    --tls-domain, Enables TLS and automatically acquires a TLS key and
+    certificate using LetsEncypt. Setting --tls-domain requires port 443.
+    You may specify multiple --tls-domain flags to serve multiple domains.
+    The resulting files are cached in the "$HOME/.cache/chisel" directory.
+    You can modify this path by setting the CHISEL_LE_CACHE variable,
+    or disable caching by setting this variable to "-". You can optionally
+    provide a certificate notification email by setting CHISEL_LE_EMAIL.
+
     --pid Generate pid file in current working directory
 
     -v, Enable verbose logging
@@ -152,7 +168,7 @@ $ chisel server --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14.3)
+    0.0.0-src (go1.14.5)
 
   Read more:
     https://github.com/jpillora/chisel
@@ -269,7 +285,7 @@ $ chisel client --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14.3)
+    0.0.0-src (go1.14.5)
 
   Read more:
     https://github.com/jpillora/chisel

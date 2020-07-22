@@ -39,6 +39,13 @@ func (h *HTTPServer) GoListenAndServeContext(ctx context.Context, addr string, h
 	if err != nil {
 		return err
 	}
+	return h.GoServe(ctx, l, handler)
+}
+
+func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.Handler) error {
+	if ctx == nil {
+		return errors.New("ctx must be set")
+	}
 	h.Handler = handler
 	h.serving = true
 	h.waiter, ctx = errgroup.WithContext(ctx)

@@ -6,6 +6,8 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w -X github.com/jpillora/chisel/share.BuildVersion={{.Version}}
+    flags:
+      - -trimpath
     goos:
       - linux
       - darwin

@@ -29,6 +29,7 @@ type Config struct {
 	Socks5    bool
 	Reverse   bool
 	KeepAlive time.Duration
+	TLS       TLSConfig
 }
 
 // Server respresent a chisel service
@@ -137,14 +138,17 @@ func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	if s.reverseProxy != nil {
 		s.Infof("Reverse proxy enabled")
 	}
-	s.Infof("Listening on %s:%s...", host, port)
+	l, err := s.listener(host, port)
+	if err != nil {
+		return err
+	}
 	h := http.Handler(http.HandlerFunc(s.handleClientHandler))
 	if s.Debug {
 		o := requestlog.DefaultOptions
 		o.TrustProxy = true
 		h = requestlog.WrapWith(h, o)
 	}
-	return s.httpServer.GoListenAndServeContext(ctx, host+":"+port, h)
+	return s.httpServer.GoServe(ctx, l, h)
 }
 
 // Wait waits for the http server to close
