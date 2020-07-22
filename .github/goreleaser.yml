@@ -9,6 +9,7 @@ builds:
     flags:
       - -trimpath
     goos:
+      - android
       - linux
       - darwin
       - windows
