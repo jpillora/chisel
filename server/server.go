@@ -203,3 +203,9 @@ func (s *Server) AddUser(user, pass string, addrs ...string) error {
 func (s *Server) DeleteUser(user string) {
 	s.users.Del(user)
 }
+
+// ResetUsers in the server user index.
+// Use nil to remove all.
+func (s *Server) ResetUsers(users []*settings.User) {
+	s.users.Reset(users)
+}

@@ -45,16 +45,28 @@ func (u *Users) Set(key string, user *User) {
 	u.Unlock()
 }
 
-// Delete a users from the list
+// Del ete a users from the list
 func (u *Users) Del(key string) {
 	u.Lock()
 	delete(u.inner, key)
 	u.Unlock()
 }
 
-// AddUser adds a users to the list
+// AddUser adds a users to the set
 func (u *Users) AddUser(user *User) {
 	u.Set(user.Name, user)
+}
+
+// Reset all users to the given set,
+// Use nil to remove all.
+func (u *Users) Reset(users []*User) {
+	m := map[string]*User{}
+	for _, u := range users {
+		m[u.Name] = u
+	}
+	u.Lock()
+	u.inner = m
+	u.Unlock()
 }
 
 // UserIndex is a reloadable user source
@@ -147,11 +159,6 @@ func (u *UserIndex) loadUserIndex() error {
 		users = append(users, user)
 	}
 	//swap
-	u.RWMutex.Lock()
-	u.inner = map[string]*User{}
-	u.RWMutex.Unlock()
-	for _, user := range users {
-		u.AddUser(user)
-	}
+	u.Reset(users)
 	return nil
 }
