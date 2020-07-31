@@ -16,6 +16,7 @@ import (
 	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cos"
+	ps "github.com/mitchellh/go-ps"
 )
 
 var help = `
@@ -66,7 +67,9 @@ func main() {
 }
 
 var commonHelp = `
-    --pid Generate pid file in current working directory
+    --pid, Generate pid file in current working directory
+
+    --watch-parent, Process will exit if the parent process exits.
 
     -v, Enable verbose logging
 
@@ -89,6 +92,17 @@ func generatePidFile() {
 	pid := []byte(strconv.Itoa(os.Getpid()))
 	if err := ioutil.WriteFile("chisel.pid", pid, 0644); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func exitIfParentPidNotFound() {
+	parentPid := os.Getppid()
+	for {
+		time.Sleep(5 * time.Second)
+		parentProcess, _ := ps.FindProcess(parentPid)
+		if parentProcess == nil {
+			os.Exit(1)
+		}
 	}
 }
 
@@ -180,6 +194,7 @@ func server(args []string) {
 	port := flags.String("port", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	watchParent := flags.Bool("watch-parent", false, "")
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
@@ -212,6 +227,9 @@ func server(args []string) {
 	s.Debug = *verbose
 	if *pid {
 		generatePidFile()
+	}
+	if *watchParent {
+		go exitIfParentPidNotFound()
 	}
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
@@ -383,6 +401,7 @@ func client(args []string) {
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	watchParent := flags.Bool("watch-parent", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(1)
@@ -411,6 +430,9 @@ func client(args []string) {
 	c.Debug = *verbose
 	if *pid {
 		generatePidFile()
+	}
+	if *watchParent {
+		go exitIfParentPidNotFound()
 	}
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
