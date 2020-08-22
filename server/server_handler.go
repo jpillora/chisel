@@ -149,8 +149,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	})
 	eg.Go(func() error {
-		//connected, setup reversed-remotes
+		//connected, setup reversed-remotes?
 		serverInbound := c.Remotes.Reversed(true)
+		if len(serverInbound) == 0 {
+			return nil
+		}
+		//block
 		return tunnel.BindRemotes(ctx, serverInbound)
 	})
 	err = eg.Wait()

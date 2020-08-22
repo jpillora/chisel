@@ -25,8 +25,11 @@ type testLayout struct {
 	udpServer  bool
 }
 
-func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown context.CancelFunc) {
-	ctx, teardown := context.WithCancel(context.Background())
+func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown func()) {
+	//start of the world
+	// goroutines := runtime.NumGoroutine()
+	//root cancel
+	ctx, cancel := context.WithCancel(context.Background())
 	//fileserver (fake endpoint)
 	filePort := availablePort()
 	if tl.fileServer {
@@ -44,7 +47,7 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		log.Printf("fileserver: listening on %s", fileAddr)
 		go func() {
 			f.Serve(fl)
-			teardown()
+			cancel()
 		}()
 		go func() {
 			<-ctx.Done()
@@ -64,7 +67,7 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	go func() {
 		server.Wait()
 		server.Infof("Closed")
-		teardown()
+		cancel()
 	}()
 	//client (with defaults)
 	tl.client.Fingerprint = server.GetFingerprint()
@@ -86,8 +89,22 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	go func() {
 		client.Wait()
 		client.Infof("Closed")
-		teardown()
+		cancel()
 	}()
+	//cancel context tree, and wait for both client and server to stop
+	teardown = func() {
+		cancel()
+		server.Wait()
+		client.Wait()
+		//confirm goroutines have been cleaned up
+		// time.Sleep(1 * time.Second)
+		//TODO remove sleep
+		// d := runtime.NumGoroutine() - goroutines
+		// if d != 0 {
+		// 	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+		// 	t.Fatalf("goroutines left %d", d)
+		// }
+	}
 	//wait a bit...
 	//TODO: client signal API, similar to os.Notify(signal)
 	//      wait for client setup

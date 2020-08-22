@@ -30,7 +30,7 @@ func TestUDP(t *testing.T) {
 		},
 	)
 	defer teardown()
-	//fake udp server, read and echo back twice, close
+	//fake udp server, read and echo back duplicated, close
 	eg := errgroup.Group{}
 	eg.Go(func() error {
 		defer l.Close()

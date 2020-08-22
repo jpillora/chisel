@@ -109,6 +109,7 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				//listener closed
+				err = nil
 			default:
 				p.Infof("Accept error: %s", err)
 			}

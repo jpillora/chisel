@@ -132,7 +132,7 @@ var serverHelp = `
     specify a time with a unit, for example '5s' or '2m'. Defaults
     to '25s' (set to 0s to disable).
 
-    --proxy, Specifies another HTTP server to proxy requests to when
+    --backend, Specifies another HTTP server to proxy requests to when
     chisel receives a normal HTTP request. Useful for hiding chisel in
     plain sight.
 
@@ -169,6 +169,7 @@ func server(args []string) {
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
+	flags.StringVar(&config.Proxy, "backend", "", "")
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
