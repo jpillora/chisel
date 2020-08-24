@@ -2,7 +2,9 @@ package chserver
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -13,9 +15,10 @@ import (
 
 //TLSConfig enables configures TLS
 type TLSConfig struct {
-	Key     string
-	Cert    string
-	Domains []string
+	Key       string
+	Cert      string
+	Domains   []string
+	MtlsCaDir string
 }
 
 func (s *Server) listener(host, port string) (net.Listener, error) {
@@ -30,7 +33,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	}
 	extra := ""
 	if hasKeyCert {
-		c, err := tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert)
+		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert, s.config.TLS.MtlsCaDir)
 		if err != nil {
 			return nil, err
 		}
@@ -82,13 +85,41 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 	return m.TLSConfig()
 }
 
-func tlsKeyCert(key, cert string) (*tls.Config, error) {
+func (s *Server) tlsKeyCert(key, cert string, clientCaPath string) (*tls.Config, error) {
 	c, err := tls.LoadX509KeyPair(cert, key)
 	if err != nil {
 		return nil, err
 	}
-	//return file based tls config using tls defaults
-	return &tls.Config{
-		Certificates: []tls.Certificate{c},
-	}, nil
+	//mTLS requires Client CAs
+	if clientCaPath != "" {
+		files, err := ioutil.ReadDir(clientCaPath)
+		if err != nil {
+			return nil, err
+		}
+		s.Infof("Looking for client CA files from %s", clientCaPath)
+		clientCAPool := x509.NewCertPool()
+		//add all cert files from path
+		for _, file := range files {
+			f := file.Name()
+			content, err := ioutil.ReadFile(filepath.Join(clientCaPath, f))
+			if err == nil {
+				if clientCAPool.AppendCertsFromPEM(content) {
+					s.Infof("Add client CA file %s", f)
+				} else {
+					s.Errorf("Fail to add client CA file %s", f)
+				}
+			}
+		}
+		//return file based tls config with client CAs and cert verification enabled
+		return &tls.Config{
+			Certificates: []tls.Certificate{c},
+			ClientCAs:    clientCAPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+		}, nil
+	} else {
+		//return file based tls config using tls defaults
+		return &tls.Config{
+			Certificates: []tls.Certificate{c},
+		}, nil
+	}
 }

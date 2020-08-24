@@ -157,6 +157,11 @@ var serverHelp = `
     You can modify this path by setting the CHISEL_LE_CACHE variable,
     or disable caching by setting this variable to "-". You can optionally
     provide a certificate notification email by setting CHISEL_LE_EMAIL.
+
+    --tls-mtls-ca-dir, for mTLS support only. Specify the path to load 
+    all self signed client certificates and trusted CAs in PEM-encoded 
+    format. For trusted CAs, any client certificates signed by these CAs 
+    consider to be allowed.
 ` + commonHelp
 
 func server(args []string) {
@@ -175,6 +180,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
+	flags.StringVar(&config.TLS.MtlsCaDir, "tls-mtls-ca-dir", "", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -367,6 +373,12 @@ var clientHelp = `
     transport https (wss) connection. Chisel server's public key
     may be still verified (see --fingerprint) after inner connection
     is established.
+
+    --tls-mtls-clicrt, for mTLS support only. PEM-encoded client certificate
+    for mTLS authentication.
+
+    --tls-mtls-clikey, for mTLS support only. PEM-encoded client key for
+    mTLS authentication.
 ` + commonHelp
 
 func client(args []string) {
@@ -380,6 +392,8 @@ func client(args []string) {
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
+	flags.StringVar(&config.TLS.MtlsCliCrt, "tls-mtls-clicrt", "", "")
+	flags.StringVar(&config.TLS.MtlsCliKey, "tls-mtls-clikey", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")
