@@ -138,8 +138,8 @@ func NewClient(c *Config) (*Client, error) {
 			hasStdio = true
 		}
 		//confirm non-reverse tunnel is available
-		if !r.Reverse && !r.CanListen() {
-			return nil, fmt.Errorf("Remote %s cannot listen", r.String())
+		if !r.Reverse && !r.Stdio && !r.CanListen() {
+			return nil, fmt.Errorf("Client cannot listen on %s", r.String())
 		}
 		client.computed.Remotes = append(client.computed.Remotes, r)
 	}

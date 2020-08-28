@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -29,8 +30,8 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		//connection error
 		attempt := int(b.Attempt())
 		maxAttempt := c.config.MaxRetryCount
-		if err != nil {
-			//show error and attempt counts
+		//show error message and attempt counts (excluding disconnects)
+		if err != nil && err != io.EOF && !strings.HasSuffix(err.Error(), "use of closed network connection") {
 			msg := fmt.Sprintf("Connection error: %s", err)
 			if attempt > 0 {
 				msg += fmt.Sprintf(" (Attempt: %d", attempt)

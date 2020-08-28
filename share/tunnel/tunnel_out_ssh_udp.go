@@ -12,6 +12,11 @@ import (
 )
 
 func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort string) error {
+	conns := &udpConns{
+		Logger: l,
+		m:      map[string]*udpConn{},
+	}
+	defer conns.closeAll()
 	h := &udpHandler{
 		Logger:   l,
 		hostPort: hostPort,
@@ -20,10 +25,7 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort strin
 			w: gob.NewEncoder(rwc),
 			c: rwc,
 		},
-		udpConns: &udpConns{
-			Logger: l,
-			m:      map[string]*udpConn{},
-		},
+		udpConns: conns,
 	}
 	for {
 		p := udpPacket{}
@@ -133,6 +135,15 @@ func (cs *udpConns) len() int {
 func (cs *udpConns) remove(id string) {
 	cs.Lock()
 	delete(cs.m, id)
+	cs.Unlock()
+}
+
+func (cs *udpConns) closeAll() {
+	cs.Lock()
+	for id, conn := range cs.m {
+		conn.Close()
+		delete(cs.m, id)
+	}
 	cs.Unlock()
 }
 

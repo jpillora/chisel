@@ -6,6 +6,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +30,7 @@ type testLayout struct {
 
 func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown func()) {
 	//start of the world
-	// goroutines := runtime.NumGoroutine()
+	goroutines := runtime.NumGoroutine()
 	//root cancel
 	ctx, cancel := context.WithCancel(context.Background())
 	//fileserver (fake endpoint)
@@ -97,13 +100,13 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		server.Wait()
 		client.Wait()
 		//confirm goroutines have been cleaned up
-		// time.Sleep(1 * time.Second)
-		//TODO remove sleep
-		// d := runtime.NumGoroutine() - goroutines
-		// if d != 0 {
-		// 	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
-		// 	t.Fatalf("goroutines left %d", d)
-		// }
+		time.Sleep(500 * time.Millisecond)
+		// TODO remove sleep
+		d := runtime.NumGoroutine() - goroutines
+		if d != 0 {
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+			t.Fatalf("goroutines left %d", d)
+		}
 	}
 	//wait a bit...
 	//TODO: client signal API, similar to os.Notify(signal)

@@ -128,7 +128,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		}
 		//confirm reverse tunnel is available
 		if r.Reverse && !r.CanListen() {
-			failed(s.Errorf("Remote %s cannot listen", r.String()))
+			failed(s.Errorf("Server cannot listen on %s", r.String()))
 			return
 		}
 	}
