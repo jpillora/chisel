@@ -46,8 +46,8 @@ type Config struct {
 type TLSConfig struct {
 	SkipVerify bool
 	CA         string
-	MtlsCliCrt string
-	MtlsCliKey string
+	Cert       string
+	Key        string
 }
 
 //Client represents a client instance
@@ -120,15 +120,13 @@ func NewClient(c *Config) (*Client, error) {
 			}
 		}
 		//Specify client cert and key pair
-		if c.TLS.MtlsCliCrt != "" && c.TLS.MtlsCliKey != "" {
-			tc.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-				c, err := tls.LoadX509KeyPair(c.TLS.MtlsCliCrt, c.TLS.MtlsCliKey)
-				if err != nil {
-					return nil, fmt.Errorf("Error loading client cert and key pair: %v", err)
-				}
-				return &c, nil
+		if c.TLS.Cert != "" && c.TLS.Key != "" {
+			c, err := tls.LoadX509KeyPair(c.TLS.Cert, c.TLS.Key)
+			if err != nil {
+				return nil, fmt.Errorf("Error loading client cert and key pair: %v", err)
 			}
-		} else if c.TLS.MtlsCliCrt != "" || c.TLS.MtlsCliKey != "" {
+			tc.Certificates = []tls.Certificate{c}
+		} else if c.TLS.Cert != "" || c.TLS.Key != "" {
 			return nil, fmt.Errorf("Please specify client cert and key pair BOTH")
 		}
 		client.tlsConfig = tc

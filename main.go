@@ -158,10 +158,10 @@ var serverHelp = `
     or disable caching by setting this variable to "-". You can optionally
     provide a certificate notification email by setting CHISEL_LE_EMAIL.
 
-    --tls-mtls-ca-dir, for mTLS support only. Specify the path to load 
-    all self signed client certificates and trusted CAs in PEM-encoded 
-    format. For trusted CAs, any client certificates signed by these CAs 
-    consider to be allowed.
+    --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
+    holding multiple PEM encode CA certificate bundle files, which is used to 
+    validate client connections. The provided CA certificates will be used 
+    instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
 func server(args []string) {
@@ -180,7 +180,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
-	flags.StringVar(&config.TLS.MtlsCaDir, "tls-mtls-ca-dir", "", "")
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -374,11 +374,12 @@ var clientHelp = `
     may be still verified (see --fingerprint) after inner connection
     is established.
 
-    --tls-mtls-clicrt, for mTLS support only. PEM-encoded client certificate
-    for mTLS authentication.
+    --tls-key, a path to a PEM encoded private key used for client 
+    authentication (mutual-TLS).
 
-    --tls-mtls-clikey, for mTLS support only. PEM-encoded client key for
-    mTLS authentication.
+    --tls-cert, a path to a PEM encoded certificate matching the provided 
+    private key. The certificate must have client authentication 
+    enabled (mutual-TLS).
 ` + commonHelp
 
 func client(args []string) {
@@ -392,8 +393,8 @@ func client(args []string) {
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
-	flags.StringVar(&config.TLS.MtlsCliCrt, "tls-mtls-clicrt", "", "")
-	flags.StringVar(&config.TLS.MtlsCliKey, "tls-mtls-clikey", "", "")
+	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
+	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")
