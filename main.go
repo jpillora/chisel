@@ -157,6 +157,11 @@ var serverHelp = `
     You can modify this path by setting the CHISEL_LE_CACHE variable,
     or disable caching by setting this variable to "-". You can optionally
     provide a certificate notification email by setting CHISEL_LE_EMAIL.
+
+    --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
+    holding multiple PEM encode CA certificate bundle files, which is used to 
+    validate client connections. The provided CA certificates will be used 
+    instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
 func server(args []string) {
@@ -175,6 +180,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -367,6 +373,13 @@ var clientHelp = `
     transport https (wss) connection. Chisel server's public key
     may be still verified (see --fingerprint) after inner connection
     is established.
+
+    --tls-key, a path to a PEM encoded private key used for client 
+    authentication (mutual-TLS).
+
+    --tls-cert, a path to a PEM encoded certificate matching the provided 
+    private key. The certificate must have client authentication 
+    enabled (mutual-TLS).
 ` + commonHelp
 
 func client(args []string) {
@@ -380,6 +393,8 @@ func client(args []string) {
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
+	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
+	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")

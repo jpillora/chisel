@@ -74,7 +74,12 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	}()
 	//client (with defaults)
 	tl.client.Fingerprint = server.GetFingerprint()
-	tl.client.Server = "http://127.0.0.1:" + port
+	if tl.server.TLS.Key != "" {
+		//the domain name has to be localhost to match the ssl cert
+		tl.client.Server = "https://localhost:" + port
+	} else {
+		tl.client.Server = "http://127.0.0.1:" + port
+	}
 	for i, r := range tl.client.Remotes {
 		//convert $FILEPORT into the allocated port for this test case
 		if tl.fileServer {
