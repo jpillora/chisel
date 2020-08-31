@@ -38,7 +38,7 @@ type Tunnel struct {
 	Config
 	//ssh connection
 	activeConnMut  sync.RWMutex
-	activatingConn sync.WaitGroup
+	activatingConn waitGroup
 	activeConn     ssh.Conn
 	//proxies
 	proxyCount int
@@ -76,13 +76,7 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 		if c.Close() == nil {
 			t.Debugf("SSH cancelled")
 		}
-		t.activeConnMut.Lock()
-		set := t.activeConn != nil
-		t.activeConnMut.Unlock()
-		if !set {
-			//unblock waiters, they'll get nil
-			t.activatingConn.Done()
-		}
+		t.activatingConn.DoneAll()
 	}()
 	//mark active and unblock
 	t.activeConnMut.Lock()
