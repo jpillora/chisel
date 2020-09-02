@@ -38,8 +38,8 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 			return nil, err
 		}
 		tlsConf = c
-		if port != "443" {
-			extra = " (WARNING: lets-encrypt must connect to your domains on port 443)"
+		if port != "443" && hasDomains {
+			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
 		}
 	}
 	//tcp listen
