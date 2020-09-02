@@ -7,7 +7,7 @@ import (
 	chserver "github.com/jpillora/chisel/server"
 )
 
-func TestTls(t *testing.T) {
+func TestTLS(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
@@ -21,7 +21,6 @@ func TestTls(t *testing.T) {
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 			TLS: chclient.TLSConfig{
-				SkipVerify: false,
 				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
 				CA:   "tls/client-ca/server.crt",
 				Cert: "tls/client-crt/client.crt",
@@ -40,21 +39,20 @@ func TestTls(t *testing.T) {
 	}
 }
 
-func TestTlsMitiCAs(t *testing.T) {
+func TestMTLS(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
 			TLS: chserver.TLSConfig{
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
 				CA:   "tls/server-ca",
+				Cert: "tls/server-crt/server.crt",
+				Key:  "tls/server-crt/server.key",
 			},
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 			TLS: chclient.TLSConfig{
-				SkipVerify: false,
 				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
 				CA:   "tls/client-ca/server.crt",
 				Cert: "tls/client-crt/client.crt",
@@ -73,22 +71,21 @@ func TestTlsMitiCAs(t *testing.T) {
 	}
 }
 
-func TestTlsMissingClientCert(t *testing.T) {
+func TestTLSMissingClientCert(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
 			TLS: chserver.TLSConfig{
+				CA:   "tls/server-ca/client.crt",
 				Cert: "tls/server-crt/server.crt",
 				Key:  "tls/server-crt/server.key",
-				CA:   "tls/server-ca/client.crt",
 			},
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 			TLS: chclient.TLSConfig{
-				SkipVerify: false,
-				CA:         "tls/client-ca/server.crt",
+				CA: "tls/client-ca/server.crt",
 				//provide no client cert, server should reject the client request
 				//Cert: "tls/client-crt/client.crt",
 				//Key:  "tls/client-crt/client.key",
@@ -103,23 +100,22 @@ func TestTlsMissingClientCert(t *testing.T) {
 	}
 }
 
-func TestTlsMissingClientCA(t *testing.T) {
+func TestTLSMissingClientCA(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
 			TLS: chserver.TLSConfig{
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
 				//specify a CA which does not match the client cert
 				//server should reject the client request
-				CA: "tls/server-crt/server.crt",
+				CA:   "tls/server-crt/server.crt",
+				Cert: "tls/server-crt/server.crt",
+				Key:  "tls/server-crt/server.key",
 			},
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 			TLS: chclient.TLSConfig{
-				SkipVerify: false,
 				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
 				CA:   "tls/client-ca/server.crt",
 				Cert: "tls/client-crt/client.crt",

@@ -4,12 +4,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"golang.org/x/crypto/acme/autocert"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
+
+	"golang.org/x/crypto/acme/autocert"
 )
 
 //TLSConfig enables configures TLS
@@ -84,55 +85,63 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 	return m.TLSConfig()
 }
 
-func (s *Server) tlsKeyCert(key, cert string, clientCaPath string) (*tls.Config, error) {
-	c, err := tls.LoadX509KeyPair(cert, key)
+func (s *Server) tlsKeyCert(key, cert string, ca string) (*tls.Config, error) {
+	keypair, err := tls.LoadX509KeyPair(cert, key)
 	if err != nil {
 		return nil, err
 	}
 	//file based tls config using tls defaults
-	tlsCfg := &tls.Config{
-		Certificates: []tls.Certificate{c},
+	c := &tls.Config{
+		Certificates: []tls.Certificate{keypair},
 	}
-	//mTLS requires Client CAs
-	if clientCaPath != "" {
-		fileInfo, err := os.Stat(clientCaPath)
-		if err != nil {
+	//mTLS requires server's CA
+	if ca != "" {
+		if err := addCA(ca, c); err != nil {
 			return nil, err
 		}
-		clientCAPool := x509.NewCertPool()
-		if fileInfo.IsDir() {
-			//this is a directory holding CA bundle files
-			files, err := ioutil.ReadDir(clientCaPath)
-			if err != nil {
-				return nil, err
-			}
-			s.Infof("Looking for client CA files from %s", clientCaPath)
-			//add all cert files from path
-			for _, file := range files {
-				f := file.Name()
-				if err := addCABundle(filepath.Join(clientCaPath, f), clientCAPool); err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			//this is a CA bundle file
-			if err := addCABundle(clientCaPath, clientCAPool); err != nil {
-				return nil, err
-			}
-		}
-		//set client CAs and enable cert verification
-		tlsCfg.ClientCAs = clientCAPool
-		tlsCfg.ClientAuth = tls.RequireAndVerifyClientCert
+		s.Infof("Loaded CA path: %s", ca)
 	}
-	return tlsCfg, nil
+	return c, nil
 }
 
-func addCABundle(clientCaPath string, clientCAPool *x509.CertPool) error {
-	if content, err := ioutil.ReadFile(clientCaPath); err != nil {
-		return nil
-	} else if !clientCAPool.AppendCertsFromPEM(content) {
-		return errors.New("Fail to load certificates from : " + clientCaPath)
-	} else {
+func addCA(ca string, c *tls.Config) error {
+	fileInfo, err := os.Stat(ca)
+	if err != nil {
 		return err
 	}
+	clientCAPool := x509.NewCertPool()
+	if fileInfo.IsDir() {
+		//this is a directory holding CA bundle files
+		files, err := ioutil.ReadDir(ca)
+		if err != nil {
+			return err
+		}
+		//add all cert files from path
+		for _, file := range files {
+			f := file.Name()
+			if err := addPEMFile(filepath.Join(ca, f), clientCAPool); err != nil {
+				return err
+			}
+		}
+	} else {
+		//this is a CA bundle file
+		if err := addPEMFile(ca, clientCAPool); err != nil {
+			return err
+		}
+	}
+	//set client CAs and enable cert verification
+	c.ClientCAs = clientCAPool
+	c.ClientAuth = tls.RequireAndVerifyClientCert
+	return nil
+}
+
+func addPEMFile(path string, pool *x509.CertPool) error {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if !pool.AppendCertsFromPEM(content) {
+		return errors.New("Fail to load certificates from : " + path)
+	}
+	return nil
 }

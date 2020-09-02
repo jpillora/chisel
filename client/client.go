@@ -105,6 +105,7 @@ func NewClient(c *Config) (*Client, error) {
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
+		//certificate verification config
 		if c.TLS.SkipVerify {
 			client.Infof("TLS verification disabled")
 			tc.InsecureSkipVerify = true
@@ -119,7 +120,7 @@ func NewClient(c *Config) (*Client, error) {
 				tc.RootCAs = rootCAs
 			}
 		}
-		//Specify client cert and key pair
+		//provide client cert and key pair for mtls
 		if c.TLS.Cert != "" && c.TLS.Key != "" {
 			c, err := tls.LoadX509KeyPair(c.TLS.Cert, c.TLS.Key)
 			if err != nil {
@@ -127,7 +128,7 @@ func NewClient(c *Config) (*Client, error) {
 			}
 			tc.Certificates = []tls.Certificate{c}
 		} else if c.TLS.Cert != "" || c.TLS.Key != "" {
-			return nil, fmt.Errorf("Please specify client cert and key pair BOTH")
+			return nil, fmt.Errorf("Please specify client BOTH cert and key")
 		}
 		client.tlsConfig = tc
 	}
