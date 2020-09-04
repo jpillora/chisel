@@ -11,6 +11,7 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
+	"github.com/pkg/sftp"
 )
 
 func (t *Tunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
@@ -41,6 +42,12 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	hostPort, proto := settings.L4Proto(remote)
 	udp := proto == "udp"
 	socks := hostPort == "socks"
+	sftp := hostPort == "sftp"
+	if sftp && !t.Sftp {
+		t.Debugf("Denied sftp request, please enable sftp")
+		ch.Reject(ssh.Prohibited, "SFTP is not enabled")
+		return
+	}
 	if socks && t.socksServer == nil {
 		t.Debugf("Denied socks request, please enable socks")
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
@@ -61,6 +68,8 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	l.Debugf("Open %s", t.connStats.String())
 	if socks {
 		err = t.handleSocks(stream)
+	} else if sftp {
+		err = t.handleSFTP(stream)
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)
 	} else {
@@ -76,6 +85,14 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 
 func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
+}
+
+func (t *Tunnel) handleSFTP(src io.ReadWriteCloser) error {
+	svr, err := sftp.NewServer(src, t.sftpOptions...)
+	if err != nil {
+		return err
+	}
+	return svr.Serve()
 }
 
 func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {

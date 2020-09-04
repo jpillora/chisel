@@ -90,6 +90,7 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	hasReverse := false
 	hasSocks := false
+	hasSftp := false
 	hasStdio := false
 	client := &Client{
 		Logger: cio.NewLogger("client"),
@@ -141,6 +142,9 @@ func NewClient(c *Config) (*Client, error) {
 		if r.Socks {
 			hasSocks = true
 		}
+		if r.Sftp {
+			hasSftp = true
+		}
 		if r.Reverse {
 			hasReverse = true
 		}
@@ -178,6 +182,7 @@ func NewClient(c *Config) (*Client, error) {
 		Inbound:  true, //client always accepts inbound
 		Outbound: hasReverse,
 		Socks:    hasReverse && hasSocks,
+		Sftp:     hasReverse && hasSftp,
 	})
 	return client, nil
 }

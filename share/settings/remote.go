@@ -35,7 +35,7 @@ import (
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Socks, Reverse, Stdio               bool
+	Socks, Reverse, Stdio, Sftp               bool
 }
 
 const revPrefix = "R:"
@@ -64,6 +64,10 @@ func DecodeRemote(s string) (*Remote, error) {
 		//local portion is stdio?
 		if i == 0 && p == "stdio" {
 			r.Stdio = true
+			continue
+		}
+		if i == len(parts)-1 && p == "sftp" {
+			r.Sftp = true
 			continue
 		}
 		p, proto := L4Proto(p)
@@ -101,6 +105,14 @@ func DecodeRemote(s string) (*Remote, error) {
 		}
 		if r.LocalPort == "" {
 			r.LocalPort = "1080"
+		}
+	} else if r.Sftp {
+		//sftp defaults
+		if r.LocalHost == "" {
+			r.LocalHost = "127.0.0.1"
+		}
+		if r.LocalPort == "" {
+			r.LocalPort = "2222"
 		}
 	} else {
 		//non-socks defaults
@@ -208,6 +220,9 @@ func (r Remote) Local() string {
 func (r Remote) Remote() string {
 	if r.Socks {
 		return "socks"
+	}
+	if r.Sftp {
+		return "sftp"
 	}
 	if r.RemoteHost == "" {
 		r.RemoteHost = "127.0.0.1"

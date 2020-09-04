@@ -139,6 +139,9 @@ var serverHelp = `
     --socks5, Allow clients to access the internal SOCKS5 proxy. See
     chisel client --help for more information.
 
+    --sftp, Allow clients to access the internal SFTP server. See chisel
+    client --help for more information.
+
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
@@ -176,6 +179,7 @@ func server(args []string) {
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.Proxy, "backend", "", "")
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
+	flags.BoolVar(&config.Sftp, "sftp", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
@@ -300,9 +304,13 @@ var clientHelp = `
       192.168.0.5:3000:google.com:80
       socks
       5000:socks
+      sftp
+      2222:sftp
       R:2222:localhost:22
       R:socks
       R:5000:socks
+      R:sftp
+      R:2222:sftp
       stdio:example.com:22
 
     When the chisel server has --socks5 enabled, remotes can
@@ -311,13 +319,34 @@ var clientHelp = `
     127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy.
 
+    When the chisel server has --sftp enabled, remotes can
+    specify "sftp" in place of remote-host and remote-port.
+    The default local host and port for a "sftp" remote is
+    127.0.0.1:2222. Connections to this remote will terminate
+    at the server's internal SFTP server. SFTP clients can
+    connect to this remote, but must specify the -S option to
+    utilize chisel's existing SSH channel.
+
+    example
+
+      $ cat chisel-sftp.sh
+      #!/bin/sh
+      nc 127.0.0.1 2222
+
+      $ chisel client http://server sftp
+
+      $ sftp -S ./chisel-sftp.sh bogus
+
     When the chisel server has --reverse enabled, remotes can
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
     Reverse remotes specifying "R:socks" will listen on the server's
     default socks port (1080) and terminate the connection at the
-    client's internal SOCKS5 proxy.
+    client's internal SOCKS5 proxy. Reverse remotes specifying
+    "R:sftp" will listen on the server's default sftp port (2222)
+    and terminate the connection at the client's internal SFTP
+    server.
 
     When stdio is used as local-host, the tunnel will connect standard
     input/output of this program with the remote. This is useful when 

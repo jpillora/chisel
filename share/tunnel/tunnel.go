@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/pkg/sftp"
 	"io/ioutil"
 	"log"
 	"os"
@@ -24,6 +25,7 @@ type Config struct {
 	Inbound   bool
 	Outbound  bool
 	Socks     bool
+	Sftp      bool
 	KeepAlive time.Duration
 }
 
@@ -45,6 +47,7 @@ type Tunnel struct {
 	//internals
 	connStats   cnet.ConnCount
 	socksServer *socks5.Server
+	sftpOptions []sftp.ServerOption
 }
 
 //New Tunnel from the given Config
@@ -63,6 +66,14 @@ func New(c Config) *Tunnel {
 		}
 		t.socksServer, _ = socks5.New(&socks5.Config{Logger: sl})
 		extra += " (SOCKS enabled)"
+	}
+	if c.Sftp {
+		fl := log.New(ioutil.Discard, "", 0)
+		if t.Logger.Debug {
+			fl = log.New(os.Stdout, "[sftp]", log.Ldate|log.Ltime)
+		}
+		t.sftpOptions = append(t.sftpOptions, sftp.WithDebug(fl.Writer()))
+		extra += " (SFTP enabled)"
 	}
 	t.Debugf("Created%s", extra)
 	return t
