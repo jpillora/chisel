@@ -125,7 +125,7 @@ func (s *Server) Run(host, port string) error {
 
 // Start is responsible for kicking off the http server
 func (s *Server) Start(host, port string) error {
-	return s.StartContext(nil, host, port)
+	return s.StartContext(context.Background(), host, port)
 }
 
 // StartContext is responsible for kicking off the http server,
