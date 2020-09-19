@@ -81,6 +81,16 @@ func TestRemoteDecode(t *testing.T) {
 			},
 			"localhost:5353:1.1.1.1:53/udp",
 		},
+		{
+			"[::1]:8080:google.com:80",
+			Remote{
+				LocalHost:  "[::1]",
+				LocalPort:  "8080",
+				RemoteHost: "google.com",
+				RemotePort: "80",
+			},
+			"[::1]:8080:google.com:80",
+		},
 	} {
 		//expected defaults
 		expected := test.Output

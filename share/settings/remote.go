@@ -85,7 +85,7 @@ func DecodeRemote(s string) (*Remote, error) {
 			return nil, errors.New("Missing ports")
 		}
 		if !isHost(p) {
-			return nil, errors.New("Invalid host")
+			return nil, errors.New("Invalid host" + p)
 		}
 		if !r.Socks && r.RemoteHost == "" {
 			r.RemoteHost = p
@@ -144,7 +144,7 @@ func isPort(s string) bool {
 }
 
 func isHost(s string) bool {
-	_, err := url.Parse(s)
+	_, err := url.Parse("//" + s)
 	if err != nil {
 		return false
 	}
