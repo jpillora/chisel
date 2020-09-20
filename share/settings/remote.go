@@ -46,7 +46,7 @@ func DecodeRemote(s string) (*Remote, error) {
 		s = strings.TrimPrefix(s, revPrefix)
 		reverse = true
 	}
-	parts := strings.Split(s, ":")
+	parts := regexp.MustCompile(`(\[[^\[\]]+\]|[^\[\]:]+):?`).FindAllStringSubmatch(s, -1)
 	if len(parts) <= 0 || len(parts) >= 5 {
 		return nil, errors.New("Invalid remote")
 	}
@@ -55,7 +55,7 @@ func DecodeRemote(s string) (*Remote, error) {
 	//then to set 'local' fields second (allows the 'remote' side
 	//to provide the defaults)
 	for i := len(parts) - 1; i >= 0; i-- {
-		p := parts[i]
+		p := parts[i][1]
 		//remote portion is socks?
 		if i == len(parts)-1 && p == "socks" {
 			r.Socks = true
@@ -144,7 +144,7 @@ func isPort(s string) bool {
 }
 
 func isHost(s string) bool {
-	_, err := url.Parse(s)
+	_, err := url.Parse("//" + s)
 	if err != nil {
 		return false
 	}
