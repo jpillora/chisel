@@ -46,7 +46,7 @@ func DecodeRemote(s string) (*Remote, error) {
 		s = strings.TrimPrefix(s, revPrefix)
 		reverse = true
 	}
-	parts := regexp.MustCompile(`(\[[A-Za-z0-9:/]+\]|[^\s:]+):?`).FindAllStringSubmatch(s, -1)
+	parts := regexp.MustCompile(`(\[[^\[\]]+\]|[^\[\]:]+):?`).FindAllStringSubmatch(s, -1)
 	if len(parts) <= 0 || len(parts) >= 5 {
 		return nil, errors.New("Invalid remote")
 	}
