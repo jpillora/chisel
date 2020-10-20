@@ -267,7 +267,7 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
                         dialertime := &net.Dialer{
                             Timeout:   30 * time.Second,
                             KeepAlive: 30 * time.Second,
-                        }
+			}
 
                         d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, c.config.Ntlmurl, c.config.Ntlmusr, c.config.Ntlmpwd, c.config.Ntlmdomain)
                 }
