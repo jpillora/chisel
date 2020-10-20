@@ -21,11 +21,23 @@ import (
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
+	"github.com/launchdarkly/go-ntlm-proxy-auth"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
+
+
+
+
+// ntlm global variables 
+var isntlm bool
+var ntlmdomain string
+var ntlmusr string
+var ntlmpwd string
+var ntlmurl string
+
 
 //Config represents a client configuration
 type Config struct {
@@ -158,6 +170,25 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//outbound proxy
 	if p := c.Proxy; p != "" {
+
+		urlrgx := regexp.MustCompile("htt.*://")
+		ntlmrgx := regexp.MustCompile("(NTLM)þ(.*):(.*):(.*)@")
+		ntlmfind := ntlmrgx.FindStringSubmatch(p)
+
+		if len(ntlmfind) == 0 {
+			;;
+		} else {
+			isntlm = true
+			ntlmdomain = ntlmfind[2]
+			ntlmusr = ntlmfind[3]
+			ntlmpwd = ntlmfind[4]
+
+			p = ntlmrgx.ReplaceAllString(p, "")
+			ntlmurl = urlrgx.ReplaceAllString(p, "")
+		}
+
+
+
 		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
@@ -232,6 +263,11 @@ func (c *Client) Start(ctx context.Context) error {
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
+		//check if ntlm connection is required
+		if isntlm {
+			d.NetDialContext = ntlm.WrapDialContext(daler.DialContext, ntlmurl, ntlmusr, ntlmpwd, ntlmdomain)
+		}
+
 		d.Proxy = func(*http.Request) (*url.URL, error) {
 			return u, nil
 		}
