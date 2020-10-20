@@ -171,22 +171,21 @@ func NewClient(c *Config) (*Client, error) {
 	//outbound proxy
 	if p := c.Proxy; p != "" {
 
-		urlrgx := regexp.MustCompile("htt.*://")
-		ntlmrgx := regexp.MustCompile("(NTLM)þ(.*):(.*):(.*)@")
-		ntlmfind := ntlmrgx.FindStringSubmatch(p)
+                urlrgx := regexp.MustCompile("htt.*://")
+                ntlmrgx := regexp.MustCompile("ntlm:([^:]+):([^:]*):([^:]*)@")
+                ntlmfind := ntlmrgx.FindStringSubmatch(p)
 
-		if len(ntlmfind) == 0 {
-			;;
-		} else {
-			isntlm = true
-			ntlmdomain = ntlmfind[2]
-			ntlmusr = ntlmfind[3]
-			ntlmpwd = ntlmfind[4]
+                if len(ntlmfind) == 0 {
+                        ;;
+                } else {
+                        isntlm = true
+                        ntlmdomain = ntlmfind[1]
+                        ntlmusr = ntlmfind[2]
+                        ntlmpwd = ntlmfind[3]
 
-			p = ntlmrgx.ReplaceAllString(p, "")
-			ntlmurl = urlrgx.ReplaceAllString(p, "")
-		}
-
+                        p = ntlmrgx.ReplaceAllString(p, "")
+                        ntlmurl = urlrgx.ReplaceAllString(p, "")
+                }
 
 
 		client.proxyURL, err = url.Parse(p)
