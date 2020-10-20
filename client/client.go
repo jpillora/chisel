@@ -31,13 +31,6 @@ import (
 
 
 
-// ntlm global variables 
-var isntlm bool
-var ntlmdomain string
-var ntlmusr string
-var ntlmpwd string
-var ntlmurl string
-
 
 //Config represents a client configuration
 type Config struct {
@@ -52,6 +45,11 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Isntlm		 bool
+	Ntlmdomain	 string
+	Ntlmusr		 string
+	Ntlmpwd		 string
+	Ntlmurl		 string
 }
 
 //TLSConfig for a Client
@@ -178,13 +176,13 @@ func NewClient(c *Config) (*Client, error) {
                 if len(ntlmfind) == 0 {
                         ;;
                 } else {
-                        isntlm = true
-                        ntlmdomain = ntlmfind[1]
-                        ntlmusr = ntlmfind[2]
-                        ntlmpwd = ntlmfind[3]
+                        c.Isntlm = true
+                        c.Ntlmdomain = ntlmfind[1]
+                        c.Ntlmusr = ntlmfind[2]
+                        c.Ntlmpwd = ntlmfind[3]
 
                         p = ntlmrgx.ReplaceAllString(p, "")
-                        ntlmurl = urlrgx.ReplaceAllString(p, "")
+                        c.Ntlmurl = urlrgx.ReplaceAllString(p, "")
                 }
 
 
@@ -265,13 +263,13 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
 		//check if ntlm connection is required
-		if isntlm {
+		if c.Isntlm {
 			dialertime := &net.Dialer{
 			    Timeout:   30 * time.Second,
 			    KeepAlive: 30 * time.Second,
 			}
 
-			d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, ntlmurl, ntlmusr, ntlmpwd, ntlmdomain)
+			d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, c.config.ntlmurl, c.config.ntlmusr, c.config.ntlmpwd, c.config.ntlmdomain)
 		}
 
 		d.Proxy = func(*http.Request) (*url.URL, error) {
