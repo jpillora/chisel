@@ -260,12 +260,19 @@ func (c *Client) Start(ctx context.Context) error {
 	return nil
 }
 
+
+
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
 		//check if ntlm connection is required
 		if isntlm {
-			d.NetDialContext = ntlm.WrapDialContext(daler.DialContext, ntlmurl, ntlmusr, ntlmpwd, ntlmdomain)
+			dialertime := &net.Dialer{
+			    Timeout:   30 * time.Second,
+			    KeepAlive: 30 * time.Second,
+			}
+
+			d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, ntlmurl, ntlmusr, ntlmpwd, ntlmdomain)
 		}
 
 		d.Proxy = func(*http.Request) (*url.URL, error) {
