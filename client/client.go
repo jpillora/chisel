@@ -263,14 +263,14 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
 		//check if ntlm connection is required
-		if c.Isntlm {
-			dialertime := &net.Dialer{
-			    Timeout:   30 * time.Second,
-			    KeepAlive: 30 * time.Second,
-			}
+                if c.config.Isntlm {
+                        dialertime := &net.Dialer{
+                            Timeout:   30 * time.Second,
+                            KeepAlive: 30 * time.Second,
+                        }
 
-			d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, c.config.ntlmurl, c.config.ntlmusr, c.config.ntlmpwd, c.config.ntlmdomain)
-		}
+                        d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, c.config.Ntlmurl, c.config.Ntlmusr, c.config.Ntlmpwd, c.config.Ntlmdomain)
+                }
 
 		d.Proxy = func(*http.Request) (*url.URL, error) {
 			return u, nil
