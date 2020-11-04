@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -195,10 +197,30 @@ func (c *Client) Run() error {
 }
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
-	expect := c.config.Fingerprint
-	if expect == "" {
-		return nil
+
+	var expect string
+	if c.config.Fingerprint != "" {
+		expect = c.config.Fingerprint
 	}
+
+	if c.config.Fingerprint == "" {
+		if os.Getenv("CHISEL_KEY") != "" {
+			//generate private key (optionally using seed)
+			key, err := ccrypto.GenerateKey(os.Getenv("CHISEL_KEY"))
+			if err != nil {
+				log.Fatal("Failed to generate key from CHISEL_KEY")
+			}
+			//convert into ssh.PrivateKey
+			private, err := ssh.ParsePrivateKey(key)
+			if err != nil {
+				log.Fatal("Failed to parse key")
+			}
+			//fingerprint this key
+			expect = ccrypto.FingerprintKey(private.PublicKey())
+			c.Infof("Expected fingerprint from CHISEL_KEY %s", expect)
+		}
+	}
+
 	got := ccrypto.FingerprintKey(key)
 	_, err := base64.StdEncoding.DecodeString(expect)
 	if _, ok := err.(base64.CorruptInputError); ok {
