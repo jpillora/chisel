@@ -190,7 +190,7 @@ func main() {
 
 	hf := exec.Command("chisel", "client",
 		// "-v",
-		"--fingerprint", "ed:f2:cf:3c:56",
+		"--fingerprint", "mOz4rg9zlQ409XAhhj6+fDDVwQMY42CL3Zg2W2oTYxA=",
 		"127.0.0.1:2002",
 		"2001:3000")
 	hf.Stdout = os.Stdout

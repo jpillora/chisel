@@ -328,9 +328,8 @@ var clientHelp = `
 
   Options:
 
-    --fingerprint, A *strongly recommended* fingerprint string
+    --fingerprint, A *strongly recommended* fingerprint (base64 encoded SHA256) string
     to perform host-key validation against the server's public key.
-    You may provide just a prefix of the key or the entire string.
     Fingerprint mismatches will close the connection.
 
     --auth, An optional username and password (client authentication)

@@ -2,8 +2,10 @@ package chclient
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -194,12 +196,37 @@ func (c *Client) Run() error {
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	expect := c.config.Fingerprint
+	if expect == "" {
+		return nil
+	}
 	got := ccrypto.FingerprintKey(key)
-	if expect != "" && !strings.HasPrefix(got, expect) {
+	_, err := base64.StdEncoding.DecodeString(expect)
+	if _, ok := err.(base64.CorruptInputError); ok {
+		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)
+		return c.verifyLegacyFingerprint(key)
+	} else if err != nil {
+		return fmt.Errorf("Error decoding fingerprint: %w", err)
+	}
+	if got != expect {
 		return fmt.Errorf("Invalid fingerprint (%s)", got)
 	}
 	//overwrite with complete fingerprint
 	c.Infof("Fingerprint %s", got)
+	return nil
+}
+
+//verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints
+func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
+	bytes := md5.Sum(key.Marshal())
+	strbytes := make([]string, len(bytes))
+	for i, b := range bytes {
+		strbytes[i] = fmt.Sprintf("%02x", b)
+	}
+	got := strings.Join(strbytes, ":")
+	expect := c.config.Fingerprint
+	if !strings.HasPrefix(got, expect) {
+		return fmt.Errorf("Invalid fingerprint (%s)", got)
+	}
 	return nil
 }
 

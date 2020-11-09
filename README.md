@@ -244,9 +244,8 @@ $ chisel client --help
 
   Options:
 
-    --fingerprint, A *strongly recommended* fingerprint string
-    to perform host-key validation against the server's public key.
-    You may provide just a prefix of the key or the entire string.
+    --fingerprint, A *strongly recommended* fingerprint (base64 encoded SHA256)
+    string to perform host-key validation against the server's public key.
     Fingerprint mismatches will close the connection.
 
     --auth, An optional username and password (client authentication)
@@ -319,7 +318,7 @@ $ chisel client --help
 
 ### Security
 
-Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
+Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
 
 ### Authentication
 
@@ -341,7 +340,7 @@ docker run \
 2. Connect your chisel client (using server's fingerprint)
 
 ```sh
-chisel client --fingerprint ab:12:34 <server-address>:9312 socks
+chisel client --fingerprint 'rHb55mcxf6vSckL2AezFV09rLs7pfPpavVu++MF7AhQ=' <server-address>:9312 socks
 ```
 
 3. Point your SOCKS5 clients (e.g. OS/Browser) to:
