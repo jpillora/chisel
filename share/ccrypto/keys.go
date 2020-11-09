@@ -3,12 +3,12 @@ package ccrypto
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -30,12 +30,8 @@ func GenerateKey(seed string) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: b}), nil
 }
 
-//FingerprintKey calculates the MD5 of an SSH public key
+//FingerprintKey calculates the SHA256 hash of an SSH public key
 func FingerprintKey(k ssh.PublicKey) string {
-	bytes := md5.Sum(k.Marshal())
-	strbytes := make([]string, len(bytes))
-	for i, b := range bytes {
-		strbytes[i] = fmt.Sprintf("%02x", b)
-	}
-	return strings.Join(strbytes, ":")
+	bytes := sha256.Sum256(k.Marshal())
+	return base64.StdEncoding.EncodeToString(bytes[:])
 }
