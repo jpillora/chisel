@@ -172,7 +172,7 @@ func NewClient(c *Config) (*Client, error) {
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
-		Timeout:         30 * time.Second,
+		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
 	//prepare client tunnel
 	client.tunnel = tunnel.New(tunnel.Config{

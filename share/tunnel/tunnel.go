@@ -121,8 +121,8 @@ func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 	select {
 	case <-ctx.Done(): //cancelled
 		return nil
-	case <-time.After(35 * time.Second): //a bit longer than ssh timeout
-		return nil
+	case <-time.After(settings.EnvDuration("SSH_WAIT", 35*time.Second)):
+		return nil //a bit longer than ssh timeout
 	case <-t.activatingConnWait():
 		t.activeConnMut.RLock()
 		c := t.activeConn

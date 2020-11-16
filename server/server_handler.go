@@ -82,7 +82,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	var r *ssh.Request
 	select {
 	case r = <-reqs:
-	case <-time.After(10 * time.Second):
+	case <-time.After(settings.EnvDuration("CONFIG_TIMEOUT", 10*time.Second)):
 		l.Debugf("Timeout waiting for configuration")
 		sshConn.Close()
 		return

@@ -277,17 +277,18 @@ var clientHelp = `
   <remote>s are remote connections tunneled through the server, each of
   which come in the form:
 
-    <local-host>:<local-port>:<remote-host>:<remote-port>
+    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
     ■ local-host defaults to 0.0.0.0 (all interfaces).
     ■ local-port defaults to remote-port.
     ■ remote-port is required*.
     ■ remote-host defaults to 0.0.0.0 (server localhost).
+    ■ protocol defaults to tcp.
 
   which shares <remote-host>:<remote-port> from the server to the client
   as <local-host>:<local-port>, or:
 
-    R:<local-interface>:<local-port>:<remote-host>:<remote-port>
+    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
   which does reverse port forwarding, sharing <remote-host>:<remote-port>
   from the client to the server's <local-interface>:<local-port>.
@@ -304,6 +305,7 @@ var clientHelp = `
       R:socks
       R:5000:socks
       stdio:example.com:22
+      1.1.1.1:53/udp
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.

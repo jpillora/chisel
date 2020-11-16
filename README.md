@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel) [![CI](https://github.com/jpillora/chisel/workflows/CI/badge.svg)](https://github.com/jpillora/chisel/actions?workflow=CI)
 
-Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network.
+Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
@@ -193,17 +193,18 @@ $ chisel client --help
   <remote>s are remote connections tunneled through the server, each of
   which come in the form:
 
-    <local-host>:<local-port>:<remote-host>:<remote-port>
+    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
     ■ local-host defaults to 0.0.0.0 (all interfaces).
     ■ local-port defaults to remote-port.
     ■ remote-port is required*.
     ■ remote-host defaults to 0.0.0.0 (server localhost).
+    ■ protocol defaults to tcp.
 
   which shares <remote-host>:<remote-port> from the server to the client
   as <local-host>:<local-port>, or:
 
-    R:<local-interface>:<local-port>:<remote-host>:<remote-port>
+    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
   which does reverse port forwarding, sharing <remote-host>:<remote-port>
   from the client to the server's <local-interface>:<local-port>.
@@ -220,6 +221,7 @@ $ chisel client --help
       R:socks
       R:5000:socks
       stdio:example.com:22
+      1.1.1.1:53/udp
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
