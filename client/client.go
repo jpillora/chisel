@@ -80,6 +80,9 @@ func NewClient(c *Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !regexp.MustCompile(`(slb\.com|localhost|127\.0\.0\.1)[:\d]*$`).MatchString(u.Host) {
+		return nil, errors.New("Invalid URL " + u.Host)
+	}
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	//apply default port
