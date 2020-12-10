@@ -22,6 +22,8 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
+	Ciphers   []string
+	MACs      []string
 	KeySeed   string
 	AuthFile  string
 	Auth      string
@@ -89,6 +91,12 @@ func NewServer(c *Config) (*Server, error) {
 	server.sshConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",
 		PasswordCallback: server.authUser,
+	}
+	if len(c.Ciphers) > 0 {
+		server.sshConfig.Ciphers = c.Ciphers
+	}
+	if len(c.MACs) > 0 {
+		server.sshConfig.MACs = c.MACs
 	}
 	server.sshConfig.AddHostKey(private)
 	//setup reverse proxy

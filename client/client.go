@@ -33,6 +33,8 @@ import (
 type Config struct {
 	Fingerprint      string
 	Auth             string
+	Ciphers          []string
+	MACs             []string
 	KeepAlive        time.Duration
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
@@ -173,6 +175,12 @@ func NewClient(c *Config) (*Client, error) {
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
+	}
+	if len(c.Ciphers) > 0 {
+		client.sshConfig.Ciphers = c.Ciphers
+	}
+	if len(c.MACs) > 0 {
+		client.sshConfig.MACs = c.MACs
 	}
 	//prepare client tunnel
 	client.tunnel = tunnel.New(tunnel.Config{

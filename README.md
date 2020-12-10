@@ -124,6 +124,12 @@ $ chisel server --help
     authfile with {"<user:pass>": [""]}. If unset, it will use the
     environment variable AUTH.
 
+    --ciphers, An optional string comma separated to provide a list of ciphers to
+    use by order of preference and matching the client (default "aes128-gcm@openssh.com,chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr").
+
+    --macs, An optional string comma separated to provide a list of MACs to
+    use by order of preference and matching the client (default "hmac-sha2-256-etm@openssh.com,hmac-sha2-256,hmac-sha1,hmac-sha1-96").
+
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
@@ -257,6 +263,12 @@ $ chisel client --help
     in the form: "<user>:<pass>". These credentials are compared to
     the credentials inside the server's --authfile. defaults to the
     AUTH environment variable.
+
+    --ciphers, An optional string comma separated to provide a list of ciphers to
+    use by order of preference and matching the server (default "aes128-gcm@openssh.com,chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr").
+
+    --macs, An optional string comma separated to provide a list of MACs to
+    use by order of preference and matching the server (default "hmac-sha2-256-etm@openssh.com,hmac-sha2-256,hmac-sha1,hmac-sha1-96").
 
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
