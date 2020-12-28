@@ -34,6 +34,9 @@ archives:
   - format: gz
     files:
       - none*
+checksum:
+  algorithm: sha256
+  name_template: sha256sums.txt
 release:
   prerelease: auto
 changelog:
