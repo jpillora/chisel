@@ -2,8 +2,10 @@ package chclient
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -175,7 +177,7 @@ func NewClient(c *Config) (*Client, error) {
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
-		Timeout:         30 * time.Second,
+		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
 	//prepare client tunnel
 	client.tunnel = tunnel.New(tunnel.Config{
@@ -199,9 +201,10 @@ func (c *Client) Run() error {
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
 
-	var expect string
-	if c.config.Fingerprint != "" {
-		expect = c.config.Fingerprint
+	expect := c.config.Fingerprint
+	if expect == "" {
+		return nil
+
 	}
 
 	if c.config.Fingerprint == "" {
@@ -223,11 +226,33 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	}
 
 	got := ccrypto.FingerprintKey(key)
-	if expect != "" && !strings.HasPrefix(got, expect) {
+	_, err := base64.StdEncoding.DecodeString(expect)
+	if _, ok := err.(base64.CorruptInputError); ok {
+		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)
+		return c.verifyLegacyFingerprint(key)
+	} else if err != nil {
+		return fmt.Errorf("Error decoding fingerprint: %w", err)
+	}
+	if got != expect {
 		return fmt.Errorf("Invalid fingerprint (%s)", got)
 	}
 	//overwrite with complete fingerprint
 	c.Infof("Fingerprint %s", got)
+	return nil
+}
+
+//verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints
+func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
+	bytes := md5.Sum(key.Marshal())
+	strbytes := make([]string, len(bytes))
+	for i, b := range bytes {
+		strbytes[i] = fmt.Sprintf("%02x", b)
+	}
+	got := strings.Join(strbytes, ":")
+	expect := c.config.Fingerprint
+	if !strings.HasPrefix(got, expect) {
+		return fmt.Errorf("Invalid fingerprint (%s)", got)
+	}
 	return nil
 }
 

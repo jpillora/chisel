@@ -30,8 +30,12 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		//connection error
 		attempt := int(b.Attempt())
 		maxAttempt := c.config.MaxRetryCount
+		//dont print closed-connection errors
+		if strings.HasSuffix(err.Error(), "use of closed network connection") {
+			err = io.EOF
+		}
 		//show error message and attempt counts (excluding disconnects)
-		if err != nil && err != io.EOF && !strings.HasSuffix(err.Error(), "use of closed network connection") {
+		if err != nil && err != io.EOF {
 			msg := fmt.Sprintf("Connection error: %s", err)
 			if attempt > 0 {
 				msg += fmt.Sprintf(" (Attempt: %d", attempt)
@@ -40,10 +44,11 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 				}
 				msg += ")"
 			}
-			c.Debugf(msg)
+			c.Infof(msg)
 		}
 		//give up?
 		if !retry || (maxAttempt >= 0 && attempt >= maxAttempt) {
+			c.Infof("Give up")
 			break
 		}
 		d := b.Duration()
@@ -65,7 +70,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	//already closed?
 	select {
 	case <-ctx.Done():
-		return false, false, ctx.Err()
+		return false, false, errors.New("Cancelled")
 	default:
 		//still open
 	}
@@ -73,9 +78,11 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	defer cancel()
 	//prepare dialer
 	d := websocket.Dialer{
-		HandshakeTimeout: 45 * time.Second,
+		HandshakeTimeout: settings.EnvDuration("WS_TIMEOUT", 45*time.Second),
 		Subprotocols:     []string{chshare.ProtocolVersion},
 		TLSClientConfig:  c.tlsConfig,
+		ReadBufferSize:   settings.EnvInt("WS_BUFF_SIZE", 0),
+		WriteBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
 	}
 	//optional proxy
 	if p := c.proxyURL; p != nil {

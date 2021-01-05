@@ -46,7 +46,9 @@ type Server struct {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin:     func(r *http.Request) bool { return true },
+	ReadBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
+	WriteBufferSize: settings.EnvInt("WS_BUFF_SIZE", 0),
 }
 
 // NewServer creates and returns a new chisel server
