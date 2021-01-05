@@ -201,9 +201,10 @@ func (c *Client) Run() error {
 
 func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKey) error {
 
-	var expect string
-	if c.config.Fingerprint != "" {
-		expect = c.config.Fingerprint
+	expect := c.config.Fingerprint
+	if expect == "" {
+		return nil
+
 	}
 
 	if c.config.Fingerprint == "" {
