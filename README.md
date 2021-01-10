@@ -37,6 +37,12 @@ See [the latest release](https://github.com/jpillora/chisel/releases/latest) or 
 docker run --rm -it jpillora/chisel --help
 ```
 
+**Fedora**
+
+```sh
+sudo dnf -y install chisel
+```
+
 **Source**
 
 ```sh
