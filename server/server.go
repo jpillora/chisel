@@ -22,14 +22,15 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
+	KeySeed           string
+	AuthFile          string
+	Auth              string
+	Proxy             string
+	Socks5            bool
+	Reverse           bool
+	KeepAlive         time.Duration
+	TLS               TLSConfig
+	HeaderToMatchAddr string
 }
 
 // Server respresent a chisel service
