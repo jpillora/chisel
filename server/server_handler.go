@@ -120,10 +120,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		if s.config.HeaderToMatchAddr != "" {
-			addr := r.UserAddr()
-			if req.Header.Get(s.config.HeaderToMatchAddr) != addr {
-				failed(s.Errorf("access to '%s' denied", addr))
+		if s.config.HeaderToMatchHost != "" {
+			if req.Header.Get(s.config.HeaderToMatchHost) != r.RemoteHost {
+				failed(s.Errorf("access to '%s' denied", r.RemoteHost))
 				return
 			}
 		}

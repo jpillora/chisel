@@ -30,7 +30,7 @@ type Config struct {
 	Reverse           bool
 	KeepAlive         time.Duration
 	TLS               TLSConfig
-	HeaderToMatchAddr string
+	HeaderToMatchHost string
 }
 
 // Server respresent a chisel service

@@ -163,8 +163,8 @@ var serverHelp = `
     validate client connections. The provided CA certificates will be used 
 	instead of the system roots. This is commonly used to implement mutual-TLS. 
 	
-	--header-to-match-addr, Optional header field in the client request that
-	must match the destination address. This can be used to provide additional
+	--header-to-match-host, Optional header field in the client request that
+	must match the destination host. This can be used to provide additional
 	security validation when the server is behind a reverse proxy.
 ` + commonHelp
 
@@ -185,7 +185,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
-	flags.StringVar(&config.HeaderToMatchAddr, "header-to-match-addr", "", "")
+	flags.StringVar(&config.HeaderToMatchHost, "header-to-match-host", "", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
