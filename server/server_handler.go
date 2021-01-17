@@ -20,11 +20,9 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
 	if strings.HasPrefix(protocol, "chisel-") {
 		if protocol == chshare.ProtocolVersion {
-			s.Infof("accepting chisel connection")
 			// force add websocket headers
 			r.Header.Add("Connection", "upgrade")
 			r.Header.Add("Upgrade", "websocket")
-			
 			s.handleWebsocket(w, r)
 			return
 		}
