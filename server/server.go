@@ -28,6 +28,7 @@ type Config struct {
 	Proxy     string
 	Socks5    bool
 	Reverse   bool
+	ReusePort bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
 }
@@ -101,12 +102,19 @@ func NewServer(c *Config) (*Server, error) {
 			return nil, server.Errorf("Missing protocol (%s)", u)
 		}
 		server.reverseProxy = httputil.NewSingleHostReverseProxy(u)
+		
 		//always use proxy host
 		server.reverseProxy.Director = func(r *http.Request) {
-			//enforce origin, keep path
-			r.URL.Scheme = u.Scheme
-			r.URL.Host = u.Host
-			r.Host = u.Host
+			if c.ReusePort {
+				// inherit origin
+				r.URL.Host = u.Host // r.URL.Host is our destination - r.Host contains the actual host header
+				r.URL.Scheme = "http" // we only do HTTP backends
+			} else {
+				//enforce origin, keep path
+				r.URL.Scheme = u.Scheme
+				r.URL.Host = u.Host
+				r.Host = u.Host
+			}
 		}
 	}
 	//print when reverse tunnelling is enabled
