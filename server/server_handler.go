@@ -122,7 +122,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		}
 		if s.config.HeaderToMatchHost != "" {
 			if req.Header.Get(s.config.HeaderToMatchHost) != r.RemoteHost {
-				failed(s.Errorf("access to '%s' denied", r.RemoteHost))
+				failed(s.Errorf("Header match failed, access to '%s' denied", r.RemoteHost))
 				return
 			}
 		}
