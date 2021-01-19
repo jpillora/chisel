@@ -58,7 +58,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
-	l.Debugf("Handshaking...")
+	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
