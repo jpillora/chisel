@@ -27,12 +27,12 @@ jobs:
         env:
           GODEBUG: x509ignoreCN=0
   # ================
-  # RELEASE JOB
+  # RELEASE JOBS
   #   runs after a success test
   #   only runs on push "v*" tag
   # ================
-  release:
-    name: Release
+  release_binaries:
+    name: Release Binaries
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -46,6 +46,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: release --config .github/goreleaser.yml
+  release_docker:
+    name: Release Docker Images
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
