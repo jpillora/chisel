@@ -45,7 +45,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	}
 	//tcp listen
 	l, err := net.Listen("tcp", host+":"+port)
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 	//optionally wrap in tls
