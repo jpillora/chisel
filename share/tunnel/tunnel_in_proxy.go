@@ -2,11 +2,16 @@ package tunnel
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
+	"os"
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/chisel/share/socks5"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,13 +24,14 @@ type sshTunnel interface {
 //Proxy is the inbound portion of a Tunnel
 type Proxy struct {
 	*cio.Logger
-	sshTun sshTunnel
-	id     int
-	count  int
-	remote *settings.Remote
-	dialer net.Dialer
-	tcp    *net.TCPListener
-	udp    *udpListener
+	sshTun      sshTunnel
+	id          int
+	count       int
+	remote      *settings.Remote
+	dialer      net.Dialer
+	tcp         *net.TCPListener
+	udp         *udpListener
+	socksServer *socks5.Server
 }
 
 //NewProxy creates a Proxy
@@ -43,7 +49,7 @@ func NewProxy(logger *cio.Logger, sshTun sshTunnel, index int, remote *settings.
 func (p *Proxy) listen() error {
 	if p.remote.Stdio {
 		//TODO check if pipes active?
-	} else if p.remote.LocalProto == "tcp" {
+	} else if p.remote.Socks || p.remote.LocalProto == "tcp" {
 		addr, err := net.ResolveTCPAddr("tcp", p.remote.LocalHost+":"+p.remote.LocalPort)
 		if err != nil {
 			return p.Errorf("resolve: %s", err)
@@ -51,6 +57,21 @@ func (p *Proxy) listen() error {
 		l, err := net.ListenTCP("tcp", addr)
 		if err != nil {
 			return p.Errorf("tcp: %s", err)
+		}
+		if p.remote.Socks {
+			udpAddr, err := net.ResolveUDPAddr("udp", p.remote.LocalHost+":0")
+			if err != nil {
+				_ = l.Close()
+				return p.Errorf("resolve: %s", err)
+			}
+
+			sl := log.New(ioutil.Discard, "", 0)
+			if p.Logger.Debug {
+				sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
+			}
+			p.socksServer, _ = socks5.New(&socks5.Config{
+				Handler: makeChiselSocksHandler(p, udpAddr, sl),
+			})
 		}
 		p.Infof("Listening")
 		p.tcp = l
@@ -72,6 +93,8 @@ func (p *Proxy) listen() error {
 func (p *Proxy) Run(ctx context.Context) error {
 	if p.remote.Stdio {
 		return p.runStdio(ctx)
+	} else if p.remote.Socks {
+		return p.socksServer.Serve(ctx, p.tcp)
 	} else if p.remote.LocalProto == "tcp" {
 		return p.runTCP(ctx)
 	} else if p.remote.LocalProto == "udp" {
@@ -83,7 +106,7 @@ func (p *Proxy) Run(ctx context.Context) error {
 func (p *Proxy) runStdio(ctx context.Context) error {
 	defer p.Infof("Closed")
 	for {
-		p.pipeRemote(ctx, cio.Stdio)
+		p.pipeRemote(ctx, cio.Stdio, p.remote.Remote(), nil)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -116,11 +139,11 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 			close(done)
 			return err
 		}
-		go p.pipeRemote(ctx, src)
+		go p.pipeRemote(ctx, src, p.remote.Remote(), nil)
 	}
 }
 
-func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
+func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser, remoteHostPort string, handshake func(dst ssh.Channel) error) error {
 	defer src.Close()
 	p.count++
 	cid := p.count
@@ -128,17 +151,25 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	l.Debugf("Open")
 	sshConn := p.sshTun.getSSH(ctx)
 	if sshConn == nil {
-		l.Debugf("No remote connection")
-		return
+		msg := "no remote connection"
+		l.Debugf(msg)
+		return errors.New(msg)
 	}
 	//ssh request for tcp connection for this proxy's remote
-	dst, reqs, err := sshConn.OpenChannel("chisel", []byte(p.remote.Remote()))
+	l.Debugf("Requesting: %s", remoteHostPort)
+	dst, reqs, err := sshConn.OpenChannel("chisel", []byte(remoteHostPort))
 	if err != nil {
 		l.Infof("Stream error: %s", err)
-		return
+		return err
 	}
 	go ssh.DiscardRequests(reqs)
+	if handshake != nil {
+		if err = handshake(dst); err != nil {
+			return err
+		}
+	}
 	//then pipe
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
+	return nil
 }
