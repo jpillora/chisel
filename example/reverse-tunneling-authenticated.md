@@ -86,3 +86,39 @@ The `authfile` (`users.json`) remains the same as in the non-containerized versi
   "foo:bar": ["0.0.0.0:80"]
 }
 ```
+
+### Client
+
+```yaml
+version: '3'
+
+services:
+  chisel:
+    # ⬇️ Delay starting Chisel server until the web server container is started.
+    depends_on:
+      - webserver
+    image: jpillora/chisel
+    restart: unless-stopped
+    container_name: 'chisel'
+    command:
+      - 'client'
+      # ⬇️ Use username `foo` and password `bar` to authenticate with Chisel server.
+      - '--auth=foo:bar'
+      # ⬇️ Domain & port of Chisel server. Port defaults to 8080 on server, but must be manually set on client.
+      - 'proxy.example.com:8080'
+      # ⬇️ Reverse tunnel traffic from the chisel server to the web server container, identified in Docker using DNS by its service name `webserver`.
+      - 'R:80:webserver:80'
+    networks:
+      - internal
+  # ⬇️ Basic nginx webserver for demo purposes.
+  webserver:
+    image: nginx
+    restart: unless-stopped
+    container_name: nginx
+    networks:
+      - internal
+
+# ⬇️ Make use of a docker network called `internal`.
+networks:
+  internal:
+```
