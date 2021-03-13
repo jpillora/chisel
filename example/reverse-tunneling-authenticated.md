@@ -78,3 +78,11 @@ services:
     # ⬇️ Give the container unrestricted access to the docker host's network
     network_mode: host
 ```
+
+The `authfile` (`users.json`) remains the same as in the non-containerized version - shown again with the username `foo` and password `bar`.
+
+```json
+{
+  "foo:bar": ["0.0.0.0:80"]
+}
+```
