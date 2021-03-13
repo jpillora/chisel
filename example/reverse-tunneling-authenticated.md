@@ -5,6 +5,7 @@
 This guide will show you how to use an internet-facing server (for example, a cloud VPS) as a relay to bounce traffic down to your local webserver.
 
 ## Chisel CLI
+
 ### Server
 
 Setup a relay server to bounce down traffic on port 80:
