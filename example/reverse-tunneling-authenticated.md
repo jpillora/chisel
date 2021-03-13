@@ -28,7 +28,7 @@ The corresponding `authfile` might look like this:
 
 ## Client
 
-Setup a chisel client to receive bounced-down traffic and forward it to the webserver running on `localhost:80`
+Setup a chisel client to receive bounced-down traffic and forward it to the webserver running on the Pi:
 
 ```bash
 #!/bin/bash
@@ -43,7 +43,6 @@ chisel client \
 example.com \
 
 # ⬇️ Reverse tunnels port 80 on the relay server to
-# port 80 on your localhost. So you can expose
-# that web server running locally to the internet.
+# port 80 on your Pi.
 R:80:localhost:80
 ```
