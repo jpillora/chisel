@@ -69,6 +69,7 @@ services:
     # ⬇️ Pass CLI arguments one at a time in an array, as required by compose.
     command:
       - 'server'
+      # ⬇️ Use the --key=value syntax, since docker compose doesn't parse whitespace well.
       - '--authfile=/users.json'
       - '--reverse'
     # ⬇️ Mount the authfile as a docker volume
