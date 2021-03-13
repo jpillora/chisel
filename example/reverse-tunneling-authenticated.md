@@ -55,3 +55,25 @@ R:80:localhost:80
 This guide makes use of Docker and docker-compose to accomplish the same task as the above guide, using the chisel container.
 
 It assumes your webserver is also containerized and listening on port 80.
+
+### Server
+
+```yaml
+version: '3'
+
+services:
+  chisel:
+    image: jpillora/chisel
+    restart: unless-stopped
+    container_name: chisel
+    # ⬇️ Pass CLI arguments one at a time in an array, as required by compose.
+    command:
+      - 'server'
+      - '--authfile=/users.json'
+      - '--reverse'
+    # ⬇️ Mount the authfile as a docker volume
+    volumes:
+      - './users.json:/users.json'
+    # ⬇️ Give the container unrestricted access to the docker host's network
+    network_mode: host
+```
