@@ -4,7 +4,8 @@
 
 This guide will show you how to use an internet-facing server (for example, a cloud VPS) as a relay to bounce traffic down to your local webserver.
 
-## Server
+## Chisel CLI
+### Server
 
 Setup a relay server to bounce down traffic on port 80:
 
@@ -26,7 +27,7 @@ The corresponding `authfile` might look like this:
 }
 ```
 
-## Client
+### Client
 
 Setup a chisel client to receive bounced-down traffic and forward it to the webserver running on the Pi:
 
