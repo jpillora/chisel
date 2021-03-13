@@ -47,3 +47,11 @@ example.com \
 # port 80 on your Pi.
 R:80:localhost:80
 ```
+
+---
+
+## Chisel Docker Container
+
+This guide makes use of Docker and docker-compose to accomplish the same task as the above guide, using the chisel container.
+
+It assumes your webserver is also containerized and listening on port 80.
