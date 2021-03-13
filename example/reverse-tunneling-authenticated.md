@@ -1,6 +1,8 @@
 # Reverse Tunneling
 
-This guide will show you how to use a publicly-visible server to relay traffic. For example, to self-host a website on port 80 without opening ports on your router.
+> **Use Case**: Host a website on your Raspberry Pi without opening ports on your router.
+
+This guide will show you how to use an internet-facing server (for example, a cloud VPS) as a relay to bounce traffic down to your local webserver.
 
 ## Server
 
