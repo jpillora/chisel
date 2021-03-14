@@ -90,6 +90,8 @@ The `authfile` (`users.json`) remains the same as in the non-containerized versi
 
 ### Client
 
+Setup an instance of the Chisel client on the Pi to receive relayed TCP traffic and feed it to the web server:
+
 ```yaml
 version: '3'
 
