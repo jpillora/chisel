@@ -67,7 +67,7 @@ services:
     image: jpillora/chisel
     restart: unless-stopped
     container_name: chisel
-    # ⬇️ Pass CLI arguments one at a time in an array, as required by compose.
+    # ⬇️ Pass CLI arguments one at a time in an array, as required by docker compose.
     command:
       - 'server'
       # ⬇️ Use the --key=value syntax, since docker compose doesn't parse whitespace well.
