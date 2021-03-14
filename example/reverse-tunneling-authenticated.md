@@ -2,7 +2,7 @@
 
 > **Use Case**: Host a website on your Raspberry Pi without opening ports on your router.
 
-This guide will show you how to use an internet-facing server (for example, a cloud VPS) as a relay to bounce down TCP traffic on Port 80 to your Raspberry Pi.
+This guide will show you how to use an internet-facing server (for example, a cloud VPS) as a relay to bounce down TCP traffic on port 80 to your Raspberry Pi.
 
 ## Chisel CLI
 
