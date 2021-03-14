@@ -8,7 +8,7 @@ This guide will show you how to use an internet-facing server (for example, a cl
 
 ### Server
 
-Setup a relay server to bounce down traffic on port 80:
+Setup a relay server on the VPS to bounce down TCP traffic on port 80:
 
 ```bash
 #!/bin/bash
