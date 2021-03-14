@@ -113,7 +113,7 @@ services:
       - 'R:80:webserver:80'
     networks:
       - internal
-  # ⬇️ Basic nginx webserver for demo purposes.
+  # ⬇️ Basic Nginx webserver for demo purposes.
   webserver:
     image: nginx
     restart: unless-stopped
