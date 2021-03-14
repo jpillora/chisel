@@ -73,10 +73,10 @@ services:
       # ⬇️ Use the --key=value syntax, since Docker compose doesn't parse whitespace well.
       - '--authfile=/users.json'
       - '--reverse'
-    # ⬇️ Mount the authfile as a docker volume
+    # ⬇️ Mount the authfile as a Docker volume
     volumes:
       - './users.json:/users.json'
-    # ⬇️ Give the container unrestricted access to the docker host's network
+    # ⬇️ Give the container unrestricted access to the Docker host's network
     network_mode: host
 ```
 
@@ -119,7 +119,7 @@ services:
     networks:
       - internal
 
-# ⬇️ Make use of a docker network called `internal`.
+# ⬇️ Make use of a Docker network called `internal`.
 networks:
   internal:
 ```
