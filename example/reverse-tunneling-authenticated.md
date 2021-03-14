@@ -51,13 +51,15 @@ R:80:localhost:80
 
 ---
 
-## Chisel Container
+## Docker Container
 
 This guide makes use of Docker and Docker compose to accomplish the same task as the above guide.
 
 It assumes your webserver is also containerized and listening on port 80.
 
 ### Server
+
+Setup a relay server on the VPS to bounce down TCP traffic on port 80:
 
 ```yaml
 version: '3'
