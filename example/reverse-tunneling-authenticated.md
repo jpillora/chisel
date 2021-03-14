@@ -67,10 +67,10 @@ services:
     image: jpillora/chisel
     restart: unless-stopped
     container_name: chisel
-    # ⬇️ Pass CLI arguments one at a time in an array, as required by docker compose.
+    # ⬇️ Pass CLI arguments one at a time in an array, as required by Docker compose.
     command:
       - 'server'
-      # ⬇️ Use the --key=value syntax, since docker compose doesn't parse whitespace well.
+      # ⬇️ Use the --key=value syntax, since Docker compose doesn't parse whitespace well.
       - '--authfile=/users.json'
       - '--reverse'
     # ⬇️ Mount the authfile as a docker volume
