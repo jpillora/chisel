@@ -129,8 +129,14 @@ $ chisel server --help
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. It is equivalent to creating an
-    authfile with {"<user:pass>": [""]}. If unset, it will use the
-    environment variable AUTH.
+    authfile with {"<user:pass>": [""]}. To provide auth info securely,
+    use the string "stdin" instead of the normal "user:pass" string. If
+    a full tty shell is not present you can provide auth info as a file
+    or an environment variable. To provide a file, use a greater than
+    symbol (>) followed by the file name (relative or absolute path if
+    the file is not in the same directory). To provide an environment
+    variable, use an equal sign (=) followed by the name of the 
+    environment variable.
 
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
