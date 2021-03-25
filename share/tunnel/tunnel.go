@@ -21,10 +21,11 @@ import (
 //Config a Tunnel
 type Config struct {
 	*cio.Logger
-	Inbound   bool
-	Outbound  bool
-	Socks     bool
-	KeepAlive time.Duration
+	Inbound      bool
+	Outbound     bool
+	Socks        bool
+	Socks5Config Socks5Config
+	KeepAlive    time.Duration
 }
 
 //Tunnel represents an SSH tunnel with proxy capabilities.
@@ -61,7 +62,7 @@ func New(c Config) *Tunnel {
 		if t.Logger.Debug {
 			sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
 		}
-		t.socksServer, _ = socks5.New(&socks5.Config{Logger: sl})
+		t.socksServer, _ = CreateSocks5Server(sl, c)
 		extra += " (SOCKS enabled)"
 	}
 	t.Debugf("Created%s", extra)

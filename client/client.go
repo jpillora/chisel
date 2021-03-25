@@ -33,6 +33,7 @@ import (
 type Config struct {
 	Fingerprint      string
 	Auth             string
+	Socks5Config     tunnel.Socks5Config
 	KeepAlive        time.Duration
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
@@ -176,10 +177,11 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//prepare client tunnel
 	client.tunnel = tunnel.New(tunnel.Config{
-		Logger:   client.Logger,
-		Inbound:  true, //client always accepts inbound
-		Outbound: hasReverse,
-		Socks:    hasReverse && hasSocks,
+		Logger:       client.Logger,
+		Inbound:      true, //client always accepts inbound
+		Outbound:     hasReverse,
+		Socks:        hasReverse && hasSocks,
+		Socks5Config: c.Socks5Config,
 	})
 	return client, nil
 }
