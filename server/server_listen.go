@@ -23,6 +23,10 @@ type TLSConfig struct {
 }
 
 func (s *Server) listener(host, port string) (net.Listener, error) {
+	if s.config.Listener != nil {
+		return s.config.Listener, nil
+	}
+
 	hasDomains := len(s.config.TLS.Domains) > 0
 	hasKeyCert := s.config.TLS.Key != "" && s.config.TLS.Cert != ""
 	if hasDomains && hasKeyCert {
