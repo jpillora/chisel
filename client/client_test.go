@@ -97,6 +97,7 @@ func TestVerifyFingerprint(t *testing.T) {
 	config := Config{
 		Fingerprint: "qmrRoo8MIqePv3jC8+wv49gU6uaFgD3FASQx9V8KdmY=",
 		Server:      "http://localhost",
+
 	}
 	c, err := NewClient(&config)
 	if err != nil {
