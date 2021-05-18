@@ -37,6 +37,14 @@ See [the latest release](https://github.com/jpillora/chisel/releases/latest) or 
 docker run --rm -it jpillora/chisel --help
 ```
 
+**Fedora**
+
+The package is maintained by the Fedora community. If you encounter issues related to the usage of the RPM, please use this [issue tracker](https://bugzilla.redhat.com/buglist.cgi?bug_status=NEW&bug_status=ASSIGNED&classification=Fedora&component=chisel&list_id=11614537&product=Fedora&product=Fedora%20EPEL).
+
+```sh
+sudo dnf -y install chisel
+```
+
 **Source**
 
 ```sh
