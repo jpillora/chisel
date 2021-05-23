@@ -42,6 +42,7 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	LogInfo          bool
 }
 
 //TLSConfig for a Client
@@ -103,7 +104,7 @@ func NewClient(c *Config) (*Client, error) {
 		tlsConfig: nil,
 	}
 	//set default log level
-	client.Logger.Info = true
+	client.Logger.Info = c.LogInfo
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
