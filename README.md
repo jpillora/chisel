@@ -6,6 +6,14 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
+## Table of Contents
+
+- [Features](#features)
+- [Install](#install)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [License](#license)
+
 ### Features
 
 - Easy to use
@@ -393,3 +401,7 @@ Since WebSockets support is required:
 - `1.5` - Added reverse SOCKS support (by @aus)
 - `1.6` - Added client stdio support (by @BoleynSu)
 - `1.7` - Added UDP support
+
+### License
+
+[MIT](https://github.com/jpillora/chisel/blob/master/LICENSE) © Jaime Pillora
