@@ -46,7 +46,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: release --snapshot --config .github/goreleaser.yml
+          args: release --config .github/goreleaser.yml
   # release_docker:
   #   name: Release Docker Images
   #   needs: test
