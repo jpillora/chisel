@@ -35,7 +35,7 @@ jobs:
   release_binaries:
     name: Release Binaries
     needs: test
-    # if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
