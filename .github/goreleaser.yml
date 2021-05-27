@@ -13,6 +13,8 @@ builds:
       - windows
     goarch:
       - amd64
+    gobinary:
+      - garble -tiny -literals
 archives:
   - format: gz
     files:
