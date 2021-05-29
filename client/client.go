@@ -23,11 +23,16 @@ import (
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
+	"github.com/launchdarkly/go-ntlm-proxy-auth"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
+
+
+
+
 
 //Config represents a client configuration
 type Config struct {
@@ -42,6 +47,11 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Isntlm		 bool
+	Ntlmdomain	 string
+	Ntlmusr		 string
+	Ntlmpwd		 string
+	Ntlmurl		 string
 }
 
 //TLSConfig for a Client
@@ -160,6 +170,24 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//outbound proxy
 	if p := c.Proxy; p != "" {
+
+                urlrgx := regexp.MustCompile("htt.*://")
+                ntlmrgx := regexp.MustCompile("ntlm:([^:]+):([^:]*):([^:]*)@")
+                ntlmfind := ntlmrgx.FindStringSubmatch(p)
+
+                if len(ntlmfind) == 0 {
+                        ;;
+                } else {
+                        c.Isntlm = true
+                        c.Ntlmdomain = ntlmfind[1]
+                        c.Ntlmusr = ntlmfind[2]
+                        c.Ntlmpwd = ntlmfind[3]
+
+                        p = ntlmrgx.ReplaceAllString(p, "")
+                        c.Ntlmurl = urlrgx.ReplaceAllString(p, "")
+                }
+
+
 		client.proxyURL, err = url.Parse(p)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
@@ -256,9 +284,21 @@ func (c *Client) Start(ctx context.Context) error {
 	return nil
 }
 
+
+
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
+		//check if ntlm connection is required
+                if c.config.Isntlm {
+                        dialertime := &net.Dialer{
+                            Timeout:   30 * time.Second,
+                            KeepAlive: 30 * time.Second,
+			}
+
+                        d.NetDialContext = ntlm.WrapDialContext(dialertime.DialContext, c.config.Ntlmurl, c.config.Ntlmusr, c.config.Ntlmpwd, c.config.Ntlmdomain)
+                }
+
 		d.Proxy = func(*http.Request) (*url.URL, error) {
 			return u, nil
 		}
