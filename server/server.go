@@ -27,6 +27,7 @@ type Config struct {
 	Auth      string
 	Proxy     string
 	Socks5    bool
+	Sftp      bool
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
