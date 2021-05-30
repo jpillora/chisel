@@ -202,7 +202,6 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	got := ccrypto.FingerprintKey(key)
 	_, err := base64.StdEncoding.DecodeString(expect)
 	if _, ok := err.(base64.CorruptInputError); ok {
-		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)
 		return c.verifyLegacyFingerprint(key)
 	} else if err != nil {
 		return fmt.Errorf("Error decoding fingerprint: %w", err)
