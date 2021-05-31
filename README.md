@@ -1,4 +1,4 @@
-# chisel
+# Chisel
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel) [![CI](https://github.com/jpillora/chisel/workflows/CI/badge.svg)](https://github.com/jpillora/chisel/actions?workflow=CI)
 
@@ -6,7 +6,17 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
-### Features
+## Table of Contents
+
+- [Features](#features)
+- [Install](#install)
+- [Demo](#demo)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [Changelog](#changelog)
+- [License](#license)
+
+## Features
 
 - Easy to use
 - [Performant](./test/bench/perf.md)\*
@@ -21,15 +31,15 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 - Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
 - Client connections over stdio which supports `ssh -o ProxyCommand` providing SSH over HTTP
 
-### Install
+## Install
 
-**Binaries**
+### Binaries
 
 [![Releases](https://img.shields.io/github/release/jpillora/chisel.svg)](https://github.com/jpillora/chisel/releases) [![Releases](https://img.shields.io/github/downloads/jpillora/chisel/total.svg)](https://github.com/jpillora/chisel/releases)
 
 See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel! | bash`
 
-**Docker**
+### Docker
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://images.microbadger.com/badges/image/jpillora/chisel.svg)](https://microbadger.com/images/jpillora/chisel)
 
@@ -37,7 +47,7 @@ See [the latest release](https://github.com/jpillora/chisel/releases/latest) or 
 docker run --rm -it jpillora/chisel --help
 ```
 
-**Fedora**
+### Fedora
 
 The package is maintained by the Fedora community. If you encounter issues related to the usage of the RPM, please use this [issue tracker](https://bugzilla.redhat.com/buglist.cgi?bug_status=NEW&bug_status=ASSIGNED&classification=Fedora&component=chisel&list_id=11614537&product=Fedora&product=Fedora%20EPEL).
 
@@ -45,13 +55,13 @@ The package is maintained by the Fedora community. If you encounter issues relat
 sudo dnf -y install chisel
 ```
 
-**Source**
+### Source
 
 ```sh
 $ go get -v github.com/jpillora/chisel
 ```
 
-### Demo
+## Demo
 
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
@@ -70,7 +80,7 @@ $ chisel client https://chisel-demo.herokuapp.com 3000
 
 and then visit [localhost:3000](http://localhost:3000/), we should see a directory listing. Also, if we visit the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's default proxy and see a copy of [example.com](http://example.com).
 
-### Usage
+## Usage
 
 <!-- render these help texts by hand,
   or use https://github.com/jpillora/md-tmpl
@@ -365,7 +375,7 @@ chisel client --fingerprint 'rHb55mcxf6vSckL2AezFV09rLs7pfPpavVu++MF7AhQ=' <serv
 4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
 
 
-### Caveats
+#### Caveats
 
 Since WebSockets support is required:
 
@@ -375,7 +385,7 @@ Since WebSockets support is required:
   - Openshift has full support though connections are only accepted on ports 8443 and 8080
   - Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
 
-### Contributing
+## Contributing
 
 - http://golang.org/doc/code.html
 - http://golang.org/doc/effective_go.html
@@ -383,7 +393,7 @@ Since WebSockets support is required:
 - `github.com/jpillora/chisel/server` contains the server package
 - `github.com/jpillora/chisel/client` contains the client package
 
-### Changelog
+## Changelog
 
 - `1.0` - Initial release
 - `1.1` - Replaced simple symmetric encryption for ECDSA SSH
@@ -393,3 +403,7 @@ Since WebSockets support is required:
 - `1.5` - Added reverse SOCKS support (by @aus)
 - `1.6` - Added client stdio support (by @BoleynSu)
 - `1.7` - Added UDP support
+
+## License
+
+[MIT](https://github.com/jpillora/chisel/blob/master/LICENSE) © Jaime Pillora
