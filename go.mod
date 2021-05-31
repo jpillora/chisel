@@ -1,4 +1,4 @@
-module github.com/jpillora/chisel
+module github.com/zuzgon/chisel
 
 go 1.13
 
