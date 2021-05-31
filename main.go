@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
-	chshare "github.com/jpillora/chisel/share"
-	"github.com/jpillora/chisel/share/cos"
+	chclient "github.com/zuzgon/chisel/client"
+	chserver "github.com/zuzgon/chisel/server"
+	chshare "github.com/zuzgon/chisel/share"
+	"github.com/zuzgon/chisel/share/cos"
 )
 
 var help = `
@@ -424,6 +424,7 @@ func client(args []string) {
 		config.Headers.Set("Host", *hostname)
 	}
 	//ready
+	config.Verbose = *verbose
 	c, err := chclient.NewClient(&config)
 	if err != nil {
 		log.Fatal(err)
