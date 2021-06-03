@@ -11,9 +11,6 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 - [Chisel](#chisel)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
-    - [Performance](#performance)
-    - [Security](#security)
-    - [Resiliency](#resiliency)
   - [Install](#install)
     - [Binaries](#binaries)
     - [Docker](#docker)
@@ -21,7 +18,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
     - [Source](#source)
   - [Demo](#demo)
   - [Usage](#usage)
-    - [Security](#security-1)
+    - [Security](#security)
     - [Authentication](#authentication)
     - [SOCKS5 Guide](#socks5-guide)
       - [Caveats](#caveats)
@@ -31,13 +28,21 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 ## Features
 
-Chisel is an easy-to-use application with a simple CLI. Examples are provided for common use cases in [docs](example/), such as forwarding traffic to your Raspberry Pi behind a firewall.
+**Simplicity**
 
-### Performance
+Chisel is a lightweight, easy-to-use application packaged as a single binary. [Examples](example/) for common use cases are provided.
 
-### Security
+**Performance**
 
-### Resiliency
+Chisel uses WebSockets under the hood to provide a performant connection with low latency. Read more in our [performance](test/bench/perf.md) doc.
+
+**Security**
+
+Chisel encrypts connections with ECDSA and supports multiple methods of authentication. See [security](#security) for details.
+
+**Resiliency**
+
+Chisel supports automatic reconnection with [exponential backoff](https://github.com/jpillora/backoff).
 
 ---
 
