@@ -20,7 +20,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 **Simplicity**
 
-Chisel is a lightweight, easy-to-use application packaged as a single binary. [Examples](example/) for common use cases are provided.
+Chisel is a lightweight, easy-to-use application packaged as a single binary. [Examples](example/) for common use cases are provided for convenience.
 
 **Performance**
 
