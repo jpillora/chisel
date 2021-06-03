@@ -1,8 +1,8 @@
 # Chisel Features
 
 - Easy to use
-- [Performant](./test/bench/perf.md)\*
-- [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
+- [Performant](/test/bench/perf.md)\*
+- [Encrypted connections](/README/#security) using the SSH protocol (via `crypto/ssh`)
 - [Authenticated connections](/README.md/#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
 - Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
 - Clients can create multiple tunnel endpoints over one TCP connection
