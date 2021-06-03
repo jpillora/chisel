@@ -8,23 +8,13 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 ## Table of Contents
 
-- [Chisel](#chisel)
-  - [Table of Contents](#table-of-contents)
-  - [Features](#features)
-  - [Install](#install)
-    - [Binaries](#binaries)
-    - [Docker](#docker)
-    - [Fedora](#fedora)
-    - [Source](#source)
-  - [Demo](#demo)
-  - [Usage](#usage)
-    - [Security](#security)
-    - [Authentication](#authentication)
-    - [SOCKS5 Guide](#socks5-guide)
-      - [Caveats](#caveats)
-  - [Contributing](#contributing)
-  - [Changelog](#changelog)
-  - [License](#license)
+- [Features](#features)
+- [Install](#install)
+- [Demo](#demo)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [Changelog](#changelog)
+- [License](#license)
 
 ## Features
 
