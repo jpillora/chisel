@@ -36,7 +36,7 @@ In client mode, Chisel supports automatic reconnection with [exponential backoff
 
 **Flexibility**
 
-Chisel supports connections through TCP, SOCKS5, and HTTP. A single TCP connection can support multiple tunnel endpoints.
+In addition to "raw" TCP forwarding, Chisel supports tunneling over SOCKS5 and HTTP CONNECT. A single TCP connection can support multiple tunnel endpoints.
 
 Reverse port forwarding is also supported, allowing the user to bounce down incoming traffic from a server on the public internet to clients behind a firewall.
 
