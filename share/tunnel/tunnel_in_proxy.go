@@ -11,8 +11,8 @@ import (
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
-	"github.com/jpillora/chisel/share/socks5"
 	"github.com/jpillora/sizestr"
+	"github.com/meteorite/socks5"
 	"golang.org/x/crypto/ssh"
 )
 

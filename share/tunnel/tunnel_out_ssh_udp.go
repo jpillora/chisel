@@ -3,7 +3,7 @@ package tunnel
 import (
 	"context"
 	"encoding/gob"
-	"github.com/jpillora/chisel/share/socks5/scope"
+	"github.com/meteorite/scope"
 	"golang.org/x/sync/errgroup"
 	"io"
 	"net"

@@ -2,7 +2,7 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/jpillora/chisel/share/socks5"
+	"github.com/meteorite/socks5"
 	"io"
 	"net"
 	"strings"
