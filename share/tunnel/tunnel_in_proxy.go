@@ -70,7 +70,7 @@ func (p *Proxy) listen() error {
 				sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
 			}
 			p.socksServer, _ = socks5.New(&socks5.Config{
-				Handler: makeChiselSocksHandler(p, udpAddr, sl),
+				Handler: newSocksHandler(p, udpAddr, sl),
 			})
 		}
 		p.Infof("Listening")

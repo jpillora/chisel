@@ -12,15 +12,15 @@ import (
 	"net"
 )
 
-type chiselSocksHandler struct {
+type socksHandler struct {
 	p            *Proxy
 	udpLocalAddr *socks5.AddrSpec
 	sl           *log.Logger
 	udp          *socks5.SingleUDPPortAssociate
 }
 
-func makeChiselSocksHandler(p *Proxy, localUDPAddr *net.UDPAddr, sl *log.Logger) *chiselSocksHandler {
-	return &chiselSocksHandler{
+func newSocksHandler(p *Proxy, localUDPAddr *net.UDPAddr, sl *log.Logger) *socksHandler {
+	return &socksHandler{
 		p: p,
 		udpLocalAddr: &socks5.AddrSpec{
 			IP:   localUDPAddr.IP,
@@ -30,16 +30,16 @@ func makeChiselSocksHandler(p *Proxy, localUDPAddr *net.UDPAddr, sl *log.Logger)
 	}
 }
 
-func (h *chiselSocksHandler) OnStartServe(ctxServer socks5.ContextGo, _ net.Listener) error {
+func (h *socksHandler) OnStartServe(ctxServer socks5.ContextGo, _ net.Listener) error {
 	h.udp = socks5.MakeSingleUDPPortAssociate(h.udpLocalAddr, h, h.sl)
 	return h.udp.ListenAndServeUDPPort(ctxServer, "udp")
 }
 
-func (h *chiselSocksHandler) ErrLog() socks5.ErrorLogger {
+func (h *socksHandler) ErrLog() socks5.ErrorLogger {
 	return h.sl
 }
 
-func (h *chiselSocksHandler) OnConnect(ctx context.Context, conn net.Conn, req *socks5.Request) error {
+func (h *socksHandler) OnConnect(ctx context.Context, conn net.Conn, req *socks5.Request) error {
 	return h.p.pipeRemote(ctx, conn, req.DestAddr.Address()+"/sot", func(dst ssh.Channel) error {
 		code := []byte{0}
 		_, err := dst.Read(code)
@@ -59,11 +59,11 @@ func (h *chiselSocksHandler) OnConnect(ctx context.Context, conn net.Conn, req *
 	})
 }
 
-func (h *chiselSocksHandler) OnAssociate(_ context.Context, conn net.Conn, _ *socks5.Request) error {
+func (h *socksHandler) OnAssociate(_ context.Context, conn net.Conn, _ *socks5.Request) error {
 	return h.udp.OnAssociate(conn)
 }
 
-func (h *chiselSocksHandler) MaxUDPPacketSize() uint {
+func (h *socksHandler) MaxUDPPacketSize() uint {
 	return maxMTU
 }
 
@@ -73,7 +73,7 @@ type socksUdpConnector struct {
 	outbound *udpChannel
 }
 
-func (h *chiselSocksHandler) MakeRemoteUDPConn(
+func (h *socksHandler) MakeRemoteUDPConn(
 	ctxClient socks5.ContextGo, _ socks5.ContextGo, sendBack socks5.UDPSendBack, onBroken func(),
 ) (socks5.RemoteUDPConn, error) {
 	sshConn := h.p.sshTun.getSSH(ctxClient.Ctx())
