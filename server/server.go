@@ -30,6 +30,7 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
+	Verbose   bool
 }
 
 // Server respresent a chisel service
@@ -59,7 +60,7 @@ func NewServer(c *Config) (*Server, error) {
 		Logger:     cio.NewLogger("server"),
 		sessions:   settings.NewUsers(),
 	}
-	server.Info = true
+	server.Info = c.Verbose
 	server.users = settings.NewUserIndex(server.Logger)
 	if c.AuthFile != "" {
 		if err := server.users.LoadUsers(c.AuthFile); err != nil {
