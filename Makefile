@@ -12,7 +12,7 @@ GOFILESNOTEST=`go list ./... | grep -v test`
 $(shell mkdir -p ${DIR})
 
 all:
-	@goreleaser --skip-publish --config .github/goreleaser.yml
+	@goreleaser build --skip-validate --single-target --config .github/goreleaser.yml
 
 freebsd: lint
 	env CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-freebsd_amd64 .
@@ -46,7 +46,7 @@ test: ## Run unit tests
 	@gocover-cobertura < ${DIR}/coverage.out > ${DIR}/coverage.xml
 
 release: lint test
-	goreleaser release
+	goreleaser release --config .github/goreleaser.yml
 
 clean:
 	rm -rf ${DIRBASE}/*
