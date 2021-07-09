@@ -342,6 +342,15 @@ var clientHelp = `
     the credentials inside the server's --authfile. defaults to the
     AUTH environment variable.
 
+    --socks5-auth, An optional username and password for socks5 server
+    in the form: "<user>:<pass>". These credentials will then be required
+    by Socks5 server when new client is connecting. Defaults to the
+    AUTH_SOCKS5 environment variable.
+
+    --socks5-allowed-hosts, An optional list of hosts (comma delimited) on
+    the client side which will be allowed to connect to by socks5 client.
+    Only FQDN values are accepted
+
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
@@ -400,6 +409,10 @@ func client(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
+
+	flags.StringVar(&config.Socks5Config.Auth, "socks5-auth", "", "")
+	socks5Allowedhosts := flags.String("socks5-allowed-hosts", "", "")
+
 	hostname := flags.String("hostname", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
@@ -419,6 +432,15 @@ func client(args []string) {
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
 	}
+
+	//default socks5 auth
+	if config.Socks5Config.Auth == "" {
+		config.Socks5Config.Auth = os.Getenv("AUTH_SOCKS5")
+	}
+	if *socks5Allowedhosts != "" {
+		config.Socks5Config.AllowedHosts = strings.Split(*socks5Allowedhosts, ",")
+	}
+
 	//move hostname onto headers
 	if *hostname != "" {
 		config.Headers.Set("Host", *hostname)
