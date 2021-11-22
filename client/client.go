@@ -64,7 +64,7 @@ type Client struct {
 	connCount cnet.ConnCount
 	stop      func()
 	eg        *errgroup.Group
-	tunnel    *tunnel.Tunnel
+	Tunnel    *tunnel.Tunnel
 }
 
 //NewClient creates a new client instance
@@ -175,7 +175,7 @@ func NewClient(c *Config) (*Client, error) {
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
 	//prepare client tunnel
-	client.tunnel = tunnel.New(tunnel.Config{
+	client.Tunnel = tunnel.New(tunnel.Config{
 		Logger:   client.Logger,
 		Inbound:  true, //client always accepts inbound
 		Outbound: hasReverse,
@@ -251,7 +251,7 @@ func (c *Client) Start(ctx context.Context) error {
 		if len(clientInbound) == 0 {
 			return nil
 		}
-		return c.tunnel.BindRemotes(ctx, clientInbound)
+		return c.Tunnel.BindRemotes(ctx, clientInbound)
 	})
 	return nil
 }
