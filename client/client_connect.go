@@ -136,7 +136,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	c.Infof("Connected (Latency %s)", time.Since(t0))
 	//connected, handover ssh connection for tunnel to use, and block
 	retry = true
-	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
+	err = c.Tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	if n, ok := err.(net.Error); ok && !n.Temporary() {
 		retry = false
 	}
