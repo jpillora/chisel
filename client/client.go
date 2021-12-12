@@ -299,3 +299,7 @@ func (c *Client) Close() error {
 	}
 	return nil
 }
+
+func (c *Client) GetTunnelSSHConn(ctx context.Context) ssh.Conn {
+	return c.tunnel.GetSSH(ctx)
+}
