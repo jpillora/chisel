@@ -34,7 +34,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//no proxy defined, provide access to health/version checks
-	switch r.URL.String() {
+	switch r.URL.Path {
 	case "/health":
 		w.Write([]byte("OK\n"))
 		return
