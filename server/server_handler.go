@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"net"
 
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cnet"
