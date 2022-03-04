@@ -94,12 +94,14 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	if err != nil {
 		return false, true, err
 	}
-	conn := cnet.NewWebSocketConn(wsConn)
-	tcpConn, ok := conn.(*net.TCPConn)
+	ulwsConn := wsConn.UnderlyingConn()
+	tcpConn, ok := ulwsConn.(*net.TCPConn)
 	if ok {
-		c.Infof("SetKeepAlive false\n")
+		c.Debugf("SetKeepAlive false\n")
 		tcpConn.SetKeepAlive(false)
 	}
+	
+	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
