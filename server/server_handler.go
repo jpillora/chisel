@@ -57,6 +57,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		l.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
+	ulwsConn := wsConn.UnderlyingConn()
+	tcpConn, ok := ulwsConn.(*net.TCPConn)
+	if ok {
+		s.Debugf("SetKeepAlive false\n")
+		tcpConn.SetKeepAlive(false)
+	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	tcpConn, ok := conn.(*net.TCPConn)
 	if ok {
