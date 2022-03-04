@@ -60,7 +60,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	ulwsConn := wsConn.UnderlyingConn()
 	tcpConn, ok := ulwsConn.(*net.TCPConn)
 	if ok {
-		s.Debugf("SetKeepAlive false\n")
 		tcpConn.SetKeepAlive(false)
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
