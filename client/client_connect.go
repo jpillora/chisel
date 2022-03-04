@@ -97,7 +97,6 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	ulwsConn := wsConn.UnderlyingConn()
 	tcpConn, ok := ulwsConn.(*net.TCPConn)
 	if ok {
-		c.Debugf("SetKeepAlive false\n")
 		tcpConn.SetKeepAlive(false)
 	}
 	
