@@ -97,6 +97,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	conn := cnet.NewWebSocketConn(wsConn)
 	tcpConn, ok := conn.(*net.TCPConn)
 	if ok {
+		c.Infof("SetKeepAlive false\n")
 		tcpConn.SetKeepAlive(false)
 	}
 	// perform SSH handshake on net.Conn
