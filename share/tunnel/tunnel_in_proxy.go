@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
@@ -26,6 +27,7 @@ type Proxy struct {
 	dialer net.Dialer
 	tcp    *net.TCPListener
 	udp    *udpListener
+	mu     sync.Mutex
 }
 
 //NewProxy creates a Proxy
@@ -122,8 +124,12 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 
 func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	defer src.Close()
+
+	p.mu.Lock()
 	p.count++
 	cid := p.count
+	p.mu.Unlock()
+
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
 	sshConn := p.sshTun.getSSH(ctx)
