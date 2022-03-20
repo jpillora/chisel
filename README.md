@@ -41,7 +41,7 @@ See [the latest release](https://github.com/jpillora/chisel/releases/latest) or 
 
 ### Docker
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://images.microbadger.com/badges/image/jpillora/chisel.svg)](https://microbadger.com/images/jpillora/chisel)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://img.shields.io/docker/image-size/jpillora/chisel/latest)](https://microbadger.com/images/jpillora/chisel)
 
 ```sh
 docker run --rm -it jpillora/chisel --help
@@ -58,7 +58,7 @@ sudo dnf -y install chisel
 ### Source
 
 ```sh
-$ go get -v github.com/jpillora/chisel
+$ go install github.com/jpillora/chisel@latest -v
 ```
 
 ## Demo
