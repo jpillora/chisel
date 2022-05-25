@@ -15,6 +15,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"syscall"
+	"os"
+	"bufio"
 
 	"github.com/gorilla/websocket"
 	chshare "github.com/jpillora/chisel/share"
@@ -27,6 +30,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/term"
 )
 
 //Config represents a client configuration
@@ -261,6 +265,27 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
 	if !strings.HasPrefix(u.Scheme, "socks") {
 		d.Proxy = func(*http.Request) (*url.URL, error) {
+			if u.User != nil {
+				pass, _ := u.User.Password()
+				if pass == "" {
+					fmt.Print("*** Enter proxy password: ")
+					if term.IsTerminal(syscall.Stdin) {
+						inputPass, err := term.ReadPassword(int(syscall.Stdin))
+						if err != nil {
+							return nil, err
+						}
+						pass = string(inputPass)
+					} else {
+						reader := bufio.NewReader(os.Stdin)
+						inputPass, err := reader.ReadString('\n')
+						if err != nil {
+							return nil, err
+						}
+						pass = inputPass
+					}
+					u.User = url.UserPassword(u.User.Username(), strings.TrimSpace(pass))
+				}
+			}
 			return u, nil
 		}
 		return nil
