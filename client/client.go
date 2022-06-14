@@ -129,7 +129,7 @@ func NewClient(c *Config) (*Client, error) {
 				return nil, fmt.Errorf("Error loading client cert and key pair: %v", err)
 			}
 			tc.Certificates = []tls.Certificate{c}
-		} else if c.TLS.Cert != "" || c.TLS.Key != "" {
+		} else {
 			return nil, fmt.Errorf("Please specify client BOTH cert and key")
 		}
 		client.tlsConfig = tc
