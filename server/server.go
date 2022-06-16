@@ -135,7 +135,7 @@ func (s *Server) Start(host, port string) error {
 func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	s.Infof("Fingerprint %s", s.fingerprint)
 	if s.users.Len() > 0 {
-		s.Infof("User authenication enabled")
+		s.Infof("User authentication enabled")
 	}
 	if s.reverseProxy != nil {
 		s.Infof("Reverse proxy enabled")
@@ -170,7 +170,7 @@ func (s *Server) GetFingerprint() string {
 
 // authUser is responsible for validating the ssh user / password combination
 func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
-	// check if user authenication is enable and it not allow all
+	// check if user authentication is enabled and if not, allow all
 	if s.users.Len() == 0 {
 		return nil, nil
 	}
