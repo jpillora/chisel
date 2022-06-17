@@ -173,9 +173,7 @@ func NewClient(c *Config) (*Client, error) {
                 ntlmrgx := regexp.MustCompile("ntlm:([^:]+):([^:]*):([^:]*)@")
                 ntlmfind := ntlmrgx.FindStringSubmatch(p)
 
-                if len(ntlmfind) == 0 {
-                        ;;
-                } else {
+                if len(ntlmfind) != 0 {
                         c.Isntlm = true
                         c.Ntlmdomain = ntlmfind[1]
                         c.Ntlmusr = ntlmfind[2]
