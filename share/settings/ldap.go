@@ -56,7 +56,7 @@ func LdapAuthUser(user *User,password []byte,ldapconfig LdapConfig) error {
 	log.Printf("DN:%s",userdn)
 
 	if len(result.Entries) != 1 {
-		log.Printf("too many entries returned")
+		log.Printf("too many entries returned for user %s",user.Name)
 		return fmt.Errorf("too many entries returned")
 	}
 // Bind as the user to verify their password
@@ -71,7 +71,6 @@ func LdapAuthUser(user *User,password []byte,ldapconfig LdapConfig) error {
 // Ldap Connection with TLS
 func ConnectTLS(ldapconfig LdapConfig) (*ldap.Conn, error) {
 	var tlsConf *tls.Config
-//	var certpool *x509.CertPool
 
 	if ldapconfig.Insecure {
 		tlsConf = &tls.Config{InsecureSkipVerify: true}
