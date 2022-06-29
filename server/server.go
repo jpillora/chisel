@@ -30,6 +30,8 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
+	LdapConfigFile	string
+	LdapConfig settings.LdapConfig
 }
 
 // Server respresent a chisel service
@@ -113,6 +115,12 @@ func NewServer(c *Config) (*Server, error) {
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
 	}
+	// ldap authentication
+	if c.LdapConfigFile != "" {
+		if c.LdapConfig,err = server.LdapParseConfig(c.LdapConfigFile); err != nil {
+			return nil, err
+		}
+	}
 	return server, nil
 }
 
@@ -177,7 +185,7 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
+	if !found || ( user.Pass != string(password) && s.config.LdapConfigFile == "" ) || ( s.config.LdapConfigFile != "" && found && settings.LdapAuthUser(user,password,s.config.LdapConfig) != nil) {
 		s.Debugf("Login failed for user: %s", n)
 		return nil, errors.New("Invalid authentication for username: %s")
 	}
@@ -214,4 +222,10 @@ func (s *Server) DeleteUser(user string) {
 // Use nil to remove all.
 func (s *Server) ResetUsers(users []*settings.User) {
 	s.users.Reset(users)
+}
+
+// LdapParseConfig is validating the given ldap config
+func (s *Server) LdapParseConfig(LdapConfigFile string) (settings.LdapConfig,error) {
+	ldapConfig,err := settings.ParseConfigFile(LdapConfigFile)
+	return ldapConfig,err
 }

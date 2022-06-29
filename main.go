@@ -159,9 +159,13 @@ var serverHelp = `
     provide a certificate notification email by setting CHISEL_LE_EMAIL.
 
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
-    holding multiple PEM encode CA certificate bundle files, which is used to 
-    validate client connections. The provided CA certificates will be used 
-    instead of the system roots. This is commonly used to implement mutual-TLS. 
+    holding multiple PEM encode CA certificate bundle files, which is used to
+    validate client connections. The provided CA certificates will be used
+    instead of the system roots. This is commonly used to implement mutual-TLS.
+
+    --ldap-config, a path to a file containing the ldap authentication
+		configuration.
+
 ` + commonHelp
 
 func server(args []string) {
@@ -181,6 +185,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
+	flags.StringVar(&config.LdapConfigFile,"ldap-config","","")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -322,7 +327,7 @@ var clientHelp = `
     client's internal SOCKS5 proxy.
 
     When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when 
+    input/output of this program with the remote. This is useful when
     combined with ssh ProxyCommand. You can use
       ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
           user@example.com
@@ -378,11 +383,11 @@ var clientHelp = `
     may be still verified (see --fingerprint) after inner connection
     is established.
 
-    --tls-key, a path to a PEM encoded private key used for client 
+    --tls-key, a path to a PEM encoded private key used for client
     authentication (mutual-TLS).
 
-    --tls-cert, a path to a PEM encoded certificate matching the provided 
-    private key. The certificate must have client authentication 
+    --tls-cert, a path to a PEM encoded certificate matching the provided
+    private key. The certificate must have client authentication
     enabled (mutual-TLS).
 ` + commonHelp
 
