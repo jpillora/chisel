@@ -77,18 +77,22 @@ func ConnectTLS(ldapconfig LdapConfig) (*ldap.Conn, error) {
 	}
 
 	if ldapconfig.CA != "" {
+		log.Printf("CA file %s",ldapconfig.CA)
 		certpool := x509.NewCertPool()
 		CAfile, err := ioutil.ReadFile(ldapconfig.CA)
 		if err != nil {
+			log.Printf("Ldap CA file error")
 			return nil, fmt.Errorf("Ldap CA file error")
 		}
 		certpool.AppendCertsFromPEM([]byte(CAfile))
 		tlsConf = &tls.Config{RootCAs: certpool}
+		log.Printf("CA file %s loaded", ldapconfig.CA)
 	}
 
 	l, err := ldap.DialTLS("tcp", ldapconfig.Url, tlsConf)
   if err != nil {
-      return nil, err
+		log.Printf("TLS error: %s", err)
+    return nil, err
   }
 
   return l, nil
