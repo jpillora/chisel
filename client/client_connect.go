@@ -39,7 +39,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 			if attempt > 0 {
 				maxAttemptVal := fmt.Sprint(maxAttempt)
 				if maxAttempt < 0 {
-					maxAttemptVal = "unlimited";
+					maxAttemptVal = "unlimited"
 				}
 				msg += fmt.Sprintf(" (Attempt: %d/%s)", attempt, maxAttemptVal)
 			}
