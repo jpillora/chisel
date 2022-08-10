@@ -77,7 +77,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 	//ensure connection is cleaned up
 	defer h.udpConns.remove(conn.id)
-	maxMTU := settings.EnvInt("UDP_MAX_SIZE", 12000)
+	const maxMTU = 9012
 	buff := make([]byte, maxMTU)
 	for {
 		//response must arrive within 15 seconds

@@ -80,7 +80,7 @@ func (u *udpListener) run(ctx context.Context) error {
 }
 
 func (u *udpListener) runInbound(ctx context.Context) error {
-	maxMTU := settings.EnvInt("UDP_MAX_SIZE", 12000)
+	const maxMTU = 9012
 	buff := make([]byte, maxMTU)
 	for !isDone(ctx) {
 		//read from inbound udp

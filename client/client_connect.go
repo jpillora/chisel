@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	//connection loop!
 	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
 	for {
-		connected, err := c.connectionOnce(ctx)
+		connected, retry, err := c.connectionOnce(ctx)
 		//reset backoff after successful connections
 		if connected {
 			b.Reset()
@@ -37,16 +38,16 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		if err != nil && err != io.EOF {
 			msg := fmt.Sprintf("Connection error: %s", err)
 			if attempt > 0 {
-				maxAttemptVal := fmt.Sprint(maxAttempt)
-				if maxAttempt < 0 {
-					maxAttemptVal = "unlimited"
+				msg += fmt.Sprintf(" (Attempt: %d", attempt)
+				if maxAttempt > 0 {
+					msg += fmt.Sprintf("/%d", maxAttempt)
 				}
-				msg += fmt.Sprintf(" (Attempt: %d/%s)", attempt, maxAttemptVal)
+				msg += ")"
 			}
 			c.Infof(msg)
 		}
 		//give up?
-		if maxAttempt >= 0 && attempt >= maxAttempt {
+		if !retry || (maxAttempt >= 0 && attempt >= maxAttempt) {
 			c.Infof("Give up")
 			break
 		}
@@ -65,11 +66,11 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 }
 
 //connectionOnce connects to the chisel server and blocks
-func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error) {
+func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err error) {
 	//already closed?
 	select {
 	case <-ctx.Done():
-		return false, errors.New("Cancelled")
+		return false, false, errors.New("Cancelled")
 	default:
 		//still open
 	}
@@ -86,12 +87,12 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	//optional proxy
 	if p := c.proxyURL; p != nil {
 		if err := c.setProxy(p, &d); err != nil {
-			return false, err
+			return false, false, err
 		}
 	}
 	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
 	if err != nil {
-		return false, err
+		return false, true, err
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
@@ -102,10 +103,18 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		if strings.Contains(e, "unable to authenticate") {
 			c.Infof("Authentication failed")
 			c.Debugf(e)
-		} else {
+			retry = false
+		} else if strings.Contains(e, "connection abort") {
+			c.Infof("retriable: %s", e)
+			retry = true
+		} else if n, ok := err.(net.Error); ok && !n.Temporary() {
 			c.Infof(e)
+			retry = false
+		} else {
+			c.Infof("retriable: %s", e)
+			retry = true
 		}
-		return false, err
+		return false, retry, err
 	}
 	defer sshConn.Close()
 	// chisel client handshake (reverse of server handshake)
@@ -119,15 +128,19 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	)
 	if err != nil {
 		c.Infof("Config verification failed")
-		return false, err
+		return false, false, err
 	}
 	if len(configerr) > 0 {
-		return false, errors.New(string(configerr))
+		return false, false, errors.New(string(configerr))
 	}
 	c.Infof("Connected (Latency %s)", time.Since(t0))
 	//connected, handover ssh connection for tunnel to use, and block
+	retry = true
 	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
+	if n, ok := err.(net.Error); ok && !n.Temporary() {
+		retry = false
+	}
 	c.Infof("Disconnected")
 	connected = time.Since(t0) > 5*time.Second
-	return connected, err
+	return connected, retry, err
 }
