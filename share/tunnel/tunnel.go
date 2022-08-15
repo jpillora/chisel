@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
-	"log"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/armon/go-socks5"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
@@ -43,8 +39,8 @@ type Tunnel struct {
 	//proxies
 	proxyCount int
 	//internals
-	connStats   cnet.ConnCount
-	socksServer *socks5.Server
+	connStats    cnet.ConnCount
+	socksAllowed bool
 }
 
 //New Tunnel from the given Config
@@ -54,14 +50,12 @@ func New(c Config) *Tunnel {
 		Config: c,
 	}
 	t.activatingConn.Add(1)
-	//setup socks server (not listening on any port!)
+
+	// decide, whether socks server outbound connector (without client-interaction part, not listening on any port)
+	// is allowed or not
 	extra := ""
+	t.socksAllowed = c.Socks
 	if c.Socks {
-		sl := log.New(ioutil.Discard, "", 0)
-		if t.Logger.Debug {
-			sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
-		}
-		t.socksServer, _ = socks5.New(&socks5.Config{Logger: sl})
 		extra += " (SOCKS enabled)"
 	}
 	t.Debugf("Created%s", extra)

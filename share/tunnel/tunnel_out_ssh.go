@@ -2,12 +2,12 @@ package tunnel
 
 import (
 	"fmt"
+	"github.com/meteorite/socks5"
 	"io"
 	"net"
 	"strings"
 
 	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
@@ -38,10 +38,16 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	}
 	remote := string(ch.ExtraData())
 	//extract protocol
+	t.Debugf("remote: %s", remote)
 	hostPort, proto := settings.L4Proto(remote)
 	udp := proto == "udp"
-	socks := hostPort == "socks"
-	if socks && t.socksServer == nil {
+	socksTCP := proto == "sot"
+	socksUDP := proto == "sou"  // remote host:port is transmitted with each UDP packet both inbound and outbound
+	//if socksUDP {
+	//	hostPort = "socks" // destination is transmitted with each packet
+	//}
+	t.Debugf("remote: %s/%s", hostPort, proto)
+	if (socksTCP || socksUDP)  &&  !t.socksAllowed {
 		t.Debugf("Denied socks request, please enable socks")
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
 		return
@@ -59,8 +65,10 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
-	if socks {
-		err = t.handleSocks(stream)
+	if socksTCP {
+		err = t.handleSocksTCP(l, stream, hostPort)
+	} else if socksUDP {
+		err = t.handleSocksUDP(l, stream)
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)
 	} else {
@@ -74,8 +82,19 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
 }
 
-func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
-	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
+func (t *Tunnel) handleSocksTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
+	dst, err := net.Dial("tcp", hostPort)
+	code := []byte{socks5.DialErrorToSocksCode(err)}
+	_, errReply := src.Write(code)
+	if errReply != nil {
+		return errReply
+	}
+	if err != nil {
+		return err
+	}
+	s, r := cio.Pipe(src, dst)
+	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
+	return nil
 }
 
 func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {

@@ -1,7 +1,10 @@
 package tunnel
 
 import (
+	"context"
 	"encoding/gob"
+	"github.com/meteorite/scope"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net"
 	"os"
@@ -11,6 +14,8 @@ import (
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
 )
+
+const maxMTU = 9012
 
 func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort string) error {
 	conns := &udpConns{
@@ -77,7 +82,6 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 	//ensure connection is cleaned up
 	defer h.udpConns.remove(conn.id)
-	const maxMTU = 9012
 	buff := make([]byte, maxMTU)
 	for {
 		//response must arrive within 15 seconds
@@ -150,4 +154,68 @@ func (cs *udpConns) closeAll() {
 type udpConn struct {
 	id string
 	net.Conn
+}
+
+
+func (t *Tunnel) handleSocksUDP(l *cio.Logger, rwc io.ReadWriteCloser) error {
+	udpChannel := &udpChannel{
+		r: gob.NewDecoder(rwc),
+		w: gob.NewEncoder(rwc),
+		c: rwc,
+	}
+
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// reserve UDP port for this outbound socks connector
+	// we listen worldwide to make our NAT full cone and allow STUN scenario and other similar scenarios
+	remoteConn, err := net.ListenPacket("udp", "0.0.0.0:0")
+	if err != nil {
+		return err
+	}
+
+	// close both UDP port and SSH channel, when either forward or backward handler encounters an error and finishes
+	defer scope.Closer(ctx, remoteConn, udpChannel.c).Close()
+
+	// launch backward traffic handler
+	g.Go(func() error {
+		buff := make([]byte, maxMTU)
+		for {
+			// receive next backward UDP packet
+			n, remoteAddr, err := remoteConn.ReadFrom(buff)
+			if err != nil {
+				l.Debugf("receive return packet error: %s", err)
+				return err
+			}
+
+			// encode it back over ssh connection with remote host:port, which returned it
+			err = udpChannel.encode(remoteAddr.String(), buff[:n])
+			if err != nil {
+				l.Debugf("encode error: %s", err)
+				return err
+			}
+		}
+	})
+
+	// launch forward traffic handler
+	g.Go(func() error {
+		for {
+			// receive next forward packet from ssh
+			p := udpPacket{}
+			if err := udpChannel.decode(&p); err != nil {
+				return err
+			}
+
+			// send it to remote host
+			dst := p.Src  // for socks UDP scenario, this is really a destination, where we should send this packet
+			rUDPAddr, err := net.ResolveUDPAddr("udp", dst)
+			if err != nil {
+				return err
+			}
+			if _, err = remoteConn.WriteTo(p.Payload, rUDPAddr); err != nil {
+				return err
+			}
+		}
+	})
+
+	return g.Wait()
 }

@@ -151,7 +151,7 @@ func isHost(s string) bool {
 	return true
 }
 
-var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
+var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp|sot|sou)$`)
 
 //L4Proto extacts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
