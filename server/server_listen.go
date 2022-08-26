@@ -12,6 +12,7 @@ import (
 
 	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/acme/autocert"
+	reuseport "github.com/libp2p/go-reuseport"
 )
 
 //TLSConfig enables configures TLS
@@ -43,11 +44,29 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
 		}
 	}
-	//tcp listen
-	l, err := net.Listen("tcp", host+":"+port)
+	
+	var l net.Listener
+	var err error
+	
+	if s.config.ReusePort {
+		if tlsConf != nil {
+			return nil, errors.New("Port reuse/hijack only works for HTTP connections.")
+		}
+		
+		if s.config.Proxy == "" {
+			return nil, errors.New("For port reuse, you need to specify backend to redirect non-chisel requests to (http://127.0.0.1 perhaps?)")
+		}
+	
+		s.Infof("Attempting port reuse")
+		l, err = reuseport.Listen("tcp", host+":"+port)
+	} else {
+		l, err = net.Listen("tcp", host+":"+port)
+	}
+	
 	if err != nil {
 		return nil, err
 	}
+	
 	//optionally wrap in tls
 	proto := "http"
 	if tlsConf != nil {
