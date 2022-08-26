@@ -50,6 +50,7 @@ type TLSConfig struct {
 	CA         string
 	Cert       string
 	Key        string
+	ServerName string
 }
 
 //Client represents a client instance
@@ -107,6 +108,9 @@ func NewClient(c *Config) (*Client, error) {
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
+		if c.TLS.ServerName != "" {
+			tc.ServerName = c.TLS.ServerName
+		}
 		//certificate verification config
 		if c.TLS.SkipVerify {
 			client.Infof("TLS verification disabled")

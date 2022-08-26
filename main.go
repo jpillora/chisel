@@ -422,6 +422,7 @@ func client(args []string) {
 	//move hostname onto headers
 	if *hostname != "" {
 		config.Headers.Set("Host", *hostname)
+		config.TLS.ServerName = *hostname
 	}
 	//ready
 	c, err := chclient.NewClient(&config)
