@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -25,4 +26,14 @@ func EnvDuration(name string, def time.Duration) time.Duration {
 		return n
 	}
 	return def
+}
+
+//EnvTlsVersion returns a tls version protocol number
+func EnvTlsVersion(name string) uint16 {
+	version := Env(name)
+	if n, err := strconv.ParseFloat(version, 64); err == nil {
+		version_number := math.Round(n*10) - 10
+		return uint16(0x301 + version_number) // conversion to TLS_VERSION (0x030x)
+	}
+	return 0
 }

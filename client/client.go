@@ -182,6 +182,18 @@ func NewClient(c *Config) (*Client, error) {
 		Socks:     hasReverse && hasSocks,
 		KeepAlive: client.config.KeepAlive,
 	})
+
+	tlsMin := settings.EnvTlsVersion("TLS_MIN_VER")
+	if tlsMin != 0 {
+		client.Infof("Setting tlsConfig.MinVersion to 0x%X", tlsMin)
+		client.tlsConfig.MinVersion = tlsMin
+	}
+
+	tlsMax := settings.EnvTlsVersion("TLS_MAX_VER")
+	if tlsMax != 0 {
+		client.Infof("Setting tlsConfig.MaxVersion to 0x%X", tlsMax)
+		client.tlsConfig.MaxVersion = tlsMax
+	}
 	return client, nil
 }
 
