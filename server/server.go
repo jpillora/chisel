@@ -15,6 +15,7 @@ import (
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/craveauth"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
@@ -72,6 +73,7 @@ func NewServer(c *Config) (*Server, error) {
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
+		log.Printf("Users init %v", server.users)
 	}
 	//generate private key (optionally using seed)
 	key, err := ccrypto.GenerateKey(c.KeySeed)
@@ -169,22 +171,27 @@ func (s *Server) GetFingerprint() string {
 }
 
 // authUser is responsible for validating the ssh user / password combination
-func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (p *ssh.Permissions, err error) {
 	// check if user authentication is enabled and if not, allow all
 	if s.users.Len() == 0 {
 		return nil, nil
 	}
-	// check the user exists and has matching password
-	n := c.User()
-	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
-		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+
+	p, err = craveauth.Auth(c, password, s.Logger)
+
+	if err == nil {
+		n := c.User()
+		user, found := s.users.Get("all")
+		if !found || user.Pass != string("all") {
+			s.Infof("Login failed for user: %s", n)
+			err = errors.New("Invalid authentication for username: %s")
+		} else {
+			s.Infof("Login success for user: %s", n)
+			s.sessions.Set(string(c.SessionID()), user)
+		}
 	}
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
+	return
+
 }
 
 // AddUser adds a new user into the server user index

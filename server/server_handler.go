@@ -8,6 +8,7 @@ import (
 
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/craveauth"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
 	"golang.org/x/crypto/ssh"
@@ -19,9 +20,10 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	if upgrade == "websocket" && strings.HasPrefix(protocol, "chisel-") {
-		if protocol == chshare.ProtocolVersion {
+	if upgrade == "websocket" && (strings.HasPrefix(protocol, "chisel-") || strings.HasPrefix(protocol, "craveconnect-")) {
+		if protocol == chshare.ProtocolVersion || protocol == chshare.CraveProtocolVersion {
 			s.handleWebsocket(w, r)
+			s.Infof("Using client version %v", protocol)
 			return
 		}
 		//print into server logs and silently fall-through
@@ -117,6 +119,21 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			addr := r.UserAddr()
 			if !user.HasAccess(addr) {
 				failed(s.Errorf("access to '%s' denied", addr))
+				return
+			}
+		}
+
+		if val, ok := sshConn.Permissions.CriticalOptions["AllowedPorts"]; ok {
+			allowed, err := craveauth.CheckTargetConatinerPort(r.RemoteHost, r.RemotePort, val, l)
+			if !allowed || err != nil {
+				failed(s.Errorf("access to port %s:%s:%s denied err: %v", r.RemoteHost, r.RemotePort, val, err))
+				return
+			}
+		}
+		if val, ok := sshConn.Permissions.CriticalOptions["AllowedUser"]; ok {
+			allowed, err := craveauth.CheckTargetUser(r.RemoteHost, r.RemotePort, val, l)
+			if !allowed || err != nil {
+				failed(s.Errorf("access to port %s:%s:%s denied err: %v", r.RemoteHost, r.RemotePort, val, err))
 				return
 			}
 		}
