@@ -185,10 +185,54 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || ( user.Pass != string(password) && s.config.LdapConfigFile == "" ) || ( s.config.LdapConfigFile != "" && found && settings.LdapAuthUser(user,password,s.config.LdapConfig) != nil) {
-		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+	if (found) {
+	// User found
+
+		if (s.config.LdapConfigFile == "") {
+			// LDAP disabled
+
+			if (string(password) == "") {
+				// Empty password
+
+				s.Debugf("Empty passwords are not allowed. User = %s", n)
+				return nil, errors.New("Invalid authentication for username: %s")
+			} else if (user.Pass == string(password)) {
+				// Password authentication successful.
+
+			} else {
+				// Password authentication failed.
+
+				s.Debugf("Could not authenticate user: %s", n)
+				return nil, errors.New("Invalid authentication for username: %s")
+			}
+		} else {
+			// LDAP enabled
+
+			if (string(password) == "") {
+				// Empty password
+
+				s.Debugf("Empty passwords are not allowed. User = %s", n)
+				return nil, errors.New("Invalid authentication for username: %s")
+			} else if (user.Pass == string(password)) {
+				// Password authentication successful.
+
+			} else if (settings.LdapAuthUser(user,password,s.config.LdapConfig) == nil) {
+				// LDAP authentication successful.
+
+			} else {
+				// Password authentication & LDAP authentication failed.
+
+				s.Debugf("Could not authenticate user: %s", n)
+				return nil, errors.New("Invalid authentication for username: %s")
+			}
+		}
+	} else {
+	// User not found
+
+	s.Debugf("User not found: %s", n)
+	return nil, errors.New("Invalid authentication for username: %s")
 	}
+
 	// insert the user session map
 	// TODO this should probably have a lock on it given the map isn't thread-safe
 	s.sessions.Set(string(c.SessionID()), user)
