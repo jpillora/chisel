@@ -58,7 +58,7 @@ sudo dnf -y install chisel
 ### Source
 
 ```sh
-$ go install github.com/jpillora/chisel@latest -v
+$ go install github.com/jpillora/chisel@latest
 ```
 
 ## Demo
