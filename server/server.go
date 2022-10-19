@@ -185,51 +185,20 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if (found) {
-	// User found
-
-		if (s.config.LdapConfigFile == "") {
-			// LDAP disabled
-
-			if (string(password) == "") {
-				// Empty password
-
-				s.Debugf("Empty passwords are not allowed. User = %s", n)
-				return nil, errors.New("Invalid authentication for username: %s")
-			} else if (user.Pass == string(password)) {
-				// Password authentication successful.
-
-			} else {
-				// Password authentication failed.
-
-				s.Debugf("Could not authenticate user: %s", n)
-				return nil, errors.New("Invalid authentication for username: %s")
-			}
+	if (found && string(password) != "") {
+	// User found and provided password
+		if (user.Pass == string(password)) {
+		// local authentication successful.
+		} else if (s.config.LdapConfigFile != "" && settings.LdapAuthUser(user,password,s.config.LdapConfig) == nil) {
+			// LDAP authentication successful
 		} else {
-			// LDAP enabled
-
-			if (string(password) == "") {
-				// Empty password
-
-				s.Debugf("Empty passwords are not allowed. User = %s", n)
-				return nil, errors.New("Invalid authentication for username: %s")
-			} else if (user.Pass == string(password)) {
-				// Password authentication successful.
-
-			} else if (settings.LdapAuthUser(user,password,s.config.LdapConfig) == nil) {
-				// LDAP authentication successful.
-
-			} else {
-				// Password authentication & LDAP authentication failed.
-
-				s.Debugf("Could not authenticate user: %s", n)
-				return nil, errors.New("Invalid authentication for username: %s")
-			}
+			s.Debugf("unsuccessful authentication", n)
+			return nil, errors.New("Invalid authentication for username: %s")
 		}
 	} else {
-	// User not found
+	// User not found or empty password
 
-	s.Debugf("User not found: %s", n)
+	s.Debugf("User not found: %s or empty password", n)
 	return nil, errors.New("Invalid authentication for username: %s")
 	}
 
