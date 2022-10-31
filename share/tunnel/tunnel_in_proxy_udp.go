@@ -45,7 +45,9 @@ func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpLi
 		sshTun:  sshTun,
 		remote:  remote,
 		inbound: conn,
+		maxMTU:  settings.EnvInt("UDP_MAX_SIZE", 9012),
 	}
+	u.Debugf("UDP max size: %d bytes", u.maxMTU)
 	return u, nil
 }
 
@@ -57,6 +59,7 @@ type udpListener struct {
 	outboundMut sync.Mutex
 	outbound    *udpChannel
 	sent, recv  int64
+	maxMTU      int
 }
 
 func (u *udpListener) run(ctx context.Context) error {
@@ -80,8 +83,7 @@ func (u *udpListener) run(ctx context.Context) error {
 }
 
 func (u *udpListener) runInbound(ctx context.Context) error {
-	const maxMTU = 9012
-	buff := make([]byte, maxMTU)
+	buff := make([]byte, u.maxMTU)
 	for !isDone(ctx) {
 		//read from inbound udp
 		u.inbound.SetReadDeadline(time.Now().Add(time.Second))
