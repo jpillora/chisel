@@ -25,6 +25,7 @@ builds:
       - mips64le
       - s390x
     goarm:
+      - 5
       - 6
       - 7
     gomips:
