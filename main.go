@@ -151,7 +151,7 @@ var serverHelp = `
     and you cannot set --tls-domain.
 
     --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
+    certificate using LetsEncrypt. Setting --tls-domain requires port 443. 
     You may specify multiple --tls-domain flags to serve multiple domains.
     The resulting files are cached in the "$HOME/.cache/chisel" directory.
     You can modify this path by setting the CHISEL_LE_CACHE variable,
