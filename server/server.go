@@ -3,6 +3,7 @@ package chserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -30,8 +31,8 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
-	LdapConfigFile	string
-	LdapConfig settings.LdapConfig
+	LDAPConfigFile	string
+	LDAPConfig settings.LDAPConfig
 }
 
 // Server respresent a chisel service
@@ -116,8 +117,8 @@ func NewServer(c *Config) (*Server, error) {
 		server.Infof("Reverse tunnelling enabled")
 	}
 	// ldap authentication
-	if c.LdapConfigFile != "" {
-		if c.LdapConfig,err = server.LdapParseConfig(c.LdapConfigFile); err != nil {
+	if c.LDAPConfigFile != "" {
+		if c.LDAPConfig,err = server.LDAPParseConfig(c.LDAPConfigFile); err != nil {
 			return nil, err
 		}
 	}
@@ -185,22 +186,25 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if (found && string(password) != "") {
-	// User found and provided password
-		if (user.Pass == string(password)) {
-		// local authentication successful.
-		} else if (s.config.LdapConfigFile != "" && settings.LdapAuthUser(user,password,s.config.LdapConfig) == nil) {
-			// LDAP authentication successful
-		} else {
-			s.Debugf("unsuccessful authentication", n)
-			return nil, errors.New("Invalid authentication for username: %s")
-		}
-	} else {
-	// User not found or empty password
 
-	s.Debugf("User not found: %s or empty password", n)
-	return nil, errors.New("Invalid authentication for username: %s")
+	if !found {
+	  return nil, errors.New("user not found")
 	}
+	if string(password) == "" {
+	  return nil, errors.New("user password not set")
+	}
+	if (user.Pass == string(password)) {
+		// local authentication successful
+		return nil, nil
+	}
+	if (s.config.LDAPConfigFile != "") {
+		if err := settings.LDAPAuthUser(user,password,s.config.LDAPConfig); err != nil {
+			return nil, fmt.Errorf("user ldap auth failed: %w", err)
+		}
+		// ldap authentication successful
+		return nil, nil
+	}
+	return nil, errors.New("user auth failed")
 
 	// insert the user session map
 	// TODO this should probably have a lock on it given the map isn't thread-safe
@@ -237,8 +241,8 @@ func (s *Server) ResetUsers(users []*settings.User) {
 	s.users.Reset(users)
 }
 
-// LdapParseConfig is validating the given ldap config
-func (s *Server) LdapParseConfig(LdapConfigFile string) (settings.LdapConfig,error) {
-	ldapConfig,err := settings.ParseConfigFile(LdapConfigFile)
+// LDAPParseConfig is validating the given ldap config
+func (s *Server) LDAPParseConfig(LDAPConfigFile string) (settings.LDAPConfig,error) {
+	ldapConfig,err := settings.ParseConfigFile(LDAPConfigFile)
 	return ldapConfig,err
 }
