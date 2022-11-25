@@ -163,8 +163,20 @@ var serverHelp = `
     validate client connections. The provided CA certificates will be used
     instead of the system roots. This is commonly used to implement mutual-TLS.
 
-    --ldap-config, a path to a file containing the ldap authentication
-		configuration.
+    --ldap-config, a path to a JSON configuration file, which defines settings used to
+    connect to a remote LDAP server for authenticating users. once configured, user
+    passwords will be validated against the configured LDAP server.
+    here is an example of an ldap-config file
+    { "BindDN": "CN=ldapUser,OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "BindPassword": "ldapUserPassword",
+      "Url": "example.com:636",
+      "BaseDN": "OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "Filter": "(&(objectClass=person)(objectClass=user))",
+      "IDMapTo": "sAMAccountName",
+      "CA": "",
+      "Insecure": true }
+    
+
 
 ` + commonHelp
 
@@ -185,7 +197,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
-	flags.StringVar(&config.LdapConfigFile,"ldap-config","","")
+	flags.StringVar(&config.LDAPConfigFile,"ldap-config","","")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
