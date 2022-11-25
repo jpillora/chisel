@@ -87,7 +87,7 @@ and then visit [localhost:3000](http://localhost:3000/), we should see a directo
     with $ md-tmpl -w README.md -->
 
 <!--tmpl,code=plain:echo "$ chisel --help" && go run main.go --help | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
-``` plain
+``` plain 
 $ chisel --help
 
   Usage: chisel [command] [--help]
@@ -106,7 +106,7 @@ $ chisel --help
 
 
 <!--tmpl,code=plain:echo "$ chisel server --help" && go run main.go server --help | cat | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
-``` plain
+``` plain 
 $ chisel server --help
 
   Usage: chisel server [options]
@@ -214,7 +214,7 @@ $ chisel server --help
 
 
 <!--tmpl,code=plain:echo "$ chisel client --help" && go run main.go client --help | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
-``` plain
+``` plain 
 $ chisel client --help
 
   Usage: chisel client [options] <server> <remote> [remote] [remote] ...
@@ -269,7 +269,7 @@ $ chisel client --help
     client's internal SOCKS5 proxy.
 
     When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when
+    input/output of this program with the remote. This is useful when 
     combined with ssh ProxyCommand. You can use
       ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
           user@example.com
@@ -325,11 +325,11 @@ $ chisel client --help
     may be still verified (see --fingerprint) after inner connection
     is established.
 
-    --tls-key, a path to a PEM encoded private key used for client
+    --tls-key, a path to a PEM encoded private key used for client 
     authentication (mutual-TLS).
 
-    --tls-cert, a path to a PEM encoded certificate matching the provided
-    private key. The certificate must have client authentication
+    --tls-cert, a path to a PEM encoded certificate matching the provided 
+    private key. The certificate must have client authentication 
     enabled (mutual-TLS).
 
     --pid Generate pid file in current working directory
