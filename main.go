@@ -339,7 +339,7 @@ var clientHelp = `
     client's internal SOCKS5 proxy.
 
     When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when
+    input/output of this program with the remote. This is useful when 
     combined with ssh ProxyCommand. You can use
       ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
           user@example.com
@@ -395,11 +395,11 @@ var clientHelp = `
     may be still verified (see --fingerprint) after inner connection
     is established.
 
-    --tls-key, a path to a PEM encoded private key used for client
+    --tls-key, a path to a PEM encoded private key used for client 
     authentication (mutual-TLS).
 
-    --tls-cert, a path to a PEM encoded certificate matching the provided
-    private key. The certificate must have client authentication
+    --tls-cert, a path to a PEM encoded certificate matching the provided 
+    private key. The certificate must have client authentication 
     enabled (mutual-TLS).
 ` + commonHelp
 
