@@ -175,9 +175,9 @@ $ chisel server --help
     provide a certificate notification email by setting CHISEL_LE_EMAIL.
 
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
-    holding multiple PEM encode CA certificate bundle files, which is used to
-    validate client connections. The provided CA certificates will be used
-    instead of the system roots. This is commonly used to implement mutual-TLS.
+    holding multiple PEM encode CA certificate bundle files, which is used to 
+    validate client connections. The provided CA certificates will be used 
+    instead of the system roots. This is commonly used to implement mutual-TLS. 
 
     --ldap-config, a path to a JSON configuration file, which defines settings used to
     connect to a remote LDAP server for authenticating users. once configured, user
