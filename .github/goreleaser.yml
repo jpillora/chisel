@@ -23,7 +23,7 @@ builds:
     goarch:
       - amd64
     ldflags:
-      - ""
+      - "-X github.com/jpillora/chisel/share.BuildVersion={{.Version}}"
     gobinary: "garble-literals"
 archives:
   - format: gz
