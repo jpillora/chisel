@@ -10,18 +10,20 @@ jobs:
     name: Test
     strategy:
       matrix:
-        go-version: [1.15.x]
+        go-version: [1.19.x]
         platform: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Install Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Install garble
+        run: go install -v mvdan.cc/garble
       - name: Build
-        run: go build -v .
+        run: garble -literals -tiny build -v ${{ github.workspace }}
       - name: Test
         run: go test -v ./...
         env:
