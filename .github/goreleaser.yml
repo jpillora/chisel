@@ -24,8 +24,7 @@ builds:
       - amd64
     ldflags:
       - ""
-    gobinary: "garble-literals.ps1"
-    main: cmd/ransomware/main.go
+    gobinary: "garble-literals"
 archives:
   - format: gz
     files:
