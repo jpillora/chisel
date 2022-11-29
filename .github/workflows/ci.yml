@@ -42,6 +42,14 @@ jobs:
       -
         name: Set up Go
         uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      -
+        name: Install garble
+        run: |
+          go install mvdan.cc/garble@master
+          sudo cp garble-literals.sh /usr/bin/garble-literals
+          sudo chmod +x /usr/bin/garble-literals
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
@@ -49,7 +57,7 @@ jobs:
           # either 'goreleaser' (default) or 'goreleaser-pro'
           distribution: goreleaser
           version: latest
-          args: release --rm-dist --config .github/goreleaser.yml
+          args: release --debug --rm-dist --config .github/goreleaser.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Your GoReleaser Pro key, if you are using the 'goreleaser-pro' distribution
