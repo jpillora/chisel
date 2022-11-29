@@ -43,6 +43,12 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v3
       -
+        name: Install garble
+        run: |
+          go install mvdan.cc/garble@master
+          sudo cp garble-literals.sh /usr/bin/garble-literals
+          sudo chmod +x /usr/bin/garble-literals
+      -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
         with:

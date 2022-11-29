@@ -1,1 +1,0 @@
-garble -literals $args
