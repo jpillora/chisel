@@ -21,7 +21,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install garble
-        run: go install -v mvdan.cc/garble
+        run:  go install -v mvdan.cc/garble
+        env:
+          GOBIN: .
       - name: Build
         run: ./garble -literals -tiny build -v .
       - name: Test
