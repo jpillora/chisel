@@ -2,7 +2,9 @@
 # - cd chisel
 # - goreleaser --skip-publish --rm-dist --config .github/goreleaser.yml
 builds:
-  - env:
+  - id: chisel
+    binary: chisel
+    env:
       - CGO_ENABLED=0
     ldflags:
       - -s -w -X github.com/jpillora/chisel/share.BuildVersion={{.Version}}
@@ -14,7 +16,8 @@ builds:
     goarch:
       - amd64
     gobinary: "garble-literals" 
-  - binary: chisel-garble
+  - id: chisel-garble
+    binary: chisel-garble
     goos:
       - windows
     goarch:
