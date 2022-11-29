@@ -26,8 +26,12 @@ jobs:
       - name: Install garble (Linux)
         if: runner.os != 'Windows'
         run: GOBIN=$GITHUB_WORKSPACE; echo $GOBIN; go install -v mvdan.cc/garble
-      - name: Build
-        run: $GOBIN/garble -literals -tiny build -v .
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: $env:GITHUB_WORKSPACE/garble -literals -tiny build -v .
+      - name: Build (Windows)
+        if: runner.os != 'Windows'
+        run: $GITHUB_WORKSPACE/garble -literals -tiny build -v .
       - name: Test
         run: go test -v ./...
         env:
