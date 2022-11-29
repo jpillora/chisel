@@ -25,7 +25,16 @@ builds:
       - ""
     gobinary: "garble-literals"
 archives:
-  - format: gz
+  - id: chisel
+    builds: [chisel]
+    format: gz
+    name_template: chisel
+    files:
+      - none*
+  - id: chisel-garble
+    builds: [chisel-garble]
+    format: gz
+    name_template: chisel-garble
     files:
       - none*
 release:
