@@ -21,9 +21,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install garble
-        run:  go install -v mvdan.cc/garble
+        if: runner.os == 'Windows'
+        run: go install -v mvdan.cc/garble
         env:
-          GOBIN: .
+          GOBIN: $env:GITHUB_WORKSPACE
+      - name: Install garble
+        if: runner.os != 'Windows'
+        run: go install -v mvdan.cc/garble
+        env:
+          GOBIN: $GITHUB_WORKSPACE
       - name: Build
         run: ./garble -literals -tiny build -v .
       - name: Test
