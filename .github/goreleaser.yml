@@ -15,7 +15,6 @@ builds:
       - windows
     goarch:
       - amd64
-    gobinary: "garble-literals" 
   - id: chisel-garble
     binary: chisel-garble
     goos:
