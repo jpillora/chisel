@@ -25,7 +25,7 @@ jobs:
         run: $env:GOBIN=$pwd.path; go install -v mvdan.cc/garble
       - name: Install garble (Linux)
         if: runner.os != 'Windows'
-        run: GOBIN=$(pwd); go install -v mvdan.cc/garble
+        run: GOBIN=$(pwd); echo $GOBIN; go install -v mvdan.cc/garble
       - name: Build
         run: ./garble -literals -tiny build -v .
       - name: Test
