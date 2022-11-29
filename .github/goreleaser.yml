@@ -28,13 +28,13 @@ archives:
   - id: chisel
     builds: [chisel]
     format: gz
-    name_template: chisel
+    name_template: chisel_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
       - none*
   - id: chisel-garble
     builds: [chisel-garble]
     format: gz
-    name_template: chisel-garble
+    name_template: chisel-garble{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
       - none*
 release:
