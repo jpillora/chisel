@@ -18,12 +18,12 @@ jobs:
         uses: actions/setup-go@v1
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Install garble
-        run: GOBIN=$PWD go install -v mvdan.cc/garble@latest
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Install garble
+        run: GOBIN=$PWD go install -v mvdan.cc/garble
       - name: Build
-        run: GOBIN=$PWD garble -literals -tiny build -v .
+        run: ./garble -literals -tiny build -v .
       - name: Test
         run: go test -v ./...
         env:
