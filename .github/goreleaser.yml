@@ -34,7 +34,7 @@ archives:
   - id: chisel-garble
     builds: [chisel-garble]
     format: gz
-    name_template: chisel-garble{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    name_template: chisel-garble_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
       - none*
 release:
