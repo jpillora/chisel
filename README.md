@@ -1,12 +1,22 @@
-# chisel
+# Chisel
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel) [![CI](https://github.com/jpillora/chisel/workflows/CI/badge.svg)](https://github.com/jpillora/chisel/actions?workflow=CI)
 
-Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network.
+Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single executable including both client and server. Written in Go (golang). Chisel is mainly useful for passing through firewalls, though it can also be used to provide a secure endpoint into your network.
 
 ![overview](https://docs.google.com/drawings/d/1p53VWxzGNfy8rjr-mW8pvisJmhkoLl82vAgctO_6f1w/pub?w=960&h=720)
 
-### Features
+## Table of Contents
+
+- [Features](#features)
+- [Install](#install)
+- [Demo](#demo)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [Changelog](#changelog)
+- [License](#license)
+
+## Features
 
 - Easy to use
 - [Performant](./test/bench/perf.md)\*
@@ -21,29 +31,37 @@ Chisel is a fast TCP tunnel, transported over HTTP, secured via SSH. Single exec
 - Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
 - Client connections over stdio which supports `ssh -o ProxyCommand` providing SSH over HTTP
 
-### Install
+## Install
 
-**Binaries**
+### Binaries
 
 [![Releases](https://img.shields.io/github/release/jpillora/chisel.svg)](https://github.com/jpillora/chisel/releases) [![Releases](https://img.shields.io/github/downloads/jpillora/chisel/total.svg)](https://github.com/jpillora/chisel/releases)
 
 See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel! | bash`
 
-**Docker**
+### Docker
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://images.microbadger.com/badges/image/jpillora/chisel.svg)](https://microbadger.com/images/jpillora/chisel)
+[![Docker Pulls](https://img.shields.io/docker/pulls/jpillora/chisel.svg)](https://hub.docker.com/r/jpillora/chisel/) [![Image Size](https://img.shields.io/docker/image-size/jpillora/chisel/latest)](https://microbadger.com/images/jpillora/chisel)
 
 ```sh
 docker run --rm -it jpillora/chisel --help
 ```
 
-**Source**
+### Fedora
+
+The package is maintained by the Fedora community. If you encounter issues related to the usage of the RPM, please use this [issue tracker](https://bugzilla.redhat.com/buglist.cgi?bug_status=NEW&bug_status=ASSIGNED&classification=Fedora&component=chisel&list_id=11614537&product=Fedora&product=Fedora%20EPEL).
 
 ```sh
-$ go get -v github.com/jpillora/chisel
+sudo dnf -y install chisel
 ```
 
-### Demo
+### Source
+
+```sh
+$ go install github.com/jpillora/chisel@latest
+```
+
+## Demo
 
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
@@ -62,19 +80,19 @@ $ chisel client https://chisel-demo.herokuapp.com 3000
 
 and then visit [localhost:3000](http://localhost:3000/), we should see a directory listing. Also, if we visit the [demo app](https://chisel-demo.herokuapp.com) in the browser we should hit the server's default proxy and see a copy of [example.com](http://example.com).
 
-### Usage
+## Usage
 
 <!-- render these help texts by hand,
   or use https://github.com/jpillora/md-tmpl
     with $ md-tmpl -w README.md -->
 
-<!--tmpl,code=plain:echo "$ chisel --help" && go run main.go --help | cat -->
+<!--tmpl,code=plain:echo "$ chisel --help" && go run main.go --help | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
 ``` plain 
 $ chisel --help
 
   Usage: chisel [command] [--help]
 
-  Version: 0.0.0-src (go1.14.6)
+  Version: X.Y.Z
 
   Commands:
     server - runs chisel in server mode
@@ -87,7 +105,7 @@ $ chisel --help
 <!--/tmpl-->
 
 
-<!--tmpl,code=plain:echo "$ chisel server --help" && go run main.go server --help | cat -->
+<!--tmpl,code=plain:echo "$ chisel server --help" && go run main.go server --help | cat | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
 ``` plain 
 $ chisel server --help
 
@@ -149,7 +167,7 @@ $ chisel server --help
     and you cannot set --tls-domain.
 
     --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncypt. Setting --tls-domain requires port 443.
+    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
     You may specify multiple --tls-domain flags to serve multiple domains.
     The resulting files are cached in the "$HOME/.cache/chisel" directory.
     You can modify this path by setting the CHISEL_LE_CACHE variable,
@@ -173,7 +191,7 @@ $ chisel server --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14.6)
+    X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
@@ -182,7 +200,7 @@ $ chisel server --help
 <!--/tmpl-->
 
 
-<!--tmpl,code=plain:echo "$ chisel client --help" && go run main.go client --help | cat -->
+<!--tmpl,code=plain:echo "$ chisel client --help" && go run main.go client --help | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
 ``` plain 
 $ chisel client --help
 
@@ -193,17 +211,18 @@ $ chisel client --help
   <remote>s are remote connections tunneled through the server, each of
   which come in the form:
 
-    <local-host>:<local-port>:<remote-host>:<remote-port>
+    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
     ■ local-host defaults to 0.0.0.0 (all interfaces).
     ■ local-port defaults to remote-port.
     ■ remote-port is required*.
     ■ remote-host defaults to 0.0.0.0 (server localhost).
+    ■ protocol defaults to tcp.
 
   which shares <remote-host>:<remote-port> from the server to the client
   as <local-host>:<local-port>, or:
 
-    R:<local-interface>:<local-port>:<remote-host>:<remote-port>
+    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
   which does reverse port forwarding, sharing <remote-host>:<remote-port>
   from the client to the server's <local-interface>:<local-port>.
@@ -220,6 +239,7 @@ $ chisel client --help
       R:socks
       R:5000:socks
       stdio:example.com:22
+      1.1.1.1:53/udp
 
     When the chisel server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
@@ -246,8 +266,10 @@ $ chisel client --help
 
     --fingerprint, A *strongly recommended* fingerprint string
     to perform host-key validation against the server's public key.
-    You may provide just a prefix of the key or the entire string.
-    Fingerprint mismatches will close the connection.
+	Fingerprint mismatches will close the connection.
+	Fingerprints are generated by hashing the ECDSA public key using
+	SHA256 and encoding the result in base64.
+	Fingerprints must be 44 characters containing a trailing equals (=).
 
     --auth, An optional username and password (client authentication)
     in the form: "<user>:<pass>". These credentials are compared to
@@ -309,7 +331,7 @@ $ chisel client --help
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    0.0.0-src (go1.14.6)
+    X.Y.Z
 
   Read more:
     https://github.com/jpillora/chisel
@@ -319,7 +341,7 @@ $ chisel client --help
 
 ### Security
 
-Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
+Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
 
 ### Authentication
 
@@ -341,7 +363,7 @@ docker run \
 2. Connect your chisel client (using server's fingerprint)
 
 ```sh
-chisel client --fingerprint ab:12:34 <server-address>:9312 socks
+chisel client --fingerprint 'rHb55mcxf6vSckL2AezFV09rLs7pfPpavVu++MF7AhQ=' <server-address>:9312 socks
 ```
 
 3. Point your SOCKS5 clients (e.g. OS/Browser) to:
@@ -353,7 +375,7 @@ chisel client --fingerprint ab:12:34 <server-address>:9312 socks
 4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
 
 
-### Caveats
+#### Caveats
 
 Since WebSockets support is required:
 
@@ -363,7 +385,7 @@ Since WebSockets support is required:
   - Openshift has full support though connections are only accepted on ports 8443 and 8080
   - Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
 
-### Contributing
+## Contributing
 
 - http://golang.org/doc/code.html
 - http://golang.org/doc/effective_go.html
@@ -371,7 +393,7 @@ Since WebSockets support is required:
 - `github.com/jpillora/chisel/server` contains the server package
 - `github.com/jpillora/chisel/client` contains the client package
 
-### Changelog
+## Changelog
 
 - `1.0` - Initial release
 - `1.1` - Replaced simple symmetric encryption for ECDSA SSH
@@ -381,3 +403,7 @@ Since WebSockets support is required:
 - `1.5` - Added reverse SOCKS support (by @aus)
 - `1.6` - Added client stdio support (by @BoleynSu)
 - `1.7` - Added UDP support
+
+## License
+
+[MIT](https://github.com/jpillora/chisel/blob/master/LICENSE) © Jaime Pillora

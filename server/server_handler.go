@@ -19,7 +19,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	if upgrade == "websocket" && strings.HasPrefix(protocol, "chisel-") {
+	if upgrade == "websocket"  {
 		if protocol == chshare.ProtocolVersion {
 			s.handleWebsocket(w, r)
 			return
@@ -34,7 +34,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//no proxy defined, provide access to health/version checks
-	switch r.URL.String() {
+	switch r.URL.Path {
 	case "/health":
 		w.Write([]byte("OK\n"))
 		return
@@ -58,7 +58,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
-	l.Debugf("Handshaking...")
+	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
@@ -82,7 +82,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	var r *ssh.Request
 	select {
 	case r = <-reqs:
-	case <-time.After(10 * time.Second):
+	case <-time.After(settings.EnvDuration("CONFIG_TIMEOUT", 10*time.Second)):
 		l.Debugf("Timeout waiting for configuration")
 		sshConn.Close()
 		return

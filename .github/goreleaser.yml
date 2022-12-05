@@ -23,10 +23,6 @@ builds:
       - mipsle
       - mips64
       - mips64le
-      - mips64p32
-      - mips64p32le
-      - ppc
-      - s390
       - s390x
     goarm:
       - 6

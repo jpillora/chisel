@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -13,7 +14,7 @@ import (
 //adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server
-	serving   bool
+	waiterMux sync.Mutex
 	waiter    *errgroup.Group
 	listenErr error
 }
@@ -21,8 +22,7 @@ type HTTPServer struct {
 //NewHTTPServer creates a new HTTPServer
 func NewHTTPServer() *HTTPServer {
 	return &HTTPServer{
-		Server:  &http.Server{},
-		serving: false,
+		Server: &http.Server{},
 	}
 
 }
@@ -46,8 +46,9 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 	if ctx == nil {
 		return errors.New("ctx must be set")
 	}
+	h.waiterMux.Lock()
+	defer h.waiterMux.Unlock()
 	h.Handler = handler
-	h.serving = true
 	h.waiter, ctx = errgroup.WithContext(ctx)
 	h.waiter.Go(func() error {
 		return h.Serve(l)
@@ -60,17 +61,25 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 }
 
 func (h *HTTPServer) Close() error {
-	if !h.serving {
+	h.waiterMux.Lock()
+	defer h.waiterMux.Unlock()
+	if h.waiter == nil {
 		return errors.New("not started yet")
 	}
 	return h.Server.Close()
 }
 
 func (h *HTTPServer) Wait() error {
-	if !h.serving {
+	h.waiterMux.Lock()
+	unset := h.waiter == nil
+	h.waiterMux.Unlock()
+	if unset {
 		return errors.New("not started yet")
 	}
-	err := h.waiter.Wait()
+	h.waiterMux.Lock()
+	wait := h.waiter.Wait
+	h.waiterMux.Unlock()
+	err := wait()
 	if err == http.ErrServerClosed {
 		err = nil //success
 	}

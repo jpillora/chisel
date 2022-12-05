@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -44,6 +45,9 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	}
 	//tcp listen
 	l, err := net.Listen("tcp", host+":"+port)
+	if err != nil {
+		return nil, err
+	}
 	//optionally wrap in tls
 	proto := "http"
 	if tlsConf != nil {
@@ -63,11 +67,11 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 			s.Infof("Accepting LetsEncrypt TOS and fetching certificate...")
 			return true
 		},
-		Email:      os.Getenv("CHISEL_LE_EMAIL"),
+		Email:      settings.Env("LE_EMAIL"),
 		HostPolicy: autocert.HostWhitelist(domains...),
 	}
 	//configure file cache
-	c := os.Getenv("CHISEL_LE_CACHE")
+	c := settings.Env("LE_CACHE")
 	if c == "" {
 		h := os.Getenv("HOME")
 		if h == "" {
