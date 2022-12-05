@@ -92,15 +92,19 @@ func (c *Client) connectionOnce(ctx context.Context) (connected, retry bool, err
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
 	if err != nil {
-		if strings.Contains(err.Error(), "unable to authenticate") {
+		e := err.Error()
+		if strings.Contains(e, "unable to authenticate") {
 			c.Infof("Authentication failed")
-			c.Debugf(err.Error())
+			c.Debugf(e)
 			retry = false
+		} else if strings.Contains(e, "connection abort") {
+			c.Infof("retriable: %s", e)
+			retry = true
 		} else if n, ok := err.(net.Error); ok && !n.Temporary() {
-			c.Infof(err.Error())
+			c.Infof(e)
 			retry = false
 		} else {
-			c.Infof("retriable: %s", err.Error())
+			c.Infof("retriable: %s", e)
 			retry = true
 		}
 		return false, retry, err
