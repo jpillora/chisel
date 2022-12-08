@@ -1,4 +1,4 @@
-module github.com/jpillora/chisel
+module github.com/scaledata/chisel
 
 go 1.21
 

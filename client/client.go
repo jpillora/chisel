@@ -69,7 +69,25 @@ type Client struct {
 	tunnel    *tunnel.Tunnel
 }
 
-// NewClient creates a new client instance
+// NewClientWithUserAndAuth creates a new client with an SSHConfig containing
+// the provided user and password
+func NewClientWithUserAndAuth(c *Config, user string, pass string) (
+	*Client, error) {
+	client, err := NewClient(c)
+	if err != nil {
+		return nil, err
+	}
+	client.sshConfig = &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
+		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
+		HostKeyCallback: client.verifyServer,
+		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
+	}
+	return client, nil
+}
+
+//NewClient creates a new client instance
 func NewClient(c *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(c.Server, "http") {
