@@ -16,7 +16,7 @@ import (
 
 const debug = true
 
-//test layout configuration
+// test layout configuration
 type testLayout struct {
 	server     *chserver.Config
 	client     *chclient.Config
