@@ -1,16 +1,16 @@
 # build stage
-FROM golang:1.19 as build
-LABEL maintainer="dev@jpillora.com"
-ENV CGO_ENABLED 0
+FROM golang:alpine AS build
+RUN apk update && apk add git
 ADD . /src
 WORKDIR /src
-RUN go mod download
+ENV CGO_ENABLED 0
 RUN go build \
     -ldflags "-X github.com/jpillora/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
-    -o chisel
+    -o /tmp/bin
 # run stage
 FROM scratch
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+LABEL maintainer="dev@jpillora.com"
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
-COPY --from=build /src/chisel /app/chisel
-ENTRYPOINT ["/app/chisel"]
+COPY --from=build /tmp/bin /app/bin
+ENTRYPOINT ["/app/bin"]
