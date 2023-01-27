@@ -67,7 +67,6 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: jpillora/chisel
-          tag-latest: true
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
