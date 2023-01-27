@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Build
-        run: go build -v .
+        run: go build -v -o /dev/null .
       - name: Test
         run: go test -v ./...
   # ================
@@ -67,7 +67,6 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: jpillora/chisel
-          tag-latest: true
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

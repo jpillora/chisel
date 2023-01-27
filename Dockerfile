@@ -9,8 +9,8 @@ RUN go build \
     -ldflags "-X github.com/jpillora/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
     -o chisel
 # run stage
-FROM gcr.io/distroless/static-debian11
+FROM scratch
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
-CMD ["/app"]
 COPY --from=build /src/chisel /app/chisel
 ENTRYPOINT ["/app/chisel"]
