@@ -225,7 +225,21 @@ $ chisel client --help
     R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
   which does reverse port forwarding, sharing <remote-host>:<remote-port>
-  from the client to the server's <local-interface>:<local-port>.
+  from the client to the server's <local-interface>:<local-port>, or:
+
+    <local-host>:<local-port>:unix://<path/to/unix/domain/socket>
+
+    ■ local-host defaults to 0.0.0.0 (all interfaces).
+    ■ local-port is required*.
+    ■ `path/to/unix/domain/socket` is the path to the domain socket to be connected.
+
+  which shares the unix domain socket from the server to the client as 
+  <local-host>:<local-port>, or
+
+    R:<local-interface>:<local-port>:unix://<path/to/unix/domain/socket>
+
+  which does reverse forwarding, sharing the unix domain socket 
+  `path/to/unix/domain/socket` from the client to the server's <local-interface>:<local-port>
 
     example remotes
 
@@ -235,9 +249,11 @@ $ chisel client --help
       192.168.0.5:3000:google.com:80
       socks
       5000:socks
+      3306:unix:///tmp/mysql.sock
       R:2222:localhost:22
       R:socks
       R:5000:socks
+      R:3306:unix:///tmp/mysql.sock
       stdio:example.com:22
       1.1.1.1:53/udp
 
