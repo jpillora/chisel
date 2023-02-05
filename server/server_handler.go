@@ -120,6 +120,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
+		if s.config.HeaderToMatchHost != "" {
+			if req.Header.Get(s.config.HeaderToMatchHost) != r.RemoteHost {
+				failed(s.Errorf("Header match failed, access to '%s' denied", r.RemoteHost))
+				return
+			}
+		}
 		//confirm reverse tunnels are allowed
 		if r.Reverse && !s.config.Reverse {
 			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
