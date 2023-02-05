@@ -97,6 +97,9 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		//upsert ssh channel
 		uc, err := u.getUDPChan(ctx)
 		if err != nil {
+			if err.Error() == "ssh-conn nil" {
+				continue
+			}
 			if strings.HasSuffix(err.Error(), "EOF") {
 				continue
 			}
