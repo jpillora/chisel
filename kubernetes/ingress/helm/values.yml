@@ -1,0 +1,7 @@
+controller:
+  metrics:
+    enable: true
+  service:
+    type: LoadBalancer
+  publishService:
+    enabled: true
