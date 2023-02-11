@@ -1,0 +1,23 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chisel-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chisel
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Object
+      object:
+        metric:
+          name: chisel_number_of_active_sessions
+        describedObject:
+          apiVersion: v1
+          kind: Service
+          name: chisel-service
+        target:
+          type: AverageValue
+          averageValue: 10

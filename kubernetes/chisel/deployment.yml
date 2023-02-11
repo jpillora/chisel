@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app: chisel
+    name: chisel
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            app: chisel
+    template:
+        metadata:
+            labels:
+                app: chisel
+        spec:
+            containers:
+            - name: chisel
+              image: jpillora/chisel:latest
+              imagePullPolicy: Never
+              env:
+                - name: PORT
+                  value: "443"
+                - name: CHISEL_KEY
+                  value: "YourKey"
+              args:
+                - "server"
+                - "--socks5" 
+                - "--metrics"
+                - "--keepalive=5s"
+                - "--tls-key=/app/data/certs/chisel.key"
+                - "--tls-cert=/app/data/certs/chisel.crt" 
+                - "--authfile=/app/data/config/users.json" 
+              ports:
+                - containerPort: 443
+                - containerPort: 9113
+              volumeMounts:
+                - name: local-persistent-storage
+                  mountPath: /app/data
+            volumes:
+              - name: local-persistent-storage
+                persistentVolumeClaim:
+                  claimName: persistent-volume-claim

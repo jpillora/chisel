@@ -28,6 +28,7 @@ type Config struct {
 	Proxy     string
 	Socks5    bool
 	Reverse   bool
+	Metrics   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
 }
@@ -112,6 +113,10 @@ func NewServer(c *Config) (*Server, error) {
 	//print when reverse tunnelling is enabled
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
+	}
+	// prometheus metrics
+	if c.Metrics {
+		server.exposeMetrics()
 	}
 	return server, nil
 }

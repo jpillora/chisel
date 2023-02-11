@@ -1,0 +1,4 @@
+prometheus:
+  url: http://prometheus-server.prometheus.svc.cluster.local
+  port: 80
+  path: ""
