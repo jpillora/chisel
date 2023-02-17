@@ -27,7 +27,9 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort strin
 			c: rwc,
 		},
 		udpConns: conns,
+		maxMTU:   settings.EnvInt("UDP_MAX_SIZE", 9012),
 	}
+	h.Debugf("UDP max size: %d bytes", h.maxMTU)
 	for {
 		p := udpPacket{}
 		if err := h.handleWrite(&p); err != nil {
@@ -41,6 +43,7 @@ type udpHandler struct {
 	hostPort string
 	*udpChannel
 	*udpConns
+	maxMTU int
 }
 
 func (h *udpHandler) handleWrite(p *udpPacket) error {
@@ -77,8 +80,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 	//ensure connection is cleaned up
 	defer h.udpConns.remove(conn.id)
-	const maxMTU = 9012
-	buff := make([]byte, maxMTU)
+	buff := make([]byte, h.maxMTU)
 	for {
 		//response must arrive within 15 seconds
 		deadline := settings.EnvDuration("UDP_DEADLINE", 15*time.Second)

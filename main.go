@@ -151,7 +151,7 @@ var serverHelp = `
     and you cannot set --tls-domain.
 
     --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncypt. Setting --tls-domain requires port 443.
+    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
     You may specify multiple --tls-domain flags to serve multiple domains.
     The resulting files are cached in the "$HOME/.cache/chisel" directory.
     You can modify this path by setting the CHISEL_LE_CACHE variable,
@@ -366,6 +366,9 @@ var clientHelp = `
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 
+    --sni, Override the ServerName when using TLS (defaults to the 
+    hostname).
+
     --tls-ca, An optional root certificate bundle used to verify the
     chisel server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
@@ -401,6 +404,7 @@ func client(args []string) {
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
+	sni := flags.String("sni", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
@@ -422,7 +426,13 @@ func client(args []string) {
 	//move hostname onto headers
 	if *hostname != "" {
 		config.Headers.Set("Host", *hostname)
+		config.TLS.ServerName = *hostname
 	}
+
+	if *sni != "" {
+		config.TLS.ServerName = *sni
+	}
+
 	//ready
 	c, err := chclient.NewClient(&config)
 	if err != nil {

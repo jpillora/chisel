@@ -35,6 +35,7 @@ archives:
     files:
       - none*
 release:
+  draft: true
   prerelease: auto
 changelog:
   sort: asc

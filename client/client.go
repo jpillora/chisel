@@ -42,6 +42,7 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Verbose          bool
 }
 
 //TLSConfig for a Client
@@ -50,6 +51,7 @@ type TLSConfig struct {
 	CA         string
 	Cert       string
 	Key        string
+	ServerName string
 }
 
 //Client represents a client instance
@@ -103,10 +105,13 @@ func NewClient(c *Config) (*Client, error) {
 		tlsConfig: nil,
 	}
 	//set default log level
-	client.Logger.Info = true
+	client.Logger.Info = c.Verbose
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
+		if c.TLS.ServerName != "" {
+			tc.ServerName = c.TLS.ServerName
+		}
 		//certificate verification config
 		if c.TLS.SkipVerify {
 			client.Infof("TLS verification disabled")

@@ -19,7 +19,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	if upgrade == "websocket" && strings.HasPrefix(protocol, "chisel-") {
+	if upgrade == "websocket"  {
 		if protocol == chshare.ProtocolVersion {
 			s.handleWebsocket(w, r)
 			return
@@ -34,7 +34,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//no proxy defined, provide access to health/version checks
-	switch r.URL.String() {
+	switch r.URL.Path {
 	case "/health":
 		w.Write([]byte("OK\n"))
 		return
