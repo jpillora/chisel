@@ -39,7 +39,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 			if attempt > 0 {
 				maxAttemptVal := fmt.Sprint(maxAttempt)
 				if maxAttempt < 0 {
-					maxAttemptVal = "unlimited";
+					maxAttemptVal = "unlimited"
 				}
 				msg += fmt.Sprintf(" (Attempt: %d/%s)", attempt, maxAttemptVal)
 			}
@@ -64,7 +64,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	return nil
 }
 
-//connectionOnce connects to the chisel server and blocks
+// connectionOnce connects to the chisel server and blocks
 func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error) {
 	//already closed?
 	select {
@@ -82,6 +82,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		TLSClientConfig:  c.tlsConfig,
 		ReadBufferSize:   settings.EnvInt("WS_BUFF_SIZE", 0),
 		WriteBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
+		NetDialContext:   c.config.DialContext,
 	}
 	//optional proxy
 	if p := c.proxyURL; p != nil {
