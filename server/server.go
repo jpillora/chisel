@@ -18,6 +18,7 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 )
 
 // Config is the configuration for the chisel service
@@ -35,14 +36,15 @@ type Config struct {
 // Server respresent a chisel service
 type Server struct {
 	*cio.Logger
-	config       *Config
-	fingerprint  string
-	httpServer   *cnet.HTTPServer
-	reverseProxy *httputil.ReverseProxy
-	sessCount    int32
-	sessions     *settings.Users
-	sshConfig    *ssh.ServerConfig
-	users        *settings.UserIndex
+	config             *Config
+	fingerprint        string
+	httpServer         *cnet.HTTPServer
+	webTransportServer *cnet.WebTransportServer
+	reverseProxy       *httputil.ReverseProxy
+	sessCount          int32
+	sessions           *settings.Users
+	sshConfig          *ssh.ServerConfig
+	users              *settings.UserIndex
 }
 
 var upgrader = websocket.Upgrader{
@@ -140,7 +142,7 @@ func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	if s.reverseProxy != nil {
 		s.Infof("Reverse proxy enabled")
 	}
-	l, err := s.listener(host, port)
+	l, q, err := s.listener(host, port)
 	if err != nil {
 		return err
 	}
@@ -150,17 +152,39 @@ func (s *Server) StartContext(ctx context.Context, host, port string) error {
 		o.TrustProxy = true
 		h = requestlog.WrapWith(h, o)
 	}
+	if q != nil {
+		s.webTransportServer = cnet.NewWebTransportServer()
+		s.webTransportServer.GoServe(ctx, q, h)
+	}
 	return s.httpServer.GoServe(ctx, l, h)
 }
 
 // Wait waits for the http server to close
 func (s *Server) Wait() error {
-	return s.httpServer.Wait()
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		return s.httpServer.Wait()
+	})
+	if s.webTransportServer != nil {
+		g.Go(func() error {
+			return s.webTransportServer.Wait()
+		})
+	}
+	return g.Wait()
 }
 
 // Close forcibly closes the http server
 func (s *Server) Close() error {
-	return s.httpServer.Close()
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		return s.httpServer.Close()
+	})
+	if s.webTransportServer != nil {
+		g.Go(func() error {
+			return s.webTransportServer.Close()
+		})
+	}
+	return g.Wait()
 }
 
 // GetFingerprint is used to access the server fingerprint
