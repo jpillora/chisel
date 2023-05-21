@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -14,6 +15,9 @@ import (
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/cos"
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"github.com/quic-go/webtransport-go"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -75,26 +79,53 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	var conn net.Conn
 	//prepare dialer
-	d := websocket.Dialer{
-		HandshakeTimeout: settings.EnvDuration("WS_TIMEOUT", 45*time.Second),
-		Subprotocols:     []string{chshare.ProtocolVersion},
-		TLSClientConfig:  c.tlsConfig,
-		ReadBufferSize:   settings.EnvInt("WS_BUFF_SIZE", 0),
-		WriteBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
-		NetDialContext:   c.config.DialContext,
-	}
-	//optional proxy
-	if p := c.proxyURL; p != nil {
-		if err := c.setProxy(p, &d); err != nil {
+	if c.config.PreferWebTransport && c.tlsConfig != nil {
+		c.Debugf("Preparing WebTransport dialer")
+		d := webtransport.Dialer{
+			RoundTripper: &http3.RoundTripper{
+				TLSClientConfig: c.tlsConfig,
+				QuicConfig: &quic.Config{
+					HandshakeIdleTimeout: settings.EnvDuration("WS_TIMEOUT", 45*time.Second),
+				},
+			},
+		}
+		//optional proxy
+		if p := c.proxyURL; p != nil {
+			return false, fmt.Errorf("proxying is not supported when using webtransport")
+		}
+		_, wtSession, err := d.Dial(ctx, c.server+"/wt", c.config.Headers)
+		if err != nil {
 			return false, err
 		}
+		wtStream, err := wtSession.OpenStream()
+		if err != nil {
+			return false, err
+		}
+		conn = cnet.NewWebTransportConn(wtStream)
+	} else {
+		c.Debugf("Preparing WebSocket dialer")
+		d := websocket.Dialer{
+			HandshakeTimeout: settings.EnvDuration("WS_TIMEOUT", 45*time.Second),
+			Subprotocols:     []string{chshare.ProtocolVersion},
+			TLSClientConfig:  c.tlsConfig,
+			ReadBufferSize:   settings.EnvInt("WS_BUFF_SIZE", 0),
+			WriteBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
+			NetDialContext:   c.config.DialContext,
+		}
+		//optional proxy
+		if p := c.proxyURL; p != nil {
+			if err := c.setProxy(p, &d); err != nil {
+				return false, err
+			}
+		}
+		wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
+		if err != nil {
+			return false, err
+		}
+		conn = cnet.NewWebSocketConn(wsConn)
 	}
-	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
-	if err != nil {
-		return false, err
-	}
-	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)

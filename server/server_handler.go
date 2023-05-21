@@ -1,6 +1,7 @@
 package chserver
 
 import (
+	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -14,14 +15,31 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// connectionType represents the transport the client is attempting to upgrade to
+type connectionType int
+
+const (
+	webSocket connectionType = iota
+	webTransport
+)
+
 // handleClientHandler is the main http websocket handler for the chisel server
 func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/wt" {
+		if s.webTransportServer != nil {
+			s.handleConnection(w, r, webTransport)
+			return
+		}
+
+		//print into server logs and silently fall-through
+		s.Infof("ignored client connection using webtransport, since the webtransport server isn't enabled")
+	}
 	//websockets upgrade AND has chisel prefix
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
-	if upgrade == "websocket"  {
+	if upgrade == "websocket" {
 		if protocol == chshare.ProtocolVersion {
-			s.handleWebsocket(w, r)
+			s.handleConnection(w, r, webSocket)
 			return
 		}
 		//print into server logs and silently fall-through
@@ -47,16 +65,32 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Not found"))
 }
 
-// handleWebsocket is responsible for handling the websocket connection
-func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
+// handleConnection is responsible for handling the websocket or webtransport connection
+func (s *Server) handleConnection(w http.ResponseWriter, req *http.Request, ct connectionType) {
 	id := atomic.AddInt32(&s.sessCount, 1)
 	l := s.Fork("session#%d", id)
-	wsConn, err := upgrader.Upgrade(w, req, nil)
-	if err != nil {
-		l.Debugf("Failed to upgrade (%s)", err)
-		return
+	var conn net.Conn
+	switch ct {
+	case webSocket:
+		wsConn, err := upgrader.Upgrade(w, req, nil)
+		if err != nil {
+			l.Debugf("Failed to upgrade (%s)", err)
+			return
+		}
+		conn = cnet.NewWebSocketConn(wsConn)
+	case webTransport:
+		wtSession, err := s.webTransportServer.Upgrade(w, req)
+		if err != nil {
+			l.Debugf("Failed to upgrade (%s)", err)
+			return
+		}
+		wtStream, err := wtSession.AcceptStream(req.Context())
+		if err != nil {
+			l.Debugf("Failed to open webtransport stream (%s)", err)
+			return
+		}
+		conn = cnet.NewWebTransportConn(wtStream)
 	}
-	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)

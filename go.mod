@@ -11,9 +11,12 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
+	github.com/quic-go/quic-go v0.34.0
+	github.com/quic-go/webtransport-go v0.5.3
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
-	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
+	golang.org/x/crypto v0.4.0
+	golang.org/x/net v0.7.0
+	golang.org/x/sync v0.1.0
 )
+
+replace github.com/quic-go/webtransport-go => github.com/FyraLabs/webtransport-go v0.0.0-20230521122645-2533f15702ba

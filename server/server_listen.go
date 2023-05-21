@@ -11,10 +11,12 @@ import (
 	"path/filepath"
 
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-//TLSConfig enables configures TLS
+// TLSConfig enables configures TLS
 type TLSConfig struct {
 	Key     string
 	Cert    string
@@ -22,11 +24,11 @@ type TLSConfig struct {
 	CA      string
 }
 
-func (s *Server) listener(host, port string) (net.Listener, error) {
+func (s *Server) listener(host, port string) (net.Listener, quic.EarlyListener, error) {
 	hasDomains := len(s.config.TLS.Domains) > 0
 	hasKeyCert := s.config.TLS.Key != "" && s.config.TLS.Cert != ""
 	if hasDomains && hasKeyCert {
-		return nil, errors.New("cannot use key/cert and domains")
+		return nil, nil, errors.New("cannot use key/cert and domains")
 	}
 	var tlsConf *tls.Config
 	if hasDomains {
@@ -36,7 +38,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	if hasKeyCert {
 		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert, s.config.TLS.CA)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tlsConf = c
 		if port != "443" && hasDomains {
@@ -46,18 +48,26 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	//tcp listen
 	l, err := net.Listen("tcp", host+":"+port)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	//quic listener
+	var q quic.EarlyListener
 	//optionally wrap in tls
 	proto := "http"
 	if tlsConf != nil {
 		proto += "s"
 		l = tls.NewListener(l, tlsConf)
+		q, err = quic.ListenAddrEarly(host+":"+port, http3.ConfigureTLSConfig(tlsConf), &quic.Config{
+			EnableDatagrams: true,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if err == nil {
 		s.Infof("Listening on %s://%s:%s%s", proto, host, port, extra)
 	}
-	return l, nil
+	return l, q, nil
 }
 
 func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
