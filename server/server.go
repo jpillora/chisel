@@ -32,7 +32,7 @@ type Config struct {
 	TLS       TLSConfig
 }
 
-// Server respresent a chisel service
+// Server represent a chisel service
 type Server struct {
 	*cio.Logger
 	config       *Config
