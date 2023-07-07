@@ -1,3 +1,5 @@
+file README.md
+======
 # Chisel
 
 [![GoDoc](https://godoc.org/github.com/jpillora/chisel?status.svg)](https://godoc.org/github.com/jpillora/chisel) [![CI](https://github.com/jpillora/chisel/workflows/CI/badge.svg)](https://github.com/jpillora/chisel/actions?workflow=CI)
@@ -191,6 +193,9 @@ $ chisel server --help
       "IDMapTo": "sAMAccountName",
       "CA": "",
       "Insecure": true }
+    
+
+
 
     --pid Generate pid file in current working directory
 
@@ -313,6 +318,9 @@ $ chisel client --help
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 
+    --sni, Override the ServerName when using TLS (defaults to the 
+    hostname).
+
     --tls-ca, An optional root certificate bundle used to verify the
     chisel server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
@@ -420,3 +428,5 @@ Since WebSockets support is required:
 ## License
 
 [MIT](https://github.com/jpillora/chisel/blob/master/LICENSE) © Jaime Pillora
+
+======
