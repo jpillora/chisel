@@ -23,16 +23,16 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
-	LDAPConfigFile	string
-	LDAPConfig settings.LDAPConfig
+	KeySeed        string
+	AuthFile       string
+	Auth           string
+	Proxy          string
+	Socks5         bool
+	Reverse        bool
+	KeepAlive      time.Duration
+	TLS            TLSConfig
+	LDAPConfigFile string
+	LDAPConfig     settings.LDAPConfig
 }
 
 // Server respresent a chisel service
@@ -118,7 +118,7 @@ func NewServer(c *Config) (*Server, error) {
 	}
 	// ldap authentication
 	if c.LDAPConfigFile != "" {
-		if c.LDAPConfig,err = server.LDAPParseConfig(c.LDAPConfigFile); err != nil {
+		if c.LDAPConfig, err = server.LDAPParseConfig(c.LDAPConfigFile); err != nil {
 			return nil, err
 		}
 	}
@@ -188,28 +188,28 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	user, found := s.users.Get(n)
 
 	if !found {
-	  return nil, errors.New("user not found")
+		return nil, errors.New("user not found")
 	}
 	if string(password) == "" {
-	  return nil, errors.New("user password not set")
+		return nil, errors.New("user password not set")
 	}
-	if (user.Pass == string(password)) {
+	if user.Pass == string(password) {
 		// local authentication successful
+		// insert the user session map
+		s.sessions.Set(string(c.SessionID()), user)
 		return nil, nil
 	}
-	if (s.config.LDAPConfigFile != "") {
-		if err := settings.LDAPAuthUser(user,password,s.config.LDAPConfig); err != nil {
+	if s.config.LDAPConfigFile != "" {
+		if err := settings.LDAPAuthUser(user, password, s.config.LDAPConfig); err != nil {
 			return nil, fmt.Errorf("user ldap auth failed: %w", err)
 		}
 		// ldap authentication successful
+		// insert the user session map
+		s.sessions.Set(string(c.SessionID()), user)
 		return nil, nil
 	}
 	return nil, errors.New("user auth failed")
 
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
 }
 
 // AddUser adds a new user into the server user index
@@ -242,7 +242,7 @@ func (s *Server) ResetUsers(users []*settings.User) {
 }
 
 // LDAPParseConfig is validating the given ldap config
-func (s *Server) LDAPParseConfig(LDAPConfigFile string) (settings.LDAPConfig,error) {
-	ldapConfig,err := settings.ParseConfigFile(LDAPConfigFile)
-	return ldapConfig,err
+func (s *Server) LDAPParseConfig(LDAPConfigFile string) (settings.LDAPConfig, error) {
+	ldapConfig, err := settings.ParseConfigFile(LDAPConfigFile)
+	return ldapConfig, err
 }
