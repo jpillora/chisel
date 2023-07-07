@@ -10,35 +10,33 @@ jobs:
     name: Test
     strategy:
       matrix:
-        go-version: [1.13.x, 1.14.x, 1.15.x]
+        go-version: [1.16.x, 1.17.x, 1.18.x, 1.19.x]
         platform: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Install Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3
       - name: Build
-        run: go build -v .
+        run: go build -v -o /dev/null .
       - name: Test
         run: go test -v ./...
-        env:
-          GODEBUG: x509ignoreCN=0
   # ================
-  # RELEASE JOB
+  # RELEASE JOBS
   #   runs after a success test
   #   only runs on push "v*" tag
   # ================
-  release:
-    name: Release
+  release_binaries:
+    name: Release Binaries
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3
       - name: goreleaser
         if: success()
         uses: docker://goreleaser/goreleaser:latest
@@ -46,33 +44,35 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: release --config .github/goreleaser.yml
+  release_docker:
+    name: Release Docker Images
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: jpillora/chisel
-          tag-latest: true
-          # Outputs:
-          # jpillora/chisel:1.2.3
-          # jpillora/chisel:1.2
-          # jpillora/chisel:1
-          # jpillora/chisel:latest
-          tag-semver: |
-            {{version}}
-            {{major}}.{{minor}}
-            {{major}}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/386,linux/arm/v7,linux/arm/v6

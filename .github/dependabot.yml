@@ -4,10 +4,10 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
 
 # Dependencies listed in go.mod
   - package-ecosystem: "gomod"
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "monthly"
