@@ -1,3 +1,4 @@
+//go:build pprof
 // +build pprof
 
 package cos

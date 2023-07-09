@@ -179,6 +179,24 @@ $ chisel server --help
     validate client connections. The provided CA certificates will be used 
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 
+    --ldap-config, a path to a JSON configuration file, which defines settings used to
+    connect to a remote LDAP server for authenticating users. once configured, user
+    passwords will be validated against the configured LDAP server.
+    here is an example of an ldap-config file: {
+      "bindDN": "CN=ldapUser,OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "bindPassword": "ldapUserPassword",
+      "url": "example.com:636",
+      "baseDN": "OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "filter": "(&(objectClass=person)(objectClass=user))",
+      "idMapTo": "sAMAccountName",
+      "ca": "",
+      "insecure": true
+    }
+    note, ldap is only used to validate password, a user or a set of users must still
+    be whitelisted with the --auth or --authfile flags.
+
+
+
     --pid Generate pid file in current working directory
 
     -v, Enable verbose logging
@@ -299,6 +317,9 @@ $ chisel client --help
 
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
+
+    --sni, Override the ServerName when using TLS (defaults to the 
+    hostname).
 
     --tls-ca, An optional root certificate bundle used to verify the
     chisel server. Only valid when connecting to the server with

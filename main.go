@@ -16,6 +16,7 @@ import (
 	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 var help = `
@@ -162,6 +163,24 @@ var serverHelp = `
     holding multiple PEM encode CA certificate bundle files, which is used to 
     validate client connections. The provided CA certificates will be used 
     instead of the system roots. This is commonly used to implement mutual-TLS. 
+
+    --ldap-config, a path to a JSON configuration file, which defines settings used to
+    connect to a remote LDAP server for authenticating users. once configured, user
+    passwords will be validated against the configured LDAP server.
+    here is an example of an ldap-config file: {
+      "bindDN": "CN=ldapUser,OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "bindPassword": "ldapUserPassword",
+      "url": "example.com:636",
+      "baseDN": "OU=Users,OU=example,DC=EXAMPLE,DC=COM",
+      "filter": "(&(objectClass=person)(objectClass=user))",
+      "idMapTo": "sAMAccountName",
+      "ca": "",
+      "insecure": true
+    }
+    note, ldap is only used to validate password, a user or a set of users must still
+    be whitelisted with the --auth or --authfile flags, TODO
+
+
 ` + commonHelp
 
 func server(args []string) {
@@ -181,6 +200,7 @@ func server(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
+	ldapConfigPath := flags.String("ldap-config", "", "")
 
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
@@ -212,6 +232,16 @@ func server(args []string) {
 	if config.KeySeed == "" {
 		config.KeySeed = os.Getenv("CHISEL_KEY")
 	}
+
+	if p := ldapConfigPath; p != nil && *p != "" {
+
+		l, err := settings.LDAPParseConfig(*p)
+		if err != nil {
+			log.Fatal(err)
+		}
+		config.LDAPConfig = l
+	}
+
 	s, err := chserver.NewServer(config)
 	if err != nil {
 		log.Fatal(err)

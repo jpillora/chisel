@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"sync"
 
@@ -72,14 +72,16 @@ func (u *Users) Reset(users []*User) {
 type UserIndex struct {
 	*cio.Logger
 	*Users
-	configFile string
+	configFile   string
+	externalAuth bool
 }
 
 // NewUserIndex creates a source for users
-func NewUserIndex(logger *cio.Logger) *UserIndex {
+func NewUserIndex(logger *cio.Logger, externalAuth bool) *UserIndex {
 	return &UserIndex{
-		Logger: logger.Fork("users"),
-		Users:  NewUsers(),
+		Logger:       logger.Fork("users"),
+		Users:        NewUsers(),
+		externalAuth: externalAuth,
 	}
 }
 
@@ -125,7 +127,7 @@ func (u *UserIndex) loadUserIndex() error {
 	if u.configFile == "" {
 		return errors.New("configuration file not set")
 	}
-	b, err := ioutil.ReadFile(u.configFile)
+	b, err := os.ReadFile(u.configFile)
 	if err != nil {
 		return fmt.Errorf("Failed to read auth file: %s, error: %s", u.configFile, err)
 	}
@@ -134,11 +136,15 @@ func (u *UserIndex) loadUserIndex() error {
 		return errors.New("Invalid JSON: " + err.Error())
 	}
 	users := []*User{}
+	passwords := false
 	for auth, remotes := range raw {
 		user := &User{}
 		user.Name, user.Pass = ParseAuth(auth)
 		if user.Name == "" {
 			return errors.New("Invalid user:pass string")
+		}
+		if user.Pass != "" {
+			passwords = true
 		}
 		for _, r := range remotes {
 			if r == "" || r == "*" {
@@ -152,6 +158,9 @@ func (u *UserIndex) loadUserIndex() error {
 			}
 		}
 		users = append(users, user)
+	}
+	if u.externalAuth && passwords {
+		u.Infof("warning: LDAP auth enabled, user passwords will not be used")
 	}
 	//swap
 	u.Reset(users)

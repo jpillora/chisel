@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/fsnotify/fsnotify v1.6.0
+	github.com/go-ldap/ldap/v3 v3.4.5
 	github.com/gorilla/websocket v1.5.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/jpillora/requestlog v1.0.0
@@ -15,7 +16,9 @@ require (
 )
 
 require (
+	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/andrew-d/go-termutil v0.0.0-20150726205930-009166a695a2 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
 	github.com/jpillora/ansi v1.0.3 // indirect
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
 	golang.org/x/sys v0.10.0 // indirect
