@@ -34,7 +34,14 @@ func (d *determRand) Read(b []byte) (int, error) {
 	for n < l {
 		next, out := hash(d.next)
 		n += copy(b[n:], out)
-		d.next = next
+		// In Golang 1.20, ecdsa.GenerateKey() introduced a function called
+		// MaybeReadRand() which reads 1 byte from the determRand reader
+		// with 50% chance. As a result, GenerateKey() generates
+		// nondeterministic keys.
+		// The following conditional check neutralizes this effect.
+		if l > 1 {
+			d.next = next
+		}
 	}
 	return n, nil
 }
