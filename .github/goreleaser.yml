@@ -13,7 +13,7 @@ builds:
       - darwin
       - windows
     goarch:
-      - 386
+      - '386'
       - amd64
       - arm
       - arm64
@@ -25,8 +25,8 @@ builds:
       - mips64le
       - s390x
     goarm:
-      - 6
-      - 7
+      - '6'
+      - '7'
     gomips:
       - hardfloat
       - softfloat
