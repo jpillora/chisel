@@ -72,6 +72,10 @@ func NewServer(c *Config) (*Server, error) {
 	if c.Auth != "" {
 		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
 		u.Name, u.Pass = settings.ParseAuth(c.Auth)
+		if c.LDAPConfigFile != "" && u.Pass != "" {
+			// we should not have local password based authentication with LDAP
+			log.Fatal("No local password based authentication in combination with LDAP")
+		}
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
@@ -193,17 +197,17 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	if string(password) == "" {
 		return nil, errors.New("user password not set")
 	}
-	if user.Pass == string(password) {
-		// local authentication successful
+	if user.Pass == string(password) && s.config.LDAPConfigFile == "" {
+		// local authentication successful and not combined with LDAP
 		// insert the user session map
 		s.sessions.Set(string(c.SessionID()), user)
 		return nil, nil
 	}
-	if s.config.LDAPConfigFile != "" {
+	if s.config.LDAPConfigFile != "" && user.Pass == "" {
 		if err := settings.LDAPAuthUser(user, password, s.config.LDAPConfig); err != nil {
 			return nil, fmt.Errorf("user ldap auth failed: %w", err)
 		}
-		// ldap authentication successful
+		// ldap authentication successful and no local password used
 		// insert the user session map
 		s.sessions.Set(string(c.SessionID()), user)
 		return nil, nil
