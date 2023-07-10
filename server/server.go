@@ -3,6 +3,7 @@ package chserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -22,14 +23,16 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
+	KeySeed        string
+	AuthFile       string
+	Auth           string
+	Proxy          string
+	Socks5         bool
+	Reverse        bool
+	KeepAlive      time.Duration
+	TLS            TLSConfig
+	LDAPConfigFile string
+	LDAPConfig     settings.LDAPConfig
 }
 
 // Server respresent a chisel service
@@ -69,6 +72,10 @@ func NewServer(c *Config) (*Server, error) {
 	if c.Auth != "" {
 		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
 		u.Name, u.Pass = settings.ParseAuth(c.Auth)
+		if c.LDAPConfigFile != "" && u.Pass != "" {
+			// we should not have local password based authentication with LDAP
+			log.Fatal("No local password based authentication in combination with LDAP")
+		}
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
@@ -112,6 +119,12 @@ func NewServer(c *Config) (*Server, error) {
 	//print when reverse tunnelling is enabled
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
+	}
+	// ldap authentication
+	if c.LDAPConfigFile != "" {
+		if c.LDAPConfig, err = server.LDAPParseConfig(c.LDAPConfigFile); err != nil {
+			return nil, err
+		}
 	}
 	return server, nil
 }
@@ -177,14 +190,30 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
-		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+
+	if !found {
+		return nil, errors.New("user not found")
 	}
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
+	if string(password) == "" {
+		return nil, errors.New("user password not set")
+	}
+	if user.Pass == string(password) && s.config.LDAPConfigFile == "" {
+		// local authentication successful and not combined with LDAP
+		// insert the user session map
+		s.sessions.Set(string(c.SessionID()), user)
+		return nil, nil
+	}
+	if s.config.LDAPConfigFile != "" && user.Pass == "" {
+		if err := settings.LDAPAuthUser(user, password, s.config.LDAPConfig); err != nil {
+			return nil, fmt.Errorf("user ldap auth failed: %w", err)
+		}
+		// ldap authentication successful and no local password used
+		// insert the user session map
+		s.sessions.Set(string(c.SessionID()), user)
+		return nil, nil
+	}
+	return nil, errors.New("user auth failed")
+
 }
 
 // AddUser adds a new user into the server user index
@@ -214,4 +243,10 @@ func (s *Server) DeleteUser(user string) {
 // Use nil to remove all.
 func (s *Server) ResetUsers(users []*settings.User) {
 	s.users.Reset(users)
+}
+
+// LDAPParseConfig is validating the given ldap config
+func (s *Server) LDAPParseConfig(LDAPConfigFile string) (settings.LDAPConfig, error) {
+	ldapConfig, err := settings.ParseConfigFile(LDAPConfigFile)
+	return ldapConfig, err
 }
