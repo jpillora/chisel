@@ -353,10 +353,14 @@ var clientHelp = `
 
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
+	
+	--pool-size, The number of tunnels to create. Each tunnel establishes 
+    a separate websocket connection to the server. When multiple --proxy flags
+    are specified, the pool size is internally multiplied accordingly. Defaults to 1.
 
     --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
-    used to reach the chisel server. Authentication can be specified
-    inside the URL.
+    used to reach the chisel server. Can be specified multiple times. 
+    Authentication can be specified inside the URL.
     For example, http://admin:password@my-server.com:8081
             or: socks://admin:password@my-server.com:1080
 
