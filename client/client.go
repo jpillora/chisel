@@ -33,6 +33,7 @@ import (
 type Config struct {
 	Fingerprint      string
 	Auth             string
+	PoolSize	     int
 	KeepAlive        time.Duration
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
@@ -67,6 +68,7 @@ type Client struct {
 	stop      func()
 	eg        *errgroup.Group
 	tunnel    *tunnel.Tunnel
+	tunnelPool tunnel.TunnelPool
 }
 
 //NewClient creates a new client instance
@@ -180,13 +182,22 @@ func NewClient(c *Config) (*Client, error) {
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
 	//prepare client tunnel
-	client.tunnel = tunnel.New(tunnel.Config{
+	config := tunnel.Config{
 		Logger:    client.Logger,
-		Inbound:   true, //client always accepts inbound
+		Inbound:   true, // client always accepts inbound
 		Outbound:  hasReverse,
 		Socks:     hasReverse && hasSocks,
 		KeepAlive: client.config.KeepAlive,
-	})
+	}
+
+	if client.config.PoolSize > 1 {
+		for i := 0; i < client.config.PoolSize; i++ {
+			client.tunnelPool = append(client.tunnelPool, tunnel.New(config, i))
+		}
+	} else {
+		client.tunnel = tunnel.New(config)
+	}
+
 	return client, nil
 }
 
@@ -247,9 +258,15 @@ func (c *Client) Start(ctx context.Context) error {
 		via = " via " + c.proxyURL.String()
 	}
 	c.Infof("Connecting to %s%s\n", c.server, via)
+
+	poolSize := len(c.tunnelPool)
 	//connect to chisel server
 	eg.Go(func() error {
-		return c.connectionLoop(ctx)
+		if poolSize > 0 {
+			return c.connectionLoopPool(ctx)
+		} else {
+			return c.connectionLoop(ctx)
+		}
 	})
 	//listen sockets
 	eg.Go(func() error {
@@ -257,7 +274,14 @@ func (c *Client) Start(ctx context.Context) error {
 		if len(clientInbound) == 0 {
 			return nil
 		}
-		return c.tunnel.BindRemotes(ctx, clientInbound)
+		if poolSize > 0 {
+			c.Infof("Binding remotes for tunnel pool\n")
+			return c.tunnelPool.BindRemotes(ctx, clientInbound, c.Logger)
+		} else {
+			c.Infof("Binding remotes for tunnel\n")
+			return c.tunnel.BindRemotes(ctx, clientInbound)
+		}
+
 	})
 	return nil
 }

@@ -397,6 +397,7 @@ func client(args []string) {
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
+	flags.IntVar(&config.PoolSize, "pool-size", 1, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
@@ -431,6 +432,10 @@ func client(args []string) {
 
 	if *sni != "" {
 		config.TLS.ServerName = *sni
+	}
+
+	if config.PoolSize <=0 {
+		log.Fatalf("The pool size must be greater than 0")
 	}
 
 	//ready

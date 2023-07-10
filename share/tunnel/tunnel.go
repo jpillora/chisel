@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ type Config struct {
 //communicates with the endpoint and returns the response.
 type Tunnel struct {
 	Config
+	Id int
 	//ssh connection
 	activeConnMut  sync.RWMutex
 	activatingConn waitGroup
@@ -46,12 +48,18 @@ type Tunnel struct {
 	connStats   cnet.ConnCount
 	socksServer *socks5.Server
 }
+type TunnelPool []*Tunnel
 
 //New Tunnel from the given Config
-func New(c Config) *Tunnel {
-	c.Logger = c.Logger.Fork("tun")
+func New(c Config, id ...int) *Tunnel {
+	tid := 0
+	if len(id) > 0 {
+		tid = id[0]
+	}
+	c.Logger = c.Logger.Fork("tun#%d", tid)
 	t := &Tunnel{
 		Config: c,
+		Id:     tid,
 	}
 	t.activatingConn.Add(1)
 	//setup socks server (not listening on any port!)
@@ -130,6 +138,15 @@ func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 		return c
 	}
 }
+func (tp TunnelPool) getSSH(ctx context.Context) ssh.Conn {
+	return tp.getRandom().getSSH(ctx)
+}
+
+func (tp TunnelPool) getRandom() *Tunnel {
+	t := tp[rand.Intn(len(tp))]
+	t.Debugf("Selected")
+	return t
+}
 
 func (t *Tunnel) activatingConnWait() <-chan struct{} {
 	ch := make(chan struct{})
@@ -171,6 +188,39 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 	t.Debugf("Unbound proxies")
 	return err
 }
+
+func (tp TunnelPool) BindRemotes(ctx context.Context, remotes []*settings.Remote, logger *cio.Logger) error {
+	if len(remotes) == 0 {
+		return errors.New("no remotes")
+	}
+	if !tp[0].Inbound {
+		return errors.New("inbound connections blocked")
+	}
+	tpLogger := logger.Fork("tunPool")
+	rand.Seed(time.Now().UnixNano())
+	proxies := make([]*Proxy, len(remotes))
+	for i, remote := range remotes {
+		p, err := NewProxy(tpLogger, tp, tp[0].proxyCount, remote)
+		if err != nil {
+			return err
+		}
+		proxies[i] = p
+		tp[0].proxyCount++
+	}
+	//TODO: handle tunnel close
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, proxy := range proxies {
+		p := proxy
+		eg.Go(func() error {
+			return p.Run(ctx)
+		})
+	}
+	tpLogger.Debugf("Bound proxies")
+	err := eg.Wait()
+	tpLogger.Debugf("Unbound proxies")
+	return err
+}
+
 
 func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 	//ping forever

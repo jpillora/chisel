@@ -15,6 +15,7 @@ import (
 	"github.com/jpillora/chisel/share/cos"
 	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 )
 
 func (c *Client) connectionLoop(ctx context.Context) error {
@@ -64,14 +65,72 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	return nil
 }
 
+func (c *Client) connectionLoopPool(ctx context.Context) error {
+	//connection loop for tunnels!
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, tunnel := range c.tunnelPool {
+		t := tunnel
+		eg.Go(func() error {
+			b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
+			for {
+				connected, err := c.connectionOnce(ctx, t.Id)
+				//reset backoff after successful connections
+				if connected {
+					b.Reset()
+				}
+				//connection error
+				attempt := int(b.Attempt())
+				maxAttempt := c.config.MaxRetryCount
+				//dont print closed-connection errors
+				if strings.HasSuffix(err.Error(), "use of closed network connection") {
+					err = io.EOF
+				}
+				//show error message and attempt counts (excluding disconnects)
+				if err != nil && err != io.EOF {
+					msg := fmt.Sprintf("Connection error: %s", err)
+					if attempt > 0 {
+						maxAttemptVal := fmt.Sprint(maxAttempt)
+						if maxAttempt < 0 {
+							maxAttemptVal = "unlimited"
+						}
+						msg += fmt.Sprintf(" (Attempt: %d/%s)", attempt, maxAttemptVal)
+					}
+					t.Infof(msg)
+				}
+				//give up?
+				if maxAttempt >= 0 && attempt >= maxAttempt {
+					t.Infof("Give up")
+					break
+				}
+				d := b.Duration()
+				t.Infof("Retrying in %s...", d)
+				select {
+				case <-cos.AfterSignal(d):
+					continue //retry now
+				case <-ctx.Done():
+					t.Infof("Cancelled")
+					return nil
+				}
+			}
+			return nil
+		})
+	}
+	eg.Wait()
+	c.Close()
+	return nil
+}
 // connectionOnce connects to the chisel server and blocks
-func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error) {
+func (c *Client) connectionOnce(ctx context.Context, id ...int) (connected bool, err error) {
 	//already closed?
 	select {
 	case <-ctx.Done():
 		return false, errors.New("Cancelled")
 	default:
 		//still open
+	}
+	targetTunnel := c.tunnel
+	if len(id) > 0 {
+		targetTunnel = c.tunnelPool[id[0]]
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -96,7 +155,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
-	c.Debugf("Handshaking...")
+	targetTunnel.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
 	if err != nil {
 		e := err.Error()
@@ -111,7 +170,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	defer sshConn.Close()
 	// chisel client handshake (reverse of server handshake)
 	// send configuration
-	c.Debugf("Sending config")
+	targetTunnel.Debugf("Sending config")
 	t0 := time.Now()
 	_, configerr, err := sshConn.SendRequest(
 		"config",
@@ -119,16 +178,16 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		settings.EncodeConfig(c.computed),
 	)
 	if err != nil {
-		c.Infof("Config verification failed")
+		targetTunnel.Infof("Config verification failed")
 		return false, err
 	}
 	if len(configerr) > 0 {
 		return false, errors.New(string(configerr))
 	}
-	c.Infof("Connected (Latency %s)", time.Since(t0))
+	targetTunnel.Infof("Connected (Latency %s)", time.Since(t0))
 	//connected, handover ssh connection for tunnel to use, and block
-	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
-	c.Infof("Disconnected")
+	err = targetTunnel.BindSSH(ctx, sshConn, reqs, chans)
+	targetTunnel.Infof("Disconnected")
 	connected = time.Since(t0) > 5*time.Second
 	return connected, err
 }
