@@ -144,11 +144,16 @@ func (c *Client) connectionOnce(ctx context.Context, id ...int) (connected bool,
 		NetDialContext:   c.config.DialContext,
 	}
 	//optional proxy
-	if p := c.proxyURL; p != nil {
-		if err := c.setProxy(p, &d); err != nil {
-			return false, err
+	proxyCount := len(c.proxyURL)
+	if proxyCount > 0 {
+		if p := c.proxyURL[targetTunnel.Id % proxyCount]; p != nil {
+			if err := c.setProxy(p, &d); err != nil {
+				return false, err
+			}
+			targetTunnel.Infof("proxy set to %s", p)
 		}
 	}
+
 	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
 	if err != nil {
 		return false, err

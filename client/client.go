@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -38,7 +39,7 @@ type Config struct {
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
 	Server           string
-	Proxy            string
+	Proxy            []string
 	Remotes          []string
 	Headers          http.Header
 	TLS              TLSConfig
@@ -62,7 +63,7 @@ type Client struct {
 	computed  settings.Config
 	sshConfig *ssh.ClientConfig
 	tlsConfig *tls.Config
-	proxyURL  *url.URL
+	proxyURL  []*url.URL
 	server    string
 	connCount cnet.ConnCount
 	stop      func()
@@ -166,12 +167,16 @@ func NewClient(c *Config) (*Client, error) {
 		client.computed.Remotes = append(client.computed.Remotes, r)
 	}
 	//outbound proxy
-	if p := c.Proxy; p != "" {
-		client.proxyURL, err = url.Parse(p)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
+	for _, proxy := range c.Proxy {
+		if p := proxy; p != "" {
+			proxyURL, err := url.Parse(p)
+			if err != nil {
+				return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
+			}
+			client.proxyURL = append(client.proxyURL, proxyURL)
 		}
 	}
+
 	//ssh auth and config
 	user, pass := settings.ParseAuth(c.Auth)
 	client.sshConfig = &ssh.ClientConfig{
@@ -189,6 +194,9 @@ func NewClient(c *Config) (*Client, error) {
 		Socks:     hasReverse && hasSocks,
 		KeepAlive: client.config.KeepAlive,
 	}
+
+	psMultiply := int(math.Max(float64(len(client.proxyURL)), 1))
+	client.config.PoolSize = client.config.PoolSize * psMultiply
 
 	if client.config.PoolSize > 1 {
 		for i := 0; i < client.config.PoolSize; i++ {
@@ -254,8 +262,12 @@ func (c *Client) Start(ctx context.Context) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	c.eg = eg
 	via := ""
-	if c.proxyURL != nil {
-		via = " via " + c.proxyURL.String()
+	if len(c.proxyURL) > 0 {
+		urls := make([]string, len(c.proxyURL))
+		for i, u := range c.proxyURL {
+			urls[i] = u.String()
+		}
+		via = " via " + strings.Join(urls, ", ")
 	}
 	c.Infof("Connecting to %s%s\n", c.server, via)
 
