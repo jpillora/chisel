@@ -1,7 +1,6 @@
 package ccrypto
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
@@ -13,13 +12,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//GenerateKey for use as an SSH private key
+// GenerateKey for use as an SSH private key
 func GenerateKey(seed string) ([]byte, error) {
 	r := rand.Reader
 	if seed != "" {
 		r = NewDetermRand([]byte(seed))
 	}
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+	priv, err := GenerateKeyGo119(elliptic.P256(), r)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +29,7 @@ func GenerateKey(seed string) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: b}), nil
 }
 
-//FingerprintKey calculates the SHA256 hash of an SSH public key
+// FingerprintKey calculates the SHA256 hash of an SSH public key
 func FingerprintKey(k ssh.PublicKey) string {
 	bytes := sha256.Sum256(k.Marshal())
 	return base64.StdEncoding.EncodeToString(bytes[:])
