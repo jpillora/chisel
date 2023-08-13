@@ -2,8 +2,8 @@ package chserver
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -25,6 +25,7 @@ import (
 // Config is the configuration for the chisel service
 type Config struct {
 	KeySeed   string
+	KeyFile   string
 	AuthFile  string
 	Auth      string
 	Proxy     string
@@ -32,7 +33,6 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
-	KeyFile   string
 }
 
 // Server respresent a chisel service
@@ -80,10 +80,17 @@ func NewServer(c *Config) (*Server, error) {
 	var key []byte
 	var err error
 	if c.KeyFile != "" {
-		//read private key from the file specified by the --keyfile flag
-		key, err = os.ReadFile(c.KeyFile)
+		s, serr := os.Stat(c.KeyFile)
+		isFile := serr == nil && !s.IsDir()
+		if isFile {
+			//read private key from the file specified by the --keyfile flag
+			key, err = os.ReadFile(c.KeyFile)
+		} else {
+			//decode the private key from the string specified by the --keyfile flag
+			key, err = base64.StdEncoding.DecodeString(c.KeyFile)
+		}
 		if err != nil {
-			log.Fatal(fmt.Sprintf("Failed to read the SSH private key %s", c.KeyFile))
+			log.Fatalf("Failed to read the SSH private key %s", c.KeyFile)
 		}
 	} else {
 		//generate private key (optionally using seed)

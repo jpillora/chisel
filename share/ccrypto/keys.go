@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -18,18 +18,11 @@ import (
 func GenerateKey(seed string) ([]byte, error) {
 	var err error
 	var priv *ecdsa.PrivateKey
-
-	r := rand.Reader
-	if seed != "" {
-		r = NewDetermRand([]byte(seed))
-	}
-
 	if seed == "" {
-		priv, err = ecdsa.GenerateKey(elliptic.P256(), r)
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	} else {
-		priv, err = GenerateKeyGo119(elliptic.P256(), r)
+		priv, err = GenerateKeyGo119(elliptic.P256(), NewDetermRand([]byte(seed)))
 	}
-
 	if err != nil {
 		return nil, err
 	}
@@ -42,12 +35,15 @@ func GenerateKey(seed string) ([]byte, error) {
 
 // GenerateKeyFile generates an SSH private key file
 func GenerateKeyFile(keyFilePath, seed string) error {
-	keyBytes, err := GenerateKey(seed)
+	pem, err := GenerateKey(seed)
 	if err != nil {
 		return err
 	}
-
-	return ioutil.WriteFile(keyFilePath, keyBytes, 0600)
+	if keyFilePath == "-" {
+		fmt.Print(string(pem))
+		return nil
+	}
+	return os.WriteFile(keyFilePath, pem, 0600)
 }
 
 // FingerprintKey calculates the SHA256 hash of an SSH public key

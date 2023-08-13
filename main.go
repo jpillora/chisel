@@ -17,6 +17,7 @@ import (
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 var help = `
@@ -104,17 +105,22 @@ var serverHelp = `
     --port, -p, Defines the HTTP listening port (defaults to the environment
     variable PORT and fallsback to port 8080).
 
-    --key, (deprecated) An optional string to seed the generation of a ECDSA public
+    --key, (deprecated use --keygen and --keyfile instead)
+    An optional string to seed the generation of a ECDSA public
     and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
 
-    --keyfile, An optional path to a PEM-encoded SSH private key. When 
-    this flag is set, the --key option is omitted, and the provided private key 
-    is used to secure all communications.
+    --keygen, A path to write a newly generated PEM-encoded SSH private key file.
+    If users depend on your --key fingerprint, you may also include your --key to
+    output your existing key. Use - (dash) to output the generated key to stdout.
 
-    --keygen, Generates a PEM-encoded SSH private key file
+    --keyfile, An optional path to a PEM-encoded SSH private key. When
+    this flag is set, the --key option is ignored, and the provided private key
+    is used to secure all communications. (defaults to the CHISEL_KEY_FILE
+    environment variable). Since ECDSA keys are short, you may also set keyfile
+    to an inline base64 private key (e.g. chisel server --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -211,7 +217,7 @@ func server(args []string) {
 	}
 
 	if config.KeySeed != "" {
-		log.Print("Option `--key` is deprecated and will be removed.")
+		log.Print("Option `--key` is deprecated and will be removed in a future version of chisel.")
 		log.Print("Please use `chisel server --keygen /file/path`, followed by `chisel server --keyfile /file/path` to specify the SSH private key")
 	}
 
@@ -230,8 +236,10 @@ func server(args []string) {
 	if *port == "" {
 		*port = "8080"
 	}
-	if config.KeySeed == "" {
-		config.KeySeed = os.Getenv("CHISEL_KEY")
+	if config.KeyFile == "" {
+		config.KeyFile = settings.Env("KEY_FILE")
+	} else if config.KeySeed == "" {
+		config.KeySeed = settings.Env("KEY")
 	}
 	s, err := chserver.NewServer(config)
 	if err != nil {
