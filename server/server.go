@@ -2,7 +2,6 @@ package chserver
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"log"
 	"net/http"
@@ -77,31 +76,37 @@ func NewServer(c *Config) (*Server, error) {
 		}
 	}
 
-	var key []byte
+	var pemBytes []byte
 	var err error
 	if c.KeyFile != "" {
-		s, serr := os.Stat(c.KeyFile)
-		isFile := serr == nil && !s.IsDir()
-		if isFile {
-			//read private key from the file specified by the --keyfile flag
-			key, err = os.ReadFile(c.KeyFile)
+		var key []byte
+
+		if ccrypto.IsChiselKey([]byte(c.KeyFile)) {
+			key = []byte(c.KeyFile)
 		} else {
-			//decode the private key from the string specified by the --keyfile flag
-			key, err = base64.StdEncoding.DecodeString(c.KeyFile)
+			key, err = os.ReadFile(c.KeyFile)
+			if err != nil {
+				log.Fatalf("Failed to read key file %s", c.KeyFile)
+			}
 		}
-		if err != nil {
-			log.Fatalf("Failed to read the SSH private key %s", c.KeyFile)
+
+		pemBytes = key
+		if ccrypto.IsChiselKey(key) {
+			pemBytes, err = ccrypto.ChiselKey2PEM(key)
+			if err != nil {
+				log.Fatalf("Invalid key %s", string(key))
+			}
 		}
 	} else {
 		//generate private key (optionally using seed)
-		key, err = ccrypto.GenerateKey(c.KeySeed)
+		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
 		if err != nil {
 			log.Fatal("Failed to generate key")
 		}
 	}
 
 	//convert into ssh.PrivateKey
-	private, err := ssh.ParsePrivateKey(key)
+	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
 		log.Fatal("Failed to parse key")
 	}
