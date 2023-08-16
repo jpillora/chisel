@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"strings"
 )
 
 const ChiselKeyPrefix = "ck-"
@@ -92,5 +93,5 @@ func ChiselKey2PEM(chiselKey []byte) ([]byte, error) {
 }
 
 func IsChiselKey(chiselKey []byte) bool {
-	return string(chiselKey[:len(ChiselKeyPrefix)]) == ChiselKeyPrefix
+	return strings.HasPrefix(string(chiselKey), ChiselKeyPrefix)
 }
