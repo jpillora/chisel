@@ -365,26 +365,23 @@ Internally, this is done using the _Password_ authentication method provided by 
 
 ### SOCKS5 Guide with Docker
 
-1. Generate a new private key
+1. Print a new private key to the terminal
 
-    ```
-    chisel server --keygen - | base64
+    ```sh
+    chisel server --keygen -
+    # or save it to disk --keygen /path/to/mykey
     ```
 
 1. Start your chisel server
 
     ```sh
-    docker run \
-      --name chisel -p 9312:9312 \
-      -d --restart always \
-      -e 'CHISEL_KEY_FILE=<output from above>'
-      jpillora/chisel server -p 9312 --socks5
+    jpillora/chisel server --keyfile '<ck-base64 string or file path>' -p 9312 --socks5
     ```
 
 1. Connect your chisel client (using server's fingerprint)
 
     ```sh
-    chisel client --fingerprint '<output from running server>' <server-address>:9312 socks
+    chisel client --fingerprint '<see server output>' <server-address>:9312 socks
     ```
 
 1. Point your SOCKS5 clients (e.g. OS/Browser) to:
@@ -424,7 +421,8 @@ Since WebSockets support is required:
 - `1.5` - Added reverse SOCKS support (by @aus)
 - `1.6` - Added client stdio support (by @BoleynSu)
 - `1.7` - Added UDP support
-- `1.8` - Deprecate `--key` and bump to Go 1.21
+- `1.8` - Move to a `scratch`Docker image
+- `1.9` - Switch from `--key` seed to P256 key strings with `--key{gen,file}` + bump to Go 1.21 (by @cmenginnz)
 
 ## License
 
