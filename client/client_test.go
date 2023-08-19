@@ -1,7 +1,6 @@
 package chclient
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"log"
 	"net/http"
@@ -54,7 +53,7 @@ func TestFallbackLegacyFingerprint(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +76,7 @@ func TestVerifyLegacyFingerprint(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +99,7 @@ func TestVerifyFingerprint(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
