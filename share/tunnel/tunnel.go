@@ -127,7 +127,7 @@ func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 		t.activeConnMut.RLock()
 		c := t.activeConn
 		t.activeConnMut.RUnlock()
-	return c
+		return c
 	}
 }
 
