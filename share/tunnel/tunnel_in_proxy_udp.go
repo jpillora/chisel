@@ -167,7 +167,7 @@ func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 		return u.outbound, nil
 	}
 	//not cached, bind
-	sshConn := u.sshTun.getSSHNoWait(ctx)
+	sshConn := u.sshTun.getSSH(ctx)
 	if sshConn == nil {
 		return nil, fmt.Errorf("ssh-conn nil")
 	}

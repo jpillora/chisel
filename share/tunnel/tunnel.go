@@ -131,17 +131,6 @@ func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 	}
 }
 
-func (t *Tunnel) getSSHNoWait(ctx context.Context) ssh.Conn {
-	//cancelled already?
-	if isDone(ctx) {
-		return nil
-	}
-	t.activeConnMut.RLock()
-	c := t.activeConn
-	t.activeConnMut.RUnlock()
-	return c
-}
-
 func (t *Tunnel) activatingConnWait() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {

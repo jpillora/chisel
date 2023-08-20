@@ -15,7 +15,6 @@ import (
 //sshTunnel exposes a subset of Tunnel to subtypes
 type sshTunnel interface {
 	getSSH(ctx context.Context) ssh.Conn
-	getSSHNoWait(ctx context.Context) ssh.Conn
 }
 
 //Proxy is the inbound portion of a Tunnel
