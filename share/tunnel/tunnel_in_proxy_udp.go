@@ -101,8 +101,6 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 				continue
 			}
 			u.Errorf("inbound-udpchan: %w", err)
-			// wait for a short while for the ssh connection
-			time.Sleep(time.Duration(100) * time.Millisecond)
 			continue
 		}
 		//send over channel, including source address
@@ -129,8 +127,6 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 				continue
 			}
 			u.Errorf("outbound-udpchan: %w", err)
-			// wait for a short while for the ssh connection
-			time.Sleep(time.Duration(100) * time.Millisecond)
 			continue
 		}
 		//receive from channel, including source address
