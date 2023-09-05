@@ -1,6 +1,5 @@
 module github.com/jpillora/chisel
 
-
 go 1.21
 
 require (
