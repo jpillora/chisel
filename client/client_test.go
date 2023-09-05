@@ -1,7 +1,6 @@
 package chclient
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"log"
 	"net/http"
@@ -45,87 +44,62 @@ func TestCustomHeaders(t *testing.T) {
 	c.Close()
 }
 
-// with the update Go to 1.20, these Unit Tests start failing,
-// since this test is related to client side, and the "fingerprint" flag is not available in cloud-connector
-// we can remove/comment these 3 Unit Tests, until fixed in upstream
-
-// func TestFallbackLegacyFingerprint(t *testing.T) {
-// 	config := Config{
-// 		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
-// 	}
-// 	c, err := NewClient(&config)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	r := ccrypto.NewDetermRand([]byte("test123"))
-// 	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	err = c.verifyServer("", nil, pub)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-// func TestVerifyLegacyFingerprint(t *testing.T) {
-// 	config := Config{
-// 		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
-// 	}
-// 	c, err := NewClient(&config)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	r := ccrypto.NewDetermRand([]byte("test123"))
-// 	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	err = c.verifyLegacyFingerprint(pub)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-// func TestVerifyFingerprint(t *testing.T) {
-// 	config := Config{
-// 		Fingerprint: "qmrRoo8MIqePv3jC8+wv49gU6uaFgD3FASQx9V8KdmY=",
-// 	}
-// 	c, err := NewClient(&config)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	r := ccrypto.NewDetermRand([]byte("test123"))
-// 	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	err = c.verifyServer("", nil, pub)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-func TestVerifyEmptyFingerprint(t *testing.T) {
-	config := Config{}
+func TestFallbackLegacyFingerprint(t *testing.T) {
+	config := Config{
+		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
+	}
 	c, err := NewClient(&config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := ssh.NewPublicKey(&priv.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.verifyServer("", nil, pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyLegacyFingerprint(t *testing.T) {
+	config := Config{
+		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
+	}
+	c, err := NewClient(&config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := ccrypto.NewDetermRand([]byte("test123"))
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := ssh.NewPublicKey(&priv.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.verifyLegacyFingerprint(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyFingerprint(t *testing.T) {
+	config := Config{
+		Fingerprint: "qmrRoo8MIqePv3jC8+wv49gU6uaFgD3FASQx9V8KdmY=",
+	}
+	c, err := NewClient(&config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := ccrypto.NewDetermRand([]byte("test123"))
+	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
 	if err != nil {
 		t.Fatal(err)
 	}

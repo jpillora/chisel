@@ -119,11 +119,22 @@ $ chisel server --help
     --port, -p, Defines the HTTP listening port (defaults to the environment
     variable PORT and fallsback to port 8080).
 
-    --key, An optional string to seed the generation of a ECDSA public
+    --key, (deprecated use --keygen and --keyfile instead)
+    An optional string to seed the generation of a ECDSA public
     and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
+
+    --keygen, A path to write a newly generated PEM-encoded SSH private key file.
+    If users depend on your --key fingerprint, you may also include your --key to
+    output your existing key. Use - (dash) to output the generated key to stdout.
+
+    --keyfile, An optional path to a PEM-encoded SSH private key. When
+    this flag is set, the --key option is ignored, and the provided private key
+    is used to secure all communications. (defaults to the CHISEL_KEY_FILE
+    environment variable). Since ECDSA keys are short, you may also set keyfile
+    to an inline base64 private key (e.g. chisel server --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -300,6 +311,9 @@ $ chisel client --help
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 
+    --sni, Override the ServerName when using TLS (defaults to the 
+    hostname).
+
     --tls-ca, An optional root certificate bundle used to verify the
     chisel server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
@@ -341,7 +355,7 @@ $ chisel client --help
 
 ### Security
 
-Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key seed, using the `--key` option, which will be used to seed the key generation. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
+Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key file, using the `--keyfile` option. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
 
 ### Authentication
 
@@ -349,30 +363,34 @@ Using the `--authfile` option, the server may optionally provide a `user.json` c
 
 Internally, this is done using the _Password_ authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
 
-### SOCKS5 Guide
+### SOCKS5 Guide with Docker
+
+1. Print a new private key to the terminal
+
+    ```sh
+    chisel server --keygen -
+    # or save it to disk --keygen /path/to/mykey
+    ```
 
 1. Start your chisel server
 
-```sh
-docker run \
-  --name chisel -p 9312:9312 \
-  -d --restart always \
-  jpillora/chisel server -p 9312 --socks5 --key supersecret
-```
+    ```sh
+    jpillora/chisel server --keyfile '<ck-base64 string or file path>' -p 9312 --socks5
+    ```
 
-2. Connect your chisel client (using server's fingerprint)
+1. Connect your chisel client (using server's fingerprint)
 
-```sh
-chisel client --fingerprint 'rHb55mcxf6vSckL2AezFV09rLs7pfPpavVu++MF7AhQ=' <server-address>:9312 socks
-```
+    ```sh
+    chisel client --fingerprint '<see server output>' <server-address>:9312 socks
+    ```
 
-3. Point your SOCKS5 clients (e.g. OS/Browser) to:
+1. Point your SOCKS5 clients (e.g. OS/Browser) to:
 
-```
-<client-address>:1080
-```
+    ```
+    <client-address>:1080
+    ```
 
-4. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
+1. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
 
 
 #### Caveats
@@ -403,6 +421,8 @@ Since WebSockets support is required:
 - `1.5` - Added reverse SOCKS support (by @aus)
 - `1.6` - Added client stdio support (by @BoleynSu)
 - `1.7` - Added UDP support
+- `1.8` - Move to a `scratch`Docker image
+- `1.9` - Switch from `--key` seed to P256 key strings with `--key{gen,file}` + bump to Go 1.21 (by @cmenginnz)
 
 ## License
 
