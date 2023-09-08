@@ -105,7 +105,7 @@ func NewClient(c *Config) (*Client, error) {
 		tlsConfig: nil,
 	}
 	//set default log level
-	client.Logger.Info = c.Verbose
+	client.Logger.Info = true
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
