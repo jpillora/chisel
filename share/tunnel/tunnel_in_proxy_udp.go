@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
+	"github.com/wolfthefallen/chisel/share/cio"
+	"github.com/wolfthefallen/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -164,7 +164,7 @@ func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 	//ssh request for udp packets for this proxy's remote,
 	//just "udp" since the remote address is sent with each packet
 	dstAddr := u.remote.Remote() + "/udp"
-	rwc, reqs, err := sshConn.OpenChannel("chisel", []byte(dstAddr))
+	rwc, reqs, err := sshConn.OpenChannel("soap", []byte(dstAddr))
 	if err != nil {
 		return nil, fmt.Errorf("ssh-chan error: %s", err)
 	}

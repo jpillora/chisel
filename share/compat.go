@@ -3,12 +3,12 @@ package chshare
 //this file exists to maintain backwards compatibility
 
 import (
-	"github.com/jpillora/chisel/share/ccrypto"
-	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/cos"
-	"github.com/jpillora/chisel/share/settings"
-	"github.com/jpillora/chisel/share/tunnel"
+	"github.com/wolfthefallen/chisel/share/ccrypto"
+	"github.com/wolfthefallen/chisel/share/cio"
+	"github.com/wolfthefallen/chisel/share/cnet"
+	"github.com/wolfthefallen/chisel/share/cos"
+	"github.com/wolfthefallen/chisel/share/settings"
+	"github.com/wolfthefallen/chisel/share/tunnel"
 )
 
 const (
