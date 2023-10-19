@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -116,7 +115,7 @@ func addCA(ca string, c *tls.Config) error {
 	clientCAPool := x509.NewCertPool()
 	if fileInfo.IsDir() {
 		//this is a directory holding CA bundle files
-		files, err := ioutil.ReadDir(ca)
+		files, err := os.ReadDir(ca)
 		if err != nil {
 			return err
 		}
@@ -140,7 +139,7 @@ func addCA(ca string, c *tls.Config) error {
 }
 
 func addPEMFile(path string, pool *x509.CertPool) error {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

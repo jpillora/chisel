@@ -2,7 +2,7 @@ package e2e_test
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -36,7 +36,7 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		fileAddr := "127.0.0.1:" + filePort
 		f := http.Server{
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				b, _ := ioutil.ReadAll(r.Body)
+				b, _ := io.ReadAll(r.Body)
 				w.Write(append(b, '!'))
 			}),
 		}
@@ -133,7 +133,7 @@ func post(url, body string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
