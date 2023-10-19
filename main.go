@@ -115,6 +115,14 @@ var serverHelp = `
     If users depend on your --key fingerprint, you may also include your --key to
     output your existing key. Use - (dash) to output the generated key to stdout.
 
+    --keygen-json, Outputs key information in json format.
+    This option will output a key and associated fingerprint in json format
+    and quit. You can use the fingerprint in the client via --fingerprint.
+    You can store the key in a file and use it via "server --keyfile filename",
+    or you can use the b64key value directly, e.g. "server --keyfile Y2stTU..."
+    The json output looks like this:
+       {"key": "ck-.....", "fingerprint": "SGVsbG...=", "b64key": "Y2stTU..."}
+
     --keyfile, An optional path to a PEM-encoded SSH private key. When
     this flag is set, the --key option is ignored, and the provided private key
     is used to secure all communications. (defaults to the CHISEL_KEY_FILE
@@ -201,6 +209,7 @@ func server(args []string) {
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	keyGen := flags.String("keygen", "", "")
+	keyGenJson := flags.Bool("keygen-json", false, "")
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
@@ -210,6 +219,12 @@ func server(args []string) {
 
 	if *keyGen != "" {
 		if err := ccrypto.GenerateKeyFile(*keyGen, config.KeySeed); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if *keyGenJson {
+		if err := ccrypto.GenerateKeyJson(config.KeySeed); err != nil {
 			log.Fatal(err)
 		}
 		return
