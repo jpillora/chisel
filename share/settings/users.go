@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"sync"
 
@@ -125,7 +125,7 @@ func (u *UserIndex) loadUserIndex() error {
 	if u.configFile == "" {
 		return errors.New("configuration file not set")
 	}
-	b, err := ioutil.ReadFile(u.configFile)
+	b, err := os.ReadFile(u.configFile)
 	if err != nil {
 		return fmt.Errorf("Failed to read auth file: %s, error: %s", u.configFile, err)
 	}

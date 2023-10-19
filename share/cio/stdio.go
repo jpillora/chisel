@@ -2,7 +2,6 @@ package cio
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -11,6 +10,6 @@ var Stdio = &struct {
 	io.ReadCloser
 	io.Writer
 }{
-	ioutil.NopCloser(os.Stdin),
+	io.NopCloser(os.Stdin),
 	os.Stdout,
 }
