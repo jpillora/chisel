@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Install garble
-        run: go install -v mvdan.cc/garble
+        run: go install -v mvdan.cc/garble@v0.9.3
       - name: Build
         run: garble -literals -tiny build -v ${{ github.workspace }}
       - name: Test
@@ -47,7 +47,7 @@ jobs:
       -
         name: Install garble
         run: |
-          go install mvdan.cc/garble@master
+          go install mvdan.cc/garble@v0.9.3
           sudo cp garble-literals.sh /usr/bin/garble-literals
           sudo chmod +x /usr/bin/garble-literals
       -
