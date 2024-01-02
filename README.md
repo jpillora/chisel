@@ -133,8 +133,9 @@ $ chisel server --help
     --keyfile, An optional path to a PEM-encoded SSH private key. When
     this flag is set, the --key option is ignored, and the provided private key
     is used to secure all communications. (defaults to the CHISEL_KEY_FILE
-    environment variable). Since ECDSA keys are short, you may also set keyfile
-    to an inline base64 private key (e.g. chisel server --keygen - | base64).
+    environment variable). Since ECDSA keys are short, you may also supply
+    the chiselkey (output of "chisel server --keygen -") as the argument
+    to --keyfile and forgo requiring a file on disk.
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
