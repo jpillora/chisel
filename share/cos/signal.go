@@ -1,4 +1,5 @@
-//+build !windows
+//go:build !windows
+// +build !windows
 
 package cos
 
@@ -13,8 +14,8 @@ import (
 	"github.com/jpillora/sizestr"
 )
 
-//GoStats prints statistics to
-//stdout on SIGUSR2 (posix-only)
+// GoStats prints statistics to
+// stdout on SIGUSR2 (posix-only)
 func GoStats() {
 	//silence complaints from windows
 	const SIGUSR2 = syscall.Signal(0x1f)
@@ -24,14 +25,14 @@ func GoStats() {
 	for range c {
 		memStats := runtime.MemStats{}
 		runtime.ReadMemStats(&memStats)
-		log.Printf("recieved SIGUSR2, go-routines: %d, go-memory-usage: %s",
+		log.Printf("received SIGUSR2, go-routines: %d, go-memory-usage: %s",
 			runtime.NumGoroutine(),
 			sizestr.ToString(int64(memStats.Alloc)))
 	}
 }
 
-//AfterSignal returns a channel which will be closed
-//after the given duration or until a SIGHUP is received
+// AfterSignal returns a channel which will be closed
+// after the given duration or until a SIGHUP is received
 func AfterSignal(d time.Duration) <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {

@@ -2,6 +2,18 @@ on: [push, pull_request]
 name: CI
 jobs:
   # ================
+  # LINTER JOB
+  #   runs on every push and PR
+  # ================
+  linter:
+    name: Linter checks
+    steps:
+      - name: Spelling check
+        uses: codespell-project/actions-codespell@v2
+        with:
+          check_filenames: true
+          check_hidden: true
+  # ================
   # TEST JOB
   #   runs on every push and PR
   #   runs 2x3 times (see matrix)
