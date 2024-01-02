@@ -28,6 +28,30 @@ func GenerateKeyFile(keyFilePath, seed string) error {
 	return os.WriteFile(keyFilePath, chiselKey, 0600)
 }
 
+func GenerateKeyJson(seed string) error {
+	privateKey, err := seed2PrivateKey(seed)
+	if err != nil {
+		return err
+	}
+	chiselKey, err := privateKey2ChiselKey(privateKey)
+	if err != nil {
+		return err
+	}
+	pemBytes, err := ChiselKey2PEM(chiselKey)
+	if err != nil {
+		return err
+	}
+	private, err := ssh.ParsePrivateKey(pemBytes)
+	if err != nil {
+		return err
+	}
+	fingerprint := FingerprintKey(private.PublicKey())
+
+	fmt.Printf("{\"key\": \"%s\", \"fingerprint\": \"%s\"}",
+		chiselKey, fingerprint)
+	return nil
+}
+
 // FingerprintKey calculates the SHA256 hash of an SSH public key
 func FingerprintKey(k ssh.PublicKey) string {
 	bytes := sha256.Sum256(k.Marshal())
