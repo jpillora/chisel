@@ -130,6 +130,7 @@ func NewServer(c *Config) (*Server, error) {
 		server.reverseProxy = httputil.NewSingleHostReverseProxy(u)
 		//always use proxy host
 		server.reverseProxy.Director = func(r *http.Request) {
+			r.Header.Add("X-Forwarded-Host", r.Host)
 			//enforce origin, keep path
 			r.URL.Scheme = u.Scheme
 			r.URL.Host = u.Host
