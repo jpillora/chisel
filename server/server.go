@@ -32,6 +32,7 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
+	HTTPHook  http.Handler
 }
 
 // Server respresent a chisel service
@@ -45,6 +46,7 @@ type Server struct {
 	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
+	httpHook     http.Handler
 }
 
 var upgrader = websocket.Upgrader{
@@ -60,6 +62,7 @@ func NewServer(c *Config) (*Server, error) {
 		httpServer: cnet.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
 		sessions:   settings.NewUsers(),
+		httpHook:   c.HTTPHook,
 	}
 	server.Info = true
 	server.users = settings.NewUserIndex(server.Logger)
