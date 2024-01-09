@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"net"
 
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/cnet"
@@ -55,6 +56,11 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		l.Debugf("Failed to upgrade (%s)", err)
 		return
+	}
+	ulwsConn := wsConn.UnderlyingConn()
+	tcpConn, ok := ulwsConn.(*net.TCPConn)
+	if ok {
+		tcpConn.SetKeepAlive(false)
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
