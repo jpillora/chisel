@@ -14,7 +14,7 @@ import (
 
 //sshTunnel exposes a subset of Tunnel to subtypes
 type sshTunnel interface {
-	getSSH(ctx context.Context) ssh.Conn
+	GetSSH(ctx context.Context) ssh.Conn
 }
 
 //Proxy is the inbound portion of a Tunnel
@@ -132,7 +132,7 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
-	sshConn := p.sshTun.getSSH(ctx)
+	sshConn := p.sshTun.GetSSH(ctx)
 	if sshConn == nil {
 		l.Debugf("No remote connection")
 		return

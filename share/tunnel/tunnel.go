@@ -105,7 +105,7 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 }
 
 //getSSH blocks while connecting
-func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
+func (t *Tunnel) GetSSH(ctx context.Context) ssh.Conn {
 	//cancelled already?
 	if isDone(ctx) {
 		return nil
