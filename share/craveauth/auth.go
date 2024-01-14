@@ -154,7 +154,14 @@ type ClientInfo struct {
 }
 
 func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (allowed bool, err error) {
-	query := "select \"ClientInfo\" from build_jobinfo where \"User_id\" = " + userId + "AND \"Status\" = 'running'"
+
+	// select "ClientInfo" from build_jobinfo where "User_id" in (select "userId" from user_teams  where "teamId" in ( select "teamId" from user_teams where "userId"=33)) AND "Status" = 'running';
+	// Don't worry about bobytabels since userId is generated from this code and not from user input
+	query := "SELECT \"ClientInfo\" FROM build_jobinfo " +
+		"WHERE \"User_id\" IN (SELECT \"userId\" FROM user_teams " +
+		"WHERE \"teamId\" IN ( SELECT \"teamId\" FROM user_teams " +
+		"WHERE \"userId\"=" + userId + ")) " +
+		"AND \"Status\" = 'running'"
 	allowed, err = GetAndCheckClientInfo(query,
 		func(ci ClientInfo) (allowed bool) {
 			tportint, _ := strconv.ParseInt(tport, 10, 64)
