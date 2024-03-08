@@ -74,7 +74,7 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	go func() {
 		<-ctx.Done()
 		if c.Close() == nil {
-			t.Debugf("SSH cancelled")
+			t.Debugf("SSH cancelled for user: %s", c.User())
 		}
 		t.activatingConn.DoneAll()
 	}()
@@ -93,9 +93,9 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	//block until closed
 	go t.handleSSHRequests(reqs)
 	go t.handleSSHChannels(chans)
-	t.Debugf("SSH connected")
+	t.Debugf("SSH connected for user: %s", c.User())
 	err := c.Wait()
-	t.Debugf("SSH disconnected")
+	t.Debugf("SSH disconnected for user: %s", c.User())
 	//mark inactive and block
 	t.activatingConn.Add(1)
 	t.activeConnMut.Lock()
