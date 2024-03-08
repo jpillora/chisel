@@ -55,7 +55,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	//cnet.MeterRWC(t.Logger.Fork("sshchan"), sshChan)
 	defer stream.Close()
 	go ssh.DiscardRequests(reqs)
-	l := t.Logger.Fork("conn#%d", t.connStats.New())
+	l := t.Logger.Fork("host#%s: conn#%d", hostPort, t.connStats.New())
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
