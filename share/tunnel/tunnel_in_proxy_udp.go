@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,18 +19,19 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//listenUDP is a special listener which forwards packets via
-//the bound ssh connection. tricky part is multiplexing lots of
-//udp clients through the entry node. each will listen on its
-//own source-port for a response:
-//                                                (random)
-//    src-1 1111->...                         dst-1 6345->7777
-//    src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
-//    src-3 3333->...    listener    handler  dst-1 1444->7777
+// listenUDP is a special listener which forwards packets via
+// the bound ssh connection. tricky part is multiplexing lots of
+// udp clients through the entry node. each will listen on its
+// own source-port for a response:
 //
-//we must store these mappings (1111-6345, etc) in memory for a length
-//of time, so that when the exit node receives a response on 6345, it
-//knows to return it to 1111.
+//	                                            (random)
+//	src-1 1111->...                         dst-1 6345->7777
+//	src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
+//	src-3 3333->...    listener    handler  dst-1 1444->7777
+//
+// we must store these mappings (1111-6345, etc) in memory for a length
+// of time, so that when the exit node receives a response on 6345, it
+// knows to return it to 1111.
 func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -159,7 +161,7 @@ func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 	//not cached, bind
 	sshConn := u.sshTun.getSSH(ctx)
 	if sshConn == nil {
-		return nil, fmt.Errorf("ssh-conn nil")
+		return nil, errors.New("ssh-conn nil")
 	}
 	//ssh request for udp packets for this proxy's remote,
 	//just "udp" since the remote address is sent with each packet
