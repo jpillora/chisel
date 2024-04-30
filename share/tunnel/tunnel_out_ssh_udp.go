@@ -188,6 +188,7 @@ type udpConn struct {
 
 func (w *udpConn) Write(b []byte) (int, error) {
 	if w.writeTimer != nil {
+		w.writeTimer.Stop()
 		w.writeTimer.Reset(settings.EnvDuration("UDP_DEADLINE", 15*time.Second))
 	}
 	return w.Conn.Write(b)
