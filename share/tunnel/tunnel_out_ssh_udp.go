@@ -28,6 +28,7 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort strin
 		},
 		udpConns: conns,
 		maxMTU:   settings.EnvInt("UDP_MAX_SIZE", 9012),
+		maxConns: settings.EnvInt("UDP_MAX_CONNS", 100),
 	}
 	h.Debugf("UDP max size: %d bytes", h.maxMTU)
 	for {
@@ -43,7 +44,8 @@ type udpHandler struct {
 	hostPort string
 	*udpChannel
 	*udpConns
-	maxMTU int
+	maxMTU   int
+	maxConns int
 }
 
 func (h *udpHandler) handleWrite(p *udpPacket) error {
@@ -62,13 +64,8 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 	//TODO++ dont use go-routines, switch to pollable
 	//  array of listeners where all listeners are
 	//  sweeped periodically, removing the idle ones
-	const maxConns = 100
 	if !exists {
-		if h.udpConns.len() <= maxConns {
-			go h.handleRead(p, conn)
-		} else {
-			h.Debugf("exceeded max udp connections (%d)", maxConns)
-		}
+		go h.handleRead(p, conn)
 	}
 	_, err = conn.Write(p.Payload)
 	if err != nil {
@@ -80,6 +77,10 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 	//ensure connection is cleaned up
 	defer h.udpConns.remove(conn.id)
+	if h.udpConns.len() > h.maxConns {
+		h.Debugf("exceeded max udp connections (%d)", h.maxConns)
+		return
+	}
 	buff := make([]byte, h.maxMTU)
 	for {
 		//response must arrive within 15 seconds
