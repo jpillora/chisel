@@ -16,7 +16,6 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort strin
 	conns := &udpConns{
 		Logger: l,
 		m:      map[string]*udpConn{},
-		wm:     map[string]*udpConn{},
 	}
 	defer conns.closeAll()
 	h := &udpHandler{
@@ -70,7 +69,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 			go h.handleRead(p, conn)
 		} else {
 			//write only
-			h.udpConns.setWriteOnly(conn.id)
+			h.udpConns.setCleanUpTimer(conn.id)
 			h.Debugf("exceeded max udp connections (%d)", h.maxConns)
 		}
 	}
@@ -117,8 +116,7 @@ func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 type udpConns struct {
 	*cio.Logger
 	sync.Mutex
-	m  map[string]*udpConn
-	wm map[string]*udpConn //write only
+	m map[string]*udpConn
 }
 
 func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
@@ -126,18 +124,15 @@ func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
 	defer cs.Unlock()
 	conn, ok := cs.m[id]
 	if !ok {
-		conn, ok = cs.wm[id]
-		if !ok {
-			c, err := net.Dial("udp", addr)
-			if err != nil {
-				return nil, false, err
-			}
-			conn = &udpConn{
-				id:   id,
-				Conn: c, // cnet.MeterConn(cs.Logger.Fork(addr), c),
-			}
-			cs.m[id] = conn
+		c, err := net.Dial("udp", addr)
+		if err != nil {
+			return nil, false, err
 		}
+		conn = &udpConn{
+			id:   id,
+			Conn: c, // cnet.MeterConn(cs.Logger.Fork(addr), c),
+		}
+		cs.m[id] = conn
 	}
 	return conn, ok, nil
 }
@@ -164,18 +159,14 @@ func (cs *udpConns) closeAll() {
 	cs.Unlock()
 }
 
-func (cs *udpConns) setWriteOnly(id string) {
+func (cs *udpConns) setCleanUpTimer(id string) {
 	cs.Lock()
 	conn, ok := cs.m[id]
 	if ok {
-		delete(cs.m, id)
 		conn.writeTimer = time.AfterFunc(settings.EnvDuration("UDP_DEADLINE", 15*time.Second), func() {
-			cs.Lock()
-			defer cs.Unlock()
-			delete(cs.wm, conn.id)
+			cs.remove(conn.id)
 			conn.Close()
 		})
-		cs.wm[id] = conn
 	}
 	cs.Unlock()
 }
