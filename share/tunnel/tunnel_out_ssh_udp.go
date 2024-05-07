@@ -161,6 +161,7 @@ func (cs *udpConns) closeAll() {
 
 func (cs *udpConns) setCleanUpTimer(id string) {
 	cs.Lock()
+	defer cs.Unlock()
 	conn, ok := cs.m[id]
 	if ok {
 		conn.writeTimer = time.AfterFunc(settings.EnvDuration("UDP_DEADLINE", 15*time.Second), func() {
@@ -168,7 +169,6 @@ func (cs *udpConns) setCleanUpTimer(id string) {
 			conn.Close()
 		})
 	}
-	cs.Unlock()
 }
 
 type udpConn struct {
