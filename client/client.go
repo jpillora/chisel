@@ -262,7 +262,9 @@ func (c *Client) Start(ctx context.Context) error {
 	c.eg = eg
 	via := ""
 	if c.proxyURL != nil {
-		via = " via " + c.proxyURL.String()
+		// Removing c.proxyURL.String() from logs
+		// to avoid logging sensitive data in logs
+		via = " via proxy"
 	}
 	c.Infof("Connecting to %s%s\n", c.server, via)
 	//connect to chisel server
