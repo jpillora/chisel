@@ -36,14 +36,15 @@ type Config struct {
 // Server respresent a chisel service
 type Server struct {
 	*cio.Logger
-	config       *Config
-	fingerprint  string
-	httpServer   *cnet.HTTPServer
-	reverseProxy *httputil.ReverseProxy
-	sessCount    int32
-	sessions     *settings.Users
-	sshConfig    *ssh.ServerConfig
-	users        *settings.UserIndex
+	config                *Config
+	fingerprint           string
+	httpServer            *cnet.HTTPServer
+	reverseProxy          *httputil.ReverseProxy
+	dynamicReverseProxies map[string]*httputil.ReverseProxy
+	sessCount             int32
+	sessions              *settings.Users
+	sshConfig             *ssh.ServerConfig
+	users                 *settings.UserIndex
 }
 
 var upgrader = websocket.Upgrader{
@@ -111,6 +112,7 @@ func NewServer(c *Config) (*Server, error) {
 			r.Host = u.Host
 		}
 	}
+	server.dynamicReverseProxies = make(map[string]*httputil.ReverseProxy)
 	//print when reverse tunnelling is enabled
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")

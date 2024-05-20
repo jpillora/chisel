@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strconv"
 	"strings"
@@ -72,7 +73,15 @@ type GetUserResponse struct {
 	Data    GetUserResponseData `json:"data"`
 }
 
-func validateUser(password []byte, l *cio.Logger) (userId int64, err error) {
+func ValidateUser(password []byte, l *cio.Logger) (userId int64, err error) {
+	return _validateUser(password, "crave-sshd", "ams", l)
+}
+
+func ValidateSignedInUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
+	return _validateUser(password, useragent, host, l)
+}
+
+func _validateUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
 	var url string
 	var payload string
 	var method string
@@ -95,6 +104,14 @@ func validateUser(password []byte, l *cio.Logger) (userId int64, err error) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", string(password))
+	req.Header.Set("User-Agent", "sshd")
+	req.Header.Set("Referer", "sshd")
+	req.Header.Set("Host", host)
+	req.Host = host
+
+	res, _ := httputil.DumpRequest(req, true)
+	l.Infof(string(res))
+
 	body, err, _ := PostRequest(req, 24*time.Hour)
 	if err != nil {
 		l.Infof("could not validate user: %v", err)
@@ -128,7 +145,7 @@ func Auth(c ssh.ConnMetadata, password []byte, l *cio.Logger) (perms *ssh.Permis
 		p.CriticalOptions = make(map[string]string)
 		p.CriticalOptions["AllowedPorts"] = "22"
 	} else {
-		userId, err1 := validateUser(password, l)
+		userId, err1 := ValidateUser(password, l)
 		if err1 == nil {
 			l.Infof("User accees granted to : %v", userId)
 			p.CriticalOptions = make(map[string]string)

@@ -35,6 +35,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		s.reverseProxy.ServeHTTP(w, r)
 		return
 	}
+
 	//no proxy defined, provide access to health/version checks
 	switch r.URL.String() {
 	case "/health":
@@ -42,6 +43,10 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	case "/version":
 		w.Write([]byte(chshare.BuildVersion))
+		return
+	}
+	if s.handleDynamicProxy(w, r) {
+		// request has been served
 		return
 	}
 	//missing :O
