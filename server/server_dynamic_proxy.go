@@ -40,6 +40,8 @@ func (s *Server) getCookieHandler(w http.ResponseWriter, r *http.Request) []byte
 func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) bool {
 	res, _ := httputil.DumpRequest(r, true)
 
+	ua := r.Header.Get("User-Agent")
+	host := r.Host
 	s.Infof(string(res))
 	// Do a client authentication.
 	authKey := []byte(r.Header.Get("Authorization"))
@@ -49,8 +51,8 @@ func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) bool
 			return true
 		}
 	}
-	s.Infof("Authorizing user key: %v", string(authKey))
-	_, err1 := craveauth.ValidateSignedInUser(authKey, r.Header.Get("User-Agent"), r.Header.Get("Host"), s.Logger)
+	s.Infof("Authorizing user key: %v, host: %v, ua: %v", string(authKey), host, ua)
+	_, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
 	if err1 != nil {
 		s.Infof("User accees denied to %v", err1)
 		http.Error(w, err1.Error(), http.StatusUnauthorized)

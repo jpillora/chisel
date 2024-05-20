@@ -104,13 +104,12 @@ func _validateUser(password []byte, useragent string, host string, l *cio.Logger
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", string(password))
-	req.Header.Set("User-Agent", "sshd")
+	req.Header.Set("User-Agent", useragent)
 	req.Header.Set("Referer", "sshd")
 	req.Header.Set("Host", host)
 	req.Host = host
 
 	res, _ := httputil.DumpRequest(req, true)
-	l.Infof(string(res))
 
 	body, err, _ := PostRequest(req, 24*time.Hour)
 	if err != nil {
