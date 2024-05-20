@@ -74,14 +74,14 @@ type GetUserResponse struct {
 }
 
 func ValidateUser(password []byte, l *cio.Logger) (userId int64, err error) {
-	return _validateUser(password, "crave-sshd", "ams", l)
+	return __validateUser(password, "crave-sshd", "ams", l)
 }
 
 func ValidateSignedInUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
-	return _validateUser(password, useragent, host, l)
+	return __validateUser(password, useragent, host, l)
 }
 
-func _validateUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
+func __validateUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
 	var url string
 	var payload string
 	var method string
