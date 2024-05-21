@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"strconv"
 	"strings"
@@ -109,7 +108,7 @@ func __validateUser(password []byte, useragent string, host string, l *cio.Logge
 	req.Header.Set("Host", host)
 	req.Host = host
 
-	res, _ := httputil.DumpRequest(req, true)
+	// res, _ := httputil.DumpRequest(req, true)
 
 	body, err, _ := PostRequest(req, 24*time.Hour)
 	if err != nil {
@@ -123,10 +122,11 @@ func __validateUser(password []byte, useragent string, host string, l *cio.Logge
 		return
 	}
 
-	l.Infof("%v %v ", resp, resp.Data.UserId)
+	// l.Infof("%v %v ", resp, resp.Data.UserId)
 	if resp.Success {
 		userId = resp.Data.UserId
 	} else {
+		l.Infof("Failed api response %v", resp)
 		err = errors.New("Failed to authenticate user")
 		return
 	}

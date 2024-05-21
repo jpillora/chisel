@@ -33,6 +33,11 @@ type Config struct {
 	TLS       TLSConfig
 }
 
+type DynamicReverseProxy struct {
+	Handler *httputil.ReverseProxy
+	AuthKey []byte
+}
+
 // Server respresent a chisel service
 type Server struct {
 	*cio.Logger
@@ -40,7 +45,7 @@ type Server struct {
 	fingerprint           string
 	httpServer            *cnet.HTTPServer
 	reverseProxy          *httputil.ReverseProxy
-	dynamicReverseProxies map[string]*httputil.ReverseProxy
+	dynamicReverseProxies map[string]*DynamicReverseProxy
 	sessCount             int32
 	sessions              *settings.Users
 	sshConfig             *ssh.ServerConfig
@@ -112,7 +117,7 @@ func NewServer(c *Config) (*Server, error) {
 			r.Host = u.Host
 		}
 	}
-	server.dynamicReverseProxies = make(map[string]*httputil.ReverseProxy)
+	server.dynamicReverseProxies = make(map[string]*DynamicReverseProxy)
 	//print when reverse tunnelling is enabled
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
