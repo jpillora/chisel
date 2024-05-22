@@ -179,7 +179,7 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	// just delete the proxy element
 	s.Infof("Deleting reverse proxy for %v", pd.Id)
-	authKey := s.authorizeRequest(w, r, "/register", pd.Id)
+	authKey := s.authorizeRequest(w, r, "/unregister", pd.Id)
 	if authKey == nil {
 		return
 	}
