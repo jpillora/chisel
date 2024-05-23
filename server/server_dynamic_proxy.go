@@ -43,6 +43,7 @@ func (s *Server) authorizeRequest(w http.ResponseWriter, r *http.Request, op, pr
 	var rHost, rPort string
 	ua := r.Header.Get("User-Agent")
 	host := r.Host
+	userId = 0
 
 	// s.Infof(string(res))
 	// Do a client authentication.
@@ -71,23 +72,26 @@ func (s *Server) authorizeRequest(w http.ResponseWriter, r *http.Request, op, pr
 	}
 	// cache auth key doesnt match requires an auth
 	// if cache auth key matches, just do a check on the ip
-	if userId == 0 {
-		userId, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
+	if userId == int64(0) {
+		uid, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
 		if err1 != nil {
-			s.Infof("User accees denied to %v", err1)
+			s.Infof("User access denied to %v", err1)
 			http.Error(w, err1.Error(), http.StatusUnauthorized)
-			return userId, nil
+			return uid, nil
 		}
+		userId = uid
 	}
 
 	u, _ := url.Parse(proxyTarget)
 	rHost, rPort, _ = net.SplitHostPort(u.Host)
+	s.Infof("checking access to port %s:%s:%v ", rHost, rPort, userId)
 	// if url was ip:port, both rhost and rport would be filled.
 	if len(rHost) > 0 && len(rPort) > 0 {
 		allowed, err := craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
 		if !allowed || err != nil {
-			s.Infof(s.Errorf("access to port %s:%s:%s denied err: %v", rHost, rPort, userId, err).Error())
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			s.Infof("access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
+			err1 := s.Errorf("access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
+			http.Error(w, err1.Error(), http.StatusUnauthorized)
 			return userId, nil
 		}
 	}
