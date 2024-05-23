@@ -72,15 +72,13 @@ func (s *Server) authorizeRequest(w http.ResponseWriter, r *http.Request, op, pr
 	}
 	// cache auth key doesnt match requires an auth
 	// if cache auth key matches, just do a check on the ip
-	if userId == int64(0) {
-		uid, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
-		if err1 != nil {
-			s.Infof("User access denied to %v", err1)
-			http.Error(w, err1.Error(), http.StatusUnauthorized)
-			return uid, nil
-		}
-		userId = uid
+	uid, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
+	if err1 != nil {
+		s.Infof("User access denied to %v", err1)
+		http.Error(w, err1.Error(), http.StatusUnauthorized)
+		return uid, nil
 	}
+	userId = uid
 
 	u, _ := url.Parse(proxyTarget)
 	rHost, rPort, _ = net.SplitHostPort(u.Host)
