@@ -34,11 +34,12 @@ type Config struct {
 }
 
 type DynamicReverseProxy struct {
-	Handler *httputil.ReverseProxy
-	AuthKey []byte
-	Target  string
-	User    int64
-	JobId   int64
+	Handler        *httputil.ReverseProxy
+	AuthKey        []byte
+	Target         string
+	User           int64
+	JobId          int64
+	DcMasterClient *dcrpc.DcMasterRPCClient
 }
 
 // Server respresent a chisel service

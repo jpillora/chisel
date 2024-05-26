@@ -287,7 +287,7 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 	return
 }
 
-func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient dcrpc.DcMasterRPCClient, err error) {
+func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient *dcrpc.DcMasterRPCClient, err error) {
 	var conn *grpc.ClientConn
 	hostUrl := fmt.Sprintf("%s:%v", ip, g.dcmasterPort)
 	conn, err = grpc.Dial(hostUrl, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
@@ -298,18 +298,18 @@ func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient dcrpc.DcMaster
 	}
 	defer conn.Close()
 
-	dcmasterClient = dcrpc.NewDcMasterRPCClient(conn)
+	dcmasterClient = &dcrpc.NewDcMasterRPCClient(conn)
 	return
 }
 
-func CheckForJob(proxyId string, dcmasterClient dcrpc.DcMasterRPCClient, jid int64) (err error) {
+func CheckForJob(dcmasterClient *dcrpc.DcMasterRPCClient, proxyId string, jid int64) (err error) {
 	downloadPatchObjectReq := &dcrpc.MasterStreamStdout{
 		ProjectAndJob: &dcrpc.ProjectAndJob{
-			ProjectId: g.pid,
-			JobId:     g.jid,
+			ProjectId: 0,
+			JobId:     jid,
 		},
 		IsStdError: false,
-		Stdout:     fmt.Sprintf("Reverse proxy request for %v", proxproxyId),
+		Stdout:     fmt.Sprintf("Reverse proxy request for %v", proxyId),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Cancel ctx as soon as function returns.

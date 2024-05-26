@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jpillora/chisel/share/craveauth"
+	"gitlab.com/accupara/buildmeup/dcrpc"
 )
 
 var AMS_COOKIE_NAME = "_acp_at"
@@ -37,7 +38,7 @@ func (s *Server) getCookieHandler(r *http.Request) (cookieBytes []byte, err erro
 	return
 }
 
-func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err error) { // s.Infof(string(res))
+func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err error) {
 	// Do a client authentication.
 	authKey = []byte(r.Header.Get("Authorization"))
 	if len(authKey) == 0 {
@@ -49,12 +50,33 @@ func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err er
 	return
 }
 
-func (s *Server) authRequest(r *http.Request, useCache bool, target string) (userId int64, authKey []byte, err error) {
+func (s *Server) checkDcMaster(ip string, jid int64, pId string, createNew bool) (client *dcrpc.DcMasterRPCClient, err error) {
+	if createNew {
+		client = craveauth.ConnectDCMasterRPC(ip, s.Logger)
+	} else {
+		client = s.dynamicReverseProxies[pId].DcMasterClient
+	}
+	if client != nil {
+		err = craveauth.CheckForJob(client, jid, pId)
+		if err != nil {
+			err = s.Errorf("Error validating dcmaster. Error: %v", err)
+			s.Infof("%v", err)
+			return
+		}
+	} else {
+		err = s.Errorf("Error validating dcmaster. RPC client unavailable.", err)
+		s.Infof("%v", err)
+	}
+	return
+}
+
+func (s *Server) authRequest(r *http.Request, useCache bool, newProxy bool, target string) (userId, jobId int64, authKey []byte, client *dcrpc.DcMasterRPCClient, err error) {
 
 	var rHost, rPort string
 	ua := r.Header.Get("User-Agent")
 	host := r.Host
 	userId = 0
+	pId := s.getProxyHashFromTarget(target)
 
 	authKey, err = s.getAuthorizationCookie(r)
 	if err != nil {
@@ -62,29 +84,52 @@ func (s *Server) authRequest(r *http.Request, useCache bool, target string) (use
 		return
 	}
 
-	userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
-	if err != nil {
-		s.Infof("User access denied to %v", err)
-		return
+	// if useCache, match cookie, else validate
+	// false for register and unregister, so a reverse proxy should exist.
+	if useCache {
+		if authKey == s.dynamicReverseProxies[pId].AuthKey {
+			userId = s.dynamicReverseProxies[pId].User
+			jobId = s.dynamicReverseProxies[pId].JobId
+		}
 	}
-
 	u, _ := url.Parse(target)
 	rHost, rPort, _ = net.SplitHostPort(u.Host)
 	s.Infof("checking access to port %s:%s:%v ", rHost, rPort, userId)
-	// if url was ip:port, both rhost and rport would be filled.
-	if len(rHost) > 0 && len(rPort) > 0 {
-		var allowed bool
-		allowed, err = craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
-		if !allowed {
-			s.Infof("Access to port %s:%s:%v denied.", rHost, rPort, userId)
-			err = errors.New("Access to requested resource denied.")
+
+	// user id is not set through because cache did not match or useCache is false
+	// go ahead and access db to get user id and jobid
+	if userId == 0 {
+		userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
+		if err != nil {
+			s.Infof("User access denied to %v", err)
 			return
 		}
-		if err != nil {
-			s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
-			return
+
+		// if url was ip:port, both rhost and rport would be filled.
+		if len(rHost) > 0 && len(rPort) > 0 {
+			var allowed bool
+			jobId, allowed, err = craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
+			if !allowed {
+				s.Infof("Access to port %s:%s:%v denied.", rHost, rPort, userId)
+				err = errors.New("Access to requested resource denied.")
+				return
+			}
+			if err != nil {
+				s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
+				return
+			}
 		}
 	}
+	// check if the job is running on the dcmaster
+	// if creating a new proxy, or just an execute then check
+	// if deleting, the skip, there is a chance that dcmaster does not exist.
+	if useCache || newProxy {
+		client, err = s.checkDcMaster(rHost, jobId, pId, newProxy)
+		if err != nil {
+			s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
+		}
+	}
+
 	return
 }
 
@@ -140,7 +185,7 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.Infof("Creating reverse proxy for %v, target: %v", pd.Target)
-	userId, authKey, err := s.authRequest(r, false, pd.Target)
+	userId, jobId, authKey, dcMasterClient, err := s.authRequest(r, false, true, pd.Target)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -182,10 +227,12 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 
 	pId := s.getProxyHashFromTarget(pd.Target)
 	s.dynamicReverseProxies[pId] = &DynamicReverseProxy{
-		Handler: reverseProxy,
-		AuthKey: authKey,
-		Target:  pd.Target,
-		User:    userId,
+		Handler:        reverseProxy,
+		AuthKey:        authKey,
+		Target:         pd.Target,
+		User:           userId,
+		JobId:          jobId,
+		DcMasterClient: dcMasterClient,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -209,7 +256,7 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 
 	pId := s.getProxyHashFromTarget(pd.Target)
 	s.Infof("Deleting reverse proxy for %v", pId)
-	_, _, err = s.authRequest(r, false, pd.Target)
+	_, _, _, _, err = s.authRequest(r, false, false, pd.Target)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -227,7 +274,7 @@ func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) {
 
 	//just serve the reverse proxy request.
 	if proxy, ok := s.dynamicReverseProxies[proxyId]; ok {
-		_, _, err := s.authRequest(r, false, proxy.Target)
+		_, _, _, _, err := s.authRequest(r, true, false, proxy.Target)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
