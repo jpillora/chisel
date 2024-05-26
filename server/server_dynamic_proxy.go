@@ -49,15 +49,6 @@ func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err er
 	return
 }
 
-func (s *Server) validateUser(authKey []byte, useCache bool, ua, host string, cachedAuthKey []byte) (userId int64, auth bool, err error) {
-	userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
-	if err != nil {
-		s.Infof("User access denied to %v", err)
-		return
-	}
-	return
-}
-
 func (s *Server) authRequest(r *http.Request, useCache bool, target string) (userId int64, authKey []byte, err error) {
 
 	var rHost, rPort string

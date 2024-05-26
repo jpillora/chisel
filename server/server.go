@@ -38,6 +38,7 @@ type DynamicReverseProxy struct {
 	AuthKey []byte
 	Target  string
 	User    int64
+	JobId   int64
 }
 
 // Server respresent a chisel service
