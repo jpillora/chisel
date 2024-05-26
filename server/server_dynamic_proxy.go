@@ -1,10 +1,13 @@
 package chserver
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"errors"
+
+	//"errors"
 	"fmt"
-	"log"
+	//"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -16,140 +19,164 @@ import (
 )
 
 var AMS_COOKIE_NAME = "_acp_at"
+var REGISTER_ENDPOINT = "register"
+var UNREGISTER_ENDPOINT = "unregister"
 
-func (s *Server) getCookieHandler(w http.ResponseWriter, r *http.Request) []byte {
+func (s *Server) getCookieHandler(r *http.Request) (cookieBytes []byte, err error) {
 	// Retrieve the cookie from the request using its name.
 	// If no matching cookie is found, this will return a
 	// http.ErrNoCookie error. We check for this, and return a 400 Bad Request
 	// response to the client.
 	cookie, err := r.Cookie(AMS_COOKIE_NAME)
 	if err != nil {
-		switch {
-		case errors.Is(err, http.ErrNoCookie):
-			http.Error(w, "auth or cookie not found", http.StatusUnauthorized)
-		default:
-			log.Println(err)
-			http.Error(w, "server error", http.StatusInternalServerError)
-		}
-		return []byte{}
+		return
 	}
-
 	// Echo out the cookie value in the response body.
-	return []byte(cookie.Value)
+
+	cookieBytes = []byte(cookie.Value)
+	return
 }
 
-func (s *Server) authorizeRequest(w http.ResponseWriter, r *http.Request, op, proxyId, proxyTarget string) (int64, []byte) {
-	var userId int64
+func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err error) { // s.Infof(string(res))
+	// Do a client authentication.
+	authKey = []byte(r.Header.Get("Authorization"))
+	if len(authKey) == 0 {
+		authKey, err = s.getCookieHandler(r)
+		if err != nil {
+			return
+			// switch {
+			// case errors.Is(err, http.ErrNoCookie):
+			// 	http.Error(w, "auth or cookie not found", http.StatusUnauthorized)
+			// default:
+			// 	log.Println(err)
+			// 	http.Error(w, "server error", http.StatusInternalServerError)
+			// }
+		}
+	}
+	return
+}
+
+func (s *Server) validateUser(authKey []byte, useCache bool, ua, host string, cachedAuthKey []byte) (userId int64, auth bool, err error) {
+	// s.Infof("Authorizing user key: %v, host: %v, ua: %v", string(authKey), host, ua)
+	// if useCache {
+	// 	if len(cachedAuthKey) != 0 && string(cachedAuthKey) == string(authKey) {
+	// 		s.Infof("Cached auth key matched for proxy target %v.", pd.Id)
+	// 		userId = proxy.User
+	// 	}
+	// }
+	// cache auth key doesnt match requires an auth
+	// if cache auth key matches, just do a check on the ip
+	userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
+	if err != nil {
+		s.Infof("User access denied to %v", err)
+		return
+	}
+	return
+}
+
+func (s *Server) authRequest(r *http.Request, useCache bool, pd ProxyData) (userId int64, authKey []byte, err error) {
+
 	var rHost, rPort string
 	ua := r.Header.Get("User-Agent")
 	host := r.Host
 	userId = 0
 
-	// s.Infof(string(res))
-	// Do a client authentication.
-	authKey := []byte(r.Header.Get("Authorization"))
-	if len(authKey) == 0 {
-		authKey = s.getCookieHandler(w, r)
-		if len(authKey) == 0 {
-			s.Infof("Authorization key not found.")
-			http.Error(w, s.Errorf("Authorization key not found.").Error(), http.StatusUnauthorized)
-			return userId, nil
-		}
+	authKey, err = s.getAuthorizationCookie(r)
+	if err != nil {
+		s.Infof("Auth error : %v", err)
+		return
 	}
 
-	proxy, proxyExists := s.dynamicReverseProxies[proxyId]
-	// s.Infof("Authorizing user key: %v, host: %v, ua: %v", string(authKey), host, ua)
-	if op != "/register" && op != "/unregister" {
-		// check cache then authorize and return key
-		cachedAuthKey := []byte{}
-		if proxyExists {
-			cachedAuthKey = proxy.AuthKey
-		}
-		if len(cachedAuthKey) != 0 && string(cachedAuthKey) == string(authKey) {
-			s.Infof("Cached auth key matched for proxy target %v.", proxyId)
-			userId = proxy.User
-		}
-	}
-	// cache auth key doesnt match requires an auth
-	// if cache auth key matches, just do a check on the ip
-	uid, err1 := craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
-	if err1 != nil {
-		s.Infof("User access denied to %v", err1)
-		http.Error(w, err1.Error(), http.StatusUnauthorized)
-		return uid, nil
-	}
-	userId = uid
+	//var cachedAuthKey []byte
+	// proxy, proxyExists := s.dynamicReverseProxies[pd.Id]
+	// if proxyExists {
+	// 	cachedAuthKey = proxy.AuthKey
+	// }
 
-	u, _ := url.Parse(proxyTarget)
+	userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
+	if err != nil {
+		s.Infof("User access denied to %v", err)
+		return
+	}
+
+	u, _ := url.Parse(pd.Target)
 	rHost, rPort, _ = net.SplitHostPort(u.Host)
 	s.Infof("checking access to port %s:%s:%v ", rHost, rPort, userId)
 	// if url was ip:port, both rhost and rport would be filled.
 	if len(rHost) > 0 && len(rPort) > 0 {
-		allowed, err := craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
-		if !allowed || err != nil {
-			s.Infof("access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
-			err1 := s.Errorf("access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
-			http.Error(w, err1.Error(), http.StatusUnauthorized)
-			return userId, nil
+		var allowed bool
+		allowed, err = craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
+		if !allowed {
+			s.Infof("Access to port %s:%s:%v denied.", rHost, rPort, userId)
+			err = errors.New("Access to requested resource denied.")
+			return
+		}
+		if err != nil {
+			s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
+			return
 		}
 	}
-	if op != "/register" && op != "/unregister" {
-		s.dynamicReverseProxies[proxyId].AuthKey = authKey
-		// s.dynamicReverseProxies[proxyId].Target = proxyTarget
-	}
-	return userId, authKey
+	return
 }
 
 // handleDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) bool {
+	var pathPrefix string
 	// res, _ := httputil.DumpRequest(r, true)
-	path := r.URL.Path
-	// s.Infof("Got a dynamic proxy path %v", path)
-	if strings.HasPrefix(path, "/register") {
+	if strings.HasPrefix(r.URL.Path, "/") {
+		pathParts := strings.Split(r.URL.Path, "/")
+		if len(pathParts) > 1 {
+			pathPrefix = pathParts[1]
+		}
+	}
+
+	s.Infof("Got a dynamic proxy path %v", pathPrefix)
+	switch pathPrefix {
+	case REGISTER_ENDPOINT:
 		s.createDynamicProxy(w, r)
-	} else if strings.HasPrefix(path, "/unregister") {
+	case UNREGISTER_ENDPOINT:
 		s.deleteDynamicProxy(w, r)
-	} else {
-		// If path is just a hexadecimal, check it is recorded as a dynamic proxy key
-		// if so execute it
+	default:
 		s.executeDynamicProxy(w, r)
 	}
 	return true
-
 }
 
 type ProxyData struct {
-	Id     string `json:"id"`
 	Target string `json:"target"`
 }
 
-func (s *Server) getProxyData(w http.ResponseWriter, r *http.Request, pd *ProxyData) (error, *DynamicReverseProxy, bool) {
-	err := json.NewDecoder(r.Body).Decode(pd)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return err, nil, false
-	}
-	x, y := s.dynamicReverseProxies[pd.Id]
-	return err, x, y
+type ProxyRegisterResponse struct {
+	Id string `json:"Id"`
+}
+
+func (s *Server) getProxyData(w http.ResponseWriter, r *http.Request, pd *ProxyData) (err error) {
+	err = json.NewDecoder(r.Body).Decode(pd)
+	return
+}
+
+func checkAndSetProxy(pd ProxyData) (proxyId string, err error) {
+
+	return
 }
 
 // createDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	var pd ProxyData
 
-	err, _, ok := s.getProxyData(w, r, &pd)
+	err := s.getProxyData(w, r, &pd)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if ok {
-		http.Error(w, s.Errorf("Id (%s) already existing.", pd.Id).Error(), http.StatusBadRequest)
+
+	s.Infof("Creating reverse proxy for %v, target: %v", pd.Target)
+	userId, authKey, err := s.authRequest(r, false, pd)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-	s.Infof("Creating reverse proxy for %v, target: %v", pd.Id, pd.Target)
-	userId, authKey := s.authorizeRequest(w, r, "/register", pd.Id, pd.Target)
-	if authKey == nil {
-		return
-	}
+
 	u, err := url.Parse(pd.Target)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -159,10 +186,12 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, s.Errorf("Missing protocol (%s)", u).Error(), http.StatusBadRequest)
 		return
 	}
+
 	// Create a NewSingleHostReverseProxy with a custom director
 	// use the url path as key to save a pointer to the proxy
 	// Send 200 - success
 	reverseProxy := httputil.NewSingleHostReverseProxy(u)
+
 	//always use proxy host
 	reverseProxy.Director = func(r *http.Request) {
 		r.URL.Scheme = u.Scheme
@@ -184,49 +213,60 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = path
 		s.Infof("Redirecting request to %s at %s\n", r.URL, time.Now().UTC())
 	}
-	s.dynamicReverseProxies[pd.Id] = &DynamicReverseProxy{
+
+	pId := fmt.Sprintf("%x", md5.Sum([]byte(pd.Target)))
+	s.dynamicReverseProxies[pId] = &DynamicReverseProxy{
 		Handler: reverseProxy,
 		AuthKey: authKey,
 		Target:  pd.Target,
 		User:    userId,
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	prr := ProxyRegisterResponse{Id: pId}
+	err = json.NewEncoder(w).Encode(prr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error building the response, %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 // deleteDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	var pd ProxyData
 
-	err, _, ok := s.getProxyData(w, r, &pd)
+	err := s.getProxyData(w, r, &pd)
 	if err != nil {
 		return
 	}
-	if !ok {
-		http.Error(w, s.Errorf("Could not find Id (%s).", pd.Id).Error(), http.StatusBadRequest)
-		return
-	}
+	// if !ok {
+	// 	http.Error(w, s.Errorf("Could not find Id (%s).", pd.Id).Error(), http.StatusBadRequest)
+	// 	return
+	// }
 	// just delete the proxy element
-	s.Infof("Deleting reverse proxy for %v", pd.Id)
-	_, authKey := s.authorizeRequest(w, r, "/unregister", pd.Id, pd.Target)
-	if authKey == nil {
-		return
-	}
-	delete(s.dynamicReverseProxies, pd.Id)
+	// s.Infof("Deleting reverse proxy for %v", pd.Id)
+	// _, authKey := s.authorizeRequest(w, r, "/unregister", pd.Id, pd.Target)
+	// if authKey == nil {
+	// 	return
+	// }
+	// delete(s.dynamicReverseProxies, pd.Id)
 }
 
 // executeDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	path = strings.TrimPrefix(path, "/")
-	pathParts := strings.SplitN(path, "/", 2)
-	proxyId := pathParts[0]
+	// path := r.URL.Path
+	// path = strings.TrimPrefix(path, "/")
+	// pathParts := strings.SplitN(path, "/", 2)
+	// proxyId := pathParts[0]
 	// just serve the reverse proxy request.
-	if proxy, ok := s.dynamicReverseProxies[proxyId]; ok {
-		_, authKey := s.authorizeRequest(w, r, proxyId, proxyId, proxy.Target)
-		if authKey == nil {
-			return
-		}
-		proxy.Handler.ServeHTTP(w, r)
-	} else {
-		http.Error(w, s.Errorf("Invalid id (%s)", proxyId).Error(), http.StatusBadRequest)
-	}
+	// if proxy, ok := s.dynamicReverseProxies[proxyId]; ok {
+	// 	_, authKey := s.authorizeRequest(w, r, proxyId, proxyId, proxy.Target)
+	// 	if authKey == nil {
+	// 		return
+	// 	}
+	// 	proxy.Handler.ServeHTTP(w, r)
+	// } else {
+	// 	http.Error(w, s.Errorf("Invalid id (%s)", proxyId).Error(), http.StatusBadRequest)
+	// }
 }
