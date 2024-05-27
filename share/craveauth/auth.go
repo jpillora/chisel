@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,7 +16,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jpillora/chisel/share/cio"
+	"gitlab.com/accupara/buildmeup/dcrpc"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 func postRequestWithClient(req *http.Request, timeout time.Duration, httpClient *http.Client) (body []byte, err error, statusCode int32) {
@@ -169,16 +173,16 @@ type ClientInfo struct {
 	Pm   []PortMap `json:"portmap"`
 }
 
-func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (allowed bool, err error) {
+func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (jid int64, allowed bool, err error) {
 
 	// select "ClientInfo" from build_jobinfo where "User_id" in (select "userId" from user_teams  where "teamId" in ( select "teamId" from user_teams where "userId"=33)) AND "Status" = 'running';
 	// Don't worry about bobytabels since userId is generated from this code and not from user input
-	query := "SELECT \"ClientInfo\" FROM build_jobinfo " +
+	query := "SELECT \"id\", \"ClientInfo\" FROM build_jobinfo " +
 		"WHERE \"User_id\" IN (SELECT \"userId\" FROM user_teams " +
 		"WHERE \"teamId\" IN ( SELECT \"teamId\" FROM user_teams " +
 		"WHERE \"userId\"=" + userId + ")) " +
 		"AND \"Status\" = 'running'"
-	allowed, err = GetAndCheckClientInfo(query,
+	jid, allowed, err = GetAndCheckClientInfo(query,
 		func(ci ClientInfo) (allowed bool) {
 			tportint, _ := strconv.ParseInt(tport, 10, 64)
 			if ci.Host == host {
@@ -196,8 +200,8 @@ func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (a
 }
 
 func CheckTargetConatinerPort(host string, tport string, cport string, l *cio.Logger) (allowed bool, err error) {
-	query := "select \"ClientInfo\" from build_jobinfo where \"ClientInfo\"::jsonb->>'host' = '" + host + "' AND \"Status\" = 'running'"
-	allowed, err = GetAndCheckClientInfo(query,
+	query := "select \"id\", \"ClientInfo\" from build_jobinfo where \"ClientInfo\"::jsonb->>'host' = '" + host + "' AND \"Status\" = 'running'"
+	_, allowed, err = GetAndCheckClientInfo(query,
 		func(ci ClientInfo) (allowed bool) {
 			tportint, _ := strconv.ParseInt(tport, 10, 64)
 			cportint, _ := strconv.ParseInt(cport, 10, 64)
@@ -217,7 +221,7 @@ func CheckTargetConatinerPort(host string, tport string, cport string, l *cio.Lo
 	return
 }
 
-func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *cio.Logger) (allowed bool, err error) {
+func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *cio.Logger) (jid int64, allowed bool, err error) {
 	dbIP := os.Getenv("DB_HOST")
 	if len(dbIP) == 0 {
 		l.Infof("could not get DB_HOST")
@@ -258,7 +262,7 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 	}
 
 	for rows.Next() {
-		err = rows.Scan(&ClientInfoString)
+		err = rows.Scan(&jid, &ClientInfoString)
 		if err != nil {
 			l.Infof("Row scanning failed: %v", err)
 			return
@@ -280,5 +284,36 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 		l.Infof("rows error: %v", err)
 		return
 	}
+	return
+}
+
+func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient *dcrpc.DcMasterRPCClient, err error) {
+	var conn *grpc.ClientConn
+	hostUrl := fmt.Sprintf("%s:%v", ip, g.dcmasterPort)
+	conn, err = grpc.Dial(hostUrl, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
+	if nil != err {
+		log.Printf("Failed to create RPC client for node %v. err = %v\n",
+			hostUrl, err)
+		return
+	}
+	defer conn.Close()
+
+	dcmasterClient = &dcrpc.NewDcMasterRPCClient(conn)
+	return
+}
+
+func CheckForJob(dcmasterClient *dcrpc.DcMasterRPCClient, proxyId string, jid int64) (err error) {
+	downloadPatchObjectReq := &dcrpc.MasterStreamStdout{
+		ProjectAndJob: &dcrpc.ProjectAndJob{
+			ProjectId: 0,
+			JobId:     jid,
+		},
+		IsStdError: false,
+		Stdout:     fmt.Sprintf("Reverse proxy request for %v", proxyId),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Cancel ctx as soon as function returns.
+	_, err = g.dcMasterClient.Trace(ctx, downloadPatchObjectReq)
+
 	return
 }
