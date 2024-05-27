@@ -98,7 +98,7 @@ func (s *Server) authRequest(r *http.Request, useCache bool, target string) (use
 }
 
 // handleDynamicProxy is the main http websocket handler for the chisel server
-func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) bool {
+func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) (handled bool) {
 	var pathPrefix string
 	// res, _ := httputil.DumpRequest(r, true)
 	if strings.HasPrefix(r.URL.Path, "/") {
@@ -112,12 +112,14 @@ func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) bool
 	switch pathPrefix {
 	case REGISTER_ENDPOINT:
 		s.createDynamicProxy(w, r)
+		handled = true
 	case UNREGISTER_ENDPOINT:
 		s.deleteDynamicProxy(w, r)
+		handled = true
 	default:
-		s.executeDynamicProxy(w, r)
+		handled = s.executeDynamicProxy(w, r)
 	}
-	return true
+	return
 }
 
 type ProxyData struct {
@@ -228,7 +230,7 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 }
 
 // executeDynamicProxy is the main http websocket handler for the chisel server
-func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) {
+func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) (handled bool) {
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/")
 	pathParts := strings.SplitN(path, "/", 2)
@@ -236,15 +238,13 @@ func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) {
 
 	//just serve the reverse proxy request.
 	if proxy, ok := s.dynamicReverseProxies[proxyId]; ok {
+		handled = true
 		_, _, err := s.authRequest(r, false, proxy.Target)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-
 		proxy.Handler.ServeHTTP(w, r)
-
-	} else {
-		http.Error(w, s.Errorf("Invalid id (%s)", proxyId).Error(), http.StatusBadRequest)
 	}
+	return
 }
