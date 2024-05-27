@@ -273,7 +273,6 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		proxy.Handler.ServeHTTP(w, r)
 		s.disconnectResourceDcMaster(proxy)
 		delete(s.dynamicReverseProxies, pId)
 	} else { // do we need this error?
