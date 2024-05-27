@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,10 +14,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jpillora/chisel/dcrpc"
 	"github.com/jpillora/chisel/share/cio"
-	"gitlab.com/accupara/buildmeup/dcrpc"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -188,7 +186,7 @@ func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (j
 			if ci.Host == host {
 				for _, v := range ci.Pm {
 					if v.Hostport == tportint {
-						l.Infof("Allowing user %v access to  : %v %v", userId, host, tportint)
+						l.Infof("Allowing user %v access to: %v %v", userId, host, tportint)
 						allowed = true
 						break
 					}
@@ -287,23 +285,23 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 	return
 }
 
-func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient *dcrpc.DcMasterRPCClient, err error) {
-	var conn *grpc.ClientConn
-	hostUrl := fmt.Sprintf("%s:%v", ip, g.dcmasterPort)
+// TODO: Put this into an interface.
+func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient dcrpc.DcMasterRPCClient, conn *grpc.ClientConn, err error) {
+	hostUrl := fmt.Sprintf("%s:%v", ip, 20000)
 	conn, err = grpc.Dial(hostUrl, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
 	if nil != err {
-		log.Printf("Failed to create RPC client for node %v. err = %v\n",
+		l.Infof("Failed to create RPC client for node %v. err = %v\n",
 			hostUrl, err)
 		return
 	}
-	defer conn.Close()
 
-	dcmasterClient = &dcrpc.NewDcMasterRPCClient(conn)
+	dcmasterClient = dcrpc.NewDcMasterRPCClient(conn)
 	return
 }
 
-func CheckForJob(dcmasterClient *dcrpc.DcMasterRPCClient, proxyId string, jid int64) (err error) {
-	downloadPatchObjectReq := &dcrpc.MasterStreamStdout{
+// TODO: Put this into an interface.
+func CheckForJob(dcMasterClient dcrpc.DcMasterRPCClient, proxyId string, jid int64) (err error) {
+	req := &dcrpc.MasterStreamStdout{
 		ProjectAndJob: &dcrpc.ProjectAndJob{
 			ProjectId: 0,
 			JobId:     jid,
@@ -313,7 +311,7 @@ func CheckForJob(dcmasterClient *dcrpc.DcMasterRPCClient, proxyId string, jid in
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Cancel ctx as soon as function returns.
-	_, err = g.dcMasterClient.Trace(ctx, downloadPatchObjectReq)
+	_, err = dcMasterClient.Trace(ctx, req)
 
 	return
 }

@@ -15,8 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jpillora/chisel/dcrpc"
 	"github.com/jpillora/chisel/share/craveauth"
-	"gitlab.com/accupara/buildmeup/dcrpc"
+	"google.golang.org/grpc"
 )
 
 var AMS_COOKIE_NAME = "_acp_at"
@@ -50,87 +51,98 @@ func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err er
 	return
 }
 
-func (s *Server) checkDcMaster(ip string, jid int64, pId string, createNew bool) (client *dcrpc.DcMasterRPCClient, err error) {
+func (s *Server) disconnectResourceDcMaster(drProxy *DynamicReverseProxy) {
+	drProxy.GrpcConn.Close()
+}
+
+// Authorize user to the target, ideally sets the connection.
+func (s *Server) checkResourceAvailableDcMaster(drProxy *DynamicReverseProxy, pId string, createNew bool) (err error) {
+	var client dcrpc.DcMasterRPCClient
+	u, _ := url.Parse(drProxy.Target)
+	ip, _, _ := net.SplitHostPort(u.Host)
+
 	if createNew {
-		client = craveauth.ConnectDCMasterRPC(ip, s.Logger)
-	} else {
-		client = s.dynamicReverseProxies[pId].DcMasterClient
-	}
-	if client != nil {
-		err = craveauth.CheckForJob(client, jid, pId)
+		var conn *grpc.ClientConn
+		s.Infof("Connecting to resource host %s.", ip)
+		client, conn, err = craveauth.ConnectDCMasterRPC(ip, s.Logger)
 		if err != nil {
-			err = s.Errorf("Error validating dcmaster. Error: %v", err)
+			return
+		}
+		drProxy.DcMasterClient = client
+		drProxy.GrpcConn = conn
+	} else {
+		// s.Infof("Checking availability of resource ip: %s, job: %v.", ip, drProxy.JobId)
+		err = craveauth.CheckForJob(drProxy.DcMasterClient, pId, drProxy.JobId)
+		if err != nil {
+			err = s.Errorf("Resource unavailable. Error: %v", err)
 			s.Infof("%v", err)
 			return
 		}
-	} else {
-		err = s.Errorf("Error validating dcmaster. RPC client unavailable.", err)
-		s.Infof("%v", err)
+		s.Infof("Available resource ip: %s, job: %v.", ip, drProxy.JobId)
 	}
 	return
 }
 
-func (s *Server) authRequest(r *http.Request, useCache bool, newProxy bool, target string) (userId, jobId int64, authKey []byte, client *dcrpc.DcMasterRPCClient, err error) {
+func (s *Server) checkResourceAccessNoop(drProxy *DynamicReverseProxy) (err error) {
+	return
+}
 
-	var rHost, rPort string
-	ua := r.Header.Get("User-Agent")
-	host := r.Host
-	userId = 0
-	pId := s.getProxyHashFromTarget(target)
+// Authenticate user to the target, ideally sets the jobid.
+func (s *Server) checkResourceAccessDcMaster(drProxy *DynamicReverseProxy) (err error) {
+	u, _ := url.Parse(drProxy.Target)
+	rHost, rPort, _ := net.SplitHostPort(u.Host)
+	// if url was ip:port, both rhost and rport would be filled.
+	if len(rHost) > 0 && len(rPort) > 0 {
+		var allowed bool
+		var jobId int64
 
-	authKey, err = s.getAuthorizationCookie(r)
+		// s.Infof("Checking access to resource %s:%s for user: %v", rHost, rPort, drProxy.User)
+		jobId, allowed, err = craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(drProxy.User), s.Logger)
+		if !allowed {
+			s.Infof("Access to resource %s:%s for user: %v denied.", rHost, rPort, drProxy.User)
+			err = errors.New("Access to requested resource denied.")
+			return
+		}
+		if err != nil {
+			s.Infof("Access to resource %s:%s for user: %v denied. Error: %v", rHost, rPort, drProxy.User, err)
+			return
+		}
+		s.Infof("Granted access to resource %s:%s for user: %v, job: %v", rHost, rPort, drProxy.User, jobId)
+		drProxy.JobId = jobId
+	}
+	return
+}
+
+// Authenticate user to the request, ideally sets the userid and authkey.
+func (s *Server) authRequest(r *http.Request, useCache bool, drProxy *DynamicReverseProxy,
+	checkResourceAccess func(drProxy *DynamicReverseProxy) error) (err error) {
+	var userId int64
+
+	authKey, err := s.getAuthorizationCookie(r)
 	if err != nil {
-		s.Infof("Auth error : %v", err)
+		s.Infof("Authkey error: %v", err)
 		return
 	}
 
 	// if useCache, match cookie, else validate
 	// false for register and unregister, so a reverse proxy should exist.
 	if useCache {
-		if authKey == s.dynamicReverseProxies[pId].AuthKey {
-			userId = s.dynamicReverseProxies[pId].User
-			jobId = s.dynamicReverseProxies[pId].JobId
+		if string(authKey) == string(drProxy.AuthKey) {
+			return
 		}
 	}
-	u, _ := url.Parse(target)
-	rHost, rPort, _ = net.SplitHostPort(u.Host)
-	s.Infof("checking access to port %s:%s:%v ", rHost, rPort, userId)
 
 	// user id is not set through because cache did not match or useCache is false
 	// go ahead and access db to get user id and jobid
-	if userId == 0 {
-		userId, err = craveauth.ValidateSignedInUser(authKey, ua, host, s.Logger)
-		if err != nil {
-			s.Infof("User access denied to %v", err)
-			return
-		}
-
-		// if url was ip:port, both rhost and rport would be filled.
-		if len(rHost) > 0 && len(rPort) > 0 {
-			var allowed bool
-			jobId, allowed, err = craveauth.CheckTargetUser(rHost, rPort, fmt.Sprint(userId), s.Logger)
-			if !allowed {
-				s.Infof("Access to port %s:%s:%v denied.", rHost, rPort, userId)
-				err = errors.New("Access to requested resource denied.")
-				return
-			}
-			if err != nil {
-				s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
-				return
-			}
-		}
+	userId, err = craveauth.ValidateSignedInUser(authKey, r.Header.Get("User-Agent"), r.Host, s.Logger)
+	if err != nil {
+		s.Infof("User access denied. Error: %v", err)
+		return
 	}
-	// check if the job is running on the dcmaster
-	// if creating a new proxy, or just an execute then check
-	// if deleting, the skip, there is a chance that dcmaster does not exist.
-	if useCache || newProxy {
-		client, err = s.checkDcMaster(rHost, jobId, pId, newProxy)
-		if err != nil {
-			s.Infof("Access to port %s:%s:%v denied err: %v", rHost, rPort, userId, err)
-		}
-	}
+	drProxy.User = userId
+	drProxy.AuthKey = authKey
 
-	return
+	return checkResourceAccess(drProxy)
 }
 
 // handleDynamicProxy is the main http websocket handler for the chisel server
@@ -163,7 +175,7 @@ type ProxyData struct {
 }
 
 type ProxyRegisterResponse struct {
-	Id string `json:"Id"`
+	Id string `json:"id"`
 }
 
 func (s *Server) getProxyData(w http.ResponseWriter, r *http.Request, pd *ProxyData) (err error) {
@@ -179,20 +191,13 @@ func (s *Server) getProxyHashFromTarget(target string) (hash string) {
 // createDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	var pd ProxyData
+	var drProxy DynamicReverseProxy
 
 	err := s.getProxyData(w, r, &pd)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	s.Infof("Creating reverse proxy for %v, target: %v", pd.Target)
-	userId, jobId, authKey, dcMasterClient, err := s.authRequest(r, false, true, pd.Target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
 	u, err := url.Parse(pd.Target)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -203,6 +208,18 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	drProxy.Target = pd.Target
+	s.Infof("Creating reverse proxy for target: %v", pd.Target)
+	err = s.authRequest(r, false, &drProxy, s.checkResourceAccessDcMaster)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	pId := s.getProxyHashFromTarget(pd.Target)
+	err = s.checkResourceAvailableDcMaster(&drProxy, pId, true)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+	}
 	reverseProxy := httputil.NewSingleHostReverseProxy(u)
 
 	//always use proxy host
@@ -216,7 +233,7 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		path = strings.TrimPrefix(path, "/")
 		pathParts := strings.SplitN(path, "/", 2)
-		s.Infof("Setting path : %v %v", path, pathParts)
+		// s.Infof("Setting path : %v %v", path, pathParts)
 		if len(pathParts) >= 2 && pathParts[1] != "" {
 			path = "/" + pathParts[1]
 		} else {
@@ -226,16 +243,8 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = path
 		s.Infof("Redirecting request to %s at %s\n", r.URL, time.Now().UTC())
 	}
-
-	pId := s.getProxyHashFromTarget(pd.Target)
-	s.dynamicReverseProxies[pId] = &DynamicReverseProxy{
-		Handler:        reverseProxy,
-		AuthKey:        authKey,
-		Target:         pd.Target,
-		User:           userId,
-		JobId:          jobId,
-		DcMasterClient: dcMasterClient,
-	}
+	drProxy.Handler = reverseProxy
+	s.dynamicReverseProxies[pId] = &drProxy
 
 	w.Header().Set("Content-Type", "application/json")
 	prr := ProxyRegisterResponse{Id: pId}
@@ -257,32 +266,43 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pId := s.getProxyHashFromTarget(pd.Target)
-	s.Infof("Deleting reverse proxy for %v", pId)
-	_, _, _, _, err = s.authRequest(r, false, false, pd.Target)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	delete(s.dynamicReverseProxies, pId)
-}
-
-// executeDynamicProxy is the main http websocket handler for the chisel server
-func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) (handled bool) {
-	path := r.URL.Path
-	path = strings.TrimPrefix(path, "/")
-	pathParts := strings.SplitN(path, "/", 2)
-	proxyId := pathParts[0]
-
-	//just serve the reverse proxy request.
-	if proxy, ok := s.dynamicReverseProxies[proxyId]; ok {
-		handled = true
-		_, _, _, _, err := s.authRequest(r, true, false, proxy.Target)
+	if proxy, ok := s.dynamicReverseProxies[pId]; ok {
+		s.Infof("Deleting reverse proxy for %v", pId)
+		err = s.authRequest(r, false, proxy, s.checkResourceAccessNoop)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 		proxy.Handler.ServeHTTP(w, r)
+		s.disconnectResourceDcMaster(proxy)
+		delete(s.dynamicReverseProxies, pId)
+	} else { // do we need this error?
+		http.Error(w, s.Errorf("Invalid id (%s)", pId).Error(), http.StatusBadRequest)
 	}
 	return
+}
+
+// executeDynamicProxy is the main http websocket handler for the chisel server
+func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) bool {
+	path := r.URL.Path
+	path = strings.TrimPrefix(path, "/")
+	pathParts := strings.SplitN(path, "/", 2)
+	pId := pathParts[0]
+
+	//just serve the reverse proxy request.
+	if proxy, ok := s.dynamicReverseProxies[pId]; ok {
+		err := s.authRequest(r, true, proxy, s.checkResourceAccessDcMaster)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return ok
+		}
+		err = s.checkResourceAvailableDcMaster(proxy, pId, false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return ok
+		}
+		proxy.Handler.ServeHTTP(w, r)
+		return ok
+	}
+	return false
 }

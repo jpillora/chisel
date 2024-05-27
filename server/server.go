@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jpillora/chisel/dcrpc"
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
@@ -19,6 +20,7 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
 )
 
 // Config is the configuration for the chisel service
@@ -39,7 +41,8 @@ type DynamicReverseProxy struct {
 	Target         string
 	User           int64
 	JobId          int64
-	DcMasterClient *dcrpc.DcMasterRPCClient
+	DcMasterClient dcrpc.DcMasterRPCClient
+	GrpcConn       *grpc.ClientConn // TODO: Put this into an interface
 }
 
 // Server respresent a chisel service
