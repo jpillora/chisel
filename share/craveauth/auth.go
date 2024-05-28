@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strconv"
 	"strings"
@@ -114,7 +115,8 @@ func __validateUser(password []byte, useragent string, host string, l *cio.Logge
 
 	body, err, _ := PostRequest(req, 24*time.Hour)
 	if err != nil {
-		l.Infof("could not validate user: %v", err)
+		res, _ := httputil.DumpRequest(req, true)
+		l.Infof("could not validate user: %v, req: %v", err, string(res))
 		return
 	}
 	//l.Infof("response Body: %v", string(body))
@@ -286,7 +288,7 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 }
 
 // TODO: Put this into an interface.
-func ConnectDCMasterRPC(ip string, l *cio.Logger) (dcmasterClient dcrpc.DcMasterRPCClient, conn *grpc.ClientConn, err error) {
+func ConnectDCMasterRPC(ip, port string, l *cio.Logger) (dcmasterClient dcrpc.DcMasterRPCClient, conn *grpc.ClientConn, err error) {
 	hostUrl := fmt.Sprintf("%s:%v", ip, 20000)
 	conn, err = grpc.Dial(hostUrl, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
 	if nil != err {

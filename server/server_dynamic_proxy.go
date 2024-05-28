@@ -41,11 +41,16 @@ func (s *Server) getCookieHandler(r *http.Request) (cookieBytes []byte, err erro
 
 func (s *Server) getAuthorizationCookie(r *http.Request) (authKey []byte, err error) {
 	// Do a client authentication.
-	authKey = []byte(r.Header.Get("Authorization"))
-	if len(authKey) == 0 {
-		authKey, err = s.getCookieHandler(r)
-		if err != nil {
-			return
+
+	// priority if for cookie as the target may overwrite auth.
+	authKey, err = s.getCookieHandler(r)
+	if err != nil {
+		authKey = []byte(r.Header.Get("Authorization"))
+		if len(authKey) == 0 {
+			s.Infof("Cookie err: %v, no authorization token in header.", err)
+			return authKey, s.Errorf("No authorization token in header or cookie.")
+		} else {
+			err = nil
 		}
 	}
 	return
@@ -64,7 +69,7 @@ func (s *Server) checkResourceAvailableDcMaster(drProxy *DynamicReverseProxy, pI
 	if createNew {
 		var conn *grpc.ClientConn
 		s.Infof("Connecting to resource host %s.", ip)
-		client, conn, err = craveauth.ConnectDCMasterRPC(ip, s.Logger)
+		client, conn, err = craveauth.ConnectDCMasterRPC(ip, s.config.DCMasterPort, s.Logger)
 		if err != nil {
 			return
 		}
@@ -171,7 +176,8 @@ func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) (han
 }
 
 type ProxyData struct {
-	Target string `json:"target"`
+	Target   string `json:"target"`
+	KeepBase bool   `json:"keepbase"`
 }
 
 type ProxyRegisterResponse struct {
@@ -209,6 +215,7 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	drProxy.Target = pd.Target
+	drProxy.KeepBase = pd.KeepBase
 	s.Infof("Creating reverse proxy for target: %v", pd.Target)
 	err = s.authRequest(r, false, &drProxy, s.checkResourceAccessDcMaster)
 	if err != nil {
@@ -233,14 +240,20 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		path = strings.TrimPrefix(path, "/")
 		pathParts := strings.SplitN(path, "/", 2)
-		// s.Infof("Setting path : %v %v", path, pathParts)
-		if len(pathParts) >= 2 && pathParts[1] != "" {
-			path = "/" + pathParts[1]
+		pId := pathParts[0]
+		if s.dynamicReverseProxies[pId].KeepBase {
+			r.URL.Path = "/sshd" + r.URL.Path
 		} else {
-			path = "/"
+			// s.Infof("Setting path : %v %v", path, pathParts)
+			if len(pathParts) >= 2 && pathParts[1] != "" {
+				path = "/" + pathParts[1]
+			} else {
+				path = "/"
+			}
+			// s.Infof("Setting path : %v", path)
+			r.URL.Path = path
 		}
-		s.Infof("Setting path : %v", path)
-		r.URL.Path = path
+
 		s.Infof("Redirecting request to %s at %s\n", r.URL, time.Now().UTC())
 	}
 	drProxy.Handler = reverseProxy
