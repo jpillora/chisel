@@ -16,7 +16,7 @@ type Logger struct {
 }
 
 func NewLogger(prefix string) *Logger {
-	return NewLoggerFlag(prefix, log.Ldate|log.Ltime)
+	return NewLoggerFlag(prefix, log.Ldate|log.Ltime|log.Lshortfile)
 }
 
 func NewLoggerFlag(prefix string, flag int) *Logger {

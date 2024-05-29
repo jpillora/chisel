@@ -35,6 +35,10 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		s.reverseProxy.ServeHTTP(w, r)
 		return
 	}
+	if s.handleDynamicProxy(w, r) {
+		// request has been served
+		return
+	}
 	//no proxy defined, provide access to health/version checks
 	switch r.URL.String() {
 	case "/health":
@@ -131,7 +135,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if val, ok := sshConn.Permissions.CriticalOptions["AllowedUser"]; ok {
-			allowed, err := craveauth.CheckTargetUser(r.RemoteHost, r.RemotePort, val, l)
+			_, allowed, err := craveauth.CheckTargetUser(r.RemoteHost, r.RemotePort, val, l)
 			if !allowed || err != nil {
 				failed(s.Errorf("access to port %s:%s:%s denied err: %v", r.RemoteHost, r.RemotePort, val, err))
 				return

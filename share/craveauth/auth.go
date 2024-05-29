@@ -8,14 +8,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jpillora/chisel/dcrpc"
 	"github.com/jpillora/chisel/share/cio"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
 )
 
 func postRequestWithClient(req *http.Request, timeout time.Duration, httpClient *http.Client) (body []byte, err error, statusCode int32) {
@@ -72,7 +75,15 @@ type GetUserResponse struct {
 	Data    GetUserResponseData `json:"data"`
 }
 
-func validateUser(password []byte, l *cio.Logger) (userId int64, err error) {
+func ValidateUser(password []byte, l *cio.Logger) (userId int64, err error) {
+	return __validateUser(password, "crave-sshd", "ams", l)
+}
+
+func ValidateSignedInUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
+	return __validateUser(password, useragent, host, l)
+}
+
+func __validateUser(password []byte, useragent string, host string, l *cio.Logger) (userId int64, err error) {
 	var url string
 	var payload string
 	var method string
@@ -95,9 +106,17 @@ func validateUser(password []byte, l *cio.Logger) (userId int64, err error) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", string(password))
+	req.Header.Set("User-Agent", useragent)
+	req.Header.Set("Referer", "sshd")
+	req.Header.Set("Host", host)
+	req.Host = host
+
+	// res, _ := httputil.DumpRequest(req, true)
+
 	body, err, _ := PostRequest(req, 24*time.Hour)
 	if err != nil {
-		l.Infof("could not validate user: %v", err)
+		res, _ := httputil.DumpRequest(req, true)
+		l.Infof("could not validate user: %v, req: %v", err, string(res))
 		return
 	}
 	//l.Infof("response Body: %v", string(body))
@@ -107,10 +126,11 @@ func validateUser(password []byte, l *cio.Logger) (userId int64, err error) {
 		return
 	}
 
-	l.Infof("%v %v ", resp, resp.Data.UserId)
+	// l.Infof("%v %v ", resp, resp.Data.UserId)
 	if resp.Success {
 		userId = resp.Data.UserId
 	} else {
+		l.Infof("Failed api response %v", resp)
 		err = errors.New("Failed to authenticate user")
 		return
 	}
@@ -128,7 +148,7 @@ func Auth(c ssh.ConnMetadata, password []byte, l *cio.Logger) (perms *ssh.Permis
 		p.CriticalOptions = make(map[string]string)
 		p.CriticalOptions["AllowedPorts"] = "22"
 	} else {
-		userId, err1 := validateUser(password, l)
+		userId, err1 := ValidateUser(password, l)
 		if err1 == nil {
 			l.Infof("User accees granted to : %v", userId)
 			p.CriticalOptions = make(map[string]string)
@@ -153,22 +173,22 @@ type ClientInfo struct {
 	Pm   []PortMap `json:"portmap"`
 }
 
-func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (allowed bool, err error) {
+func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (jid int64, allowed bool, err error) {
 
 	// select "ClientInfo" from build_jobinfo where "User_id" in (select "userId" from user_teams  where "teamId" in ( select "teamId" from user_teams where "userId"=33)) AND "Status" = 'running';
 	// Don't worry about bobytabels since userId is generated from this code and not from user input
-	query := "SELECT \"ClientInfo\" FROM build_jobinfo " +
+	query := "SELECT \"id\", \"ClientInfo\" FROM build_jobinfo " +
 		"WHERE \"User_id\" IN (SELECT \"userId\" FROM user_teams " +
 		"WHERE \"teamId\" IN ( SELECT \"teamId\" FROM user_teams " +
 		"WHERE \"userId\"=" + userId + ")) " +
 		"AND \"Status\" = 'running'"
-	allowed, err = GetAndCheckClientInfo(query,
+	jid, allowed, err = GetAndCheckClientInfo(query,
 		func(ci ClientInfo) (allowed bool) {
 			tportint, _ := strconv.ParseInt(tport, 10, 64)
 			if ci.Host == host {
 				for _, v := range ci.Pm {
 					if v.Hostport == tportint {
-						l.Infof("Allowing user %v access to  : %v %v", userId, host, tportint)
+						l.Infof("Allowing user %v access to: %v %v", userId, host, tportint)
 						allowed = true
 						break
 					}
@@ -180,8 +200,8 @@ func CheckTargetUser(host string, tport string, userId string, l *cio.Logger) (a
 }
 
 func CheckTargetConatinerPort(host string, tport string, cport string, l *cio.Logger) (allowed bool, err error) {
-	query := "select \"ClientInfo\" from build_jobinfo where \"ClientInfo\"::jsonb->>'host' = '" + host + "' AND \"Status\" = 'running'"
-	allowed, err = GetAndCheckClientInfo(query,
+	query := "select \"id\", \"ClientInfo\" from build_jobinfo where \"ClientInfo\"::jsonb->>'host' = '" + host + "' AND \"Status\" = 'running'"
+	_, allowed, err = GetAndCheckClientInfo(query,
 		func(ci ClientInfo) (allowed bool) {
 			tportint, _ := strconv.ParseInt(tport, 10, 64)
 			cportint, _ := strconv.ParseInt(cport, 10, 64)
@@ -201,7 +221,7 @@ func CheckTargetConatinerPort(host string, tport string, cport string, l *cio.Lo
 	return
 }
 
-func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *cio.Logger) (allowed bool, err error) {
+func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *cio.Logger) (jid int64, allowed bool, err error) {
 	dbIP := os.Getenv("DB_HOST")
 	if len(dbIP) == 0 {
 		l.Infof("could not get DB_HOST")
@@ -242,7 +262,7 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 	}
 
 	for rows.Next() {
-		err = rows.Scan(&ClientInfoString)
+		err = rows.Scan(&jid, &ClientInfoString)
 		if err != nil {
 			l.Infof("Row scanning failed: %v", err)
 			return
@@ -264,5 +284,36 @@ func GetAndCheckClientInfo(query string, checkFunc func(ci ClientInfo) bool, l *
 		l.Infof("rows error: %v", err)
 		return
 	}
+	return
+}
+
+// TODO: Put this into an interface.
+func ConnectDCMasterRPC(ip, port string, l *cio.Logger) (dcmasterClient dcrpc.DcMasterRPCClient, conn *grpc.ClientConn, err error) {
+	hostUrl := fmt.Sprintf("%s:%v", ip, 20000)
+	conn, err = grpc.Dial(hostUrl, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
+	if nil != err {
+		l.Infof("Failed to create RPC client for node %v. err = %v\n",
+			hostUrl, err)
+		return
+	}
+
+	dcmasterClient = dcrpc.NewDcMasterRPCClient(conn)
+	return
+}
+
+// TODO: Put this into an interface.
+func CheckForJob(dcMasterClient dcrpc.DcMasterRPCClient, proxyId string, jid int64) (err error) {
+	req := &dcrpc.MasterStreamStdout{
+		ProjectAndJob: &dcrpc.ProjectAndJob{
+			ProjectId: 0,
+			JobId:     jid,
+		},
+		IsStdError: false,
+		Stdout:     fmt.Sprintf("Reverse proxy request for %v", proxyId),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Cancel ctx as soon as function returns.
+	_, err = dcMasterClient.Trace(ctx, req)
+
 	return
 }

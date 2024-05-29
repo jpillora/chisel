@@ -3,14 +3,18 @@ package chserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
+	"github.com/jpillora/chisel/dcrpc"
 	chshare "github.com/jpillora/chisel/share"
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
@@ -19,37 +23,103 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
 )
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
+	KeySeed      string
+	AuthFile     string
+	Auth         string
+	Proxy        string
+	Socks5       bool
+	Reverse      bool
+	KeepAlive    time.Duration
+	TLS          TLSConfig
+	DCMasterPort string
+}
+
+type DynamicReverseProxy struct {
+	Handler        *httputil.ReverseProxy
+	AuthKey        []byte
+	Target         string
+	User           int64
+	JobId          int64
+	KeepBase       bool
+	DcMasterClient dcrpc.DcMasterRPCClient
+	GrpcConn       *grpc.ClientConn // TODO: Put this into an interface
 }
 
 // Server respresent a chisel service
 type Server struct {
 	*cio.Logger
-	config       *Config
-	fingerprint  string
-	httpServer   *cnet.HTTPServer
-	reverseProxy *httputil.ReverseProxy
-	sessCount    int32
-	sessions     *settings.Users
-	sshConfig    *ssh.ServerConfig
-	users        *settings.UserIndex
+	config                *Config
+	fingerprint           string
+	httpServer            *cnet.HTTPServer
+	reverseProxy          *httputil.ReverseProxy
+	dynamicReverseProxies map[string]*DynamicReverseProxy
+	sessCount             int32
+	sessions              *settings.Users
+	sshConfig             *ssh.ServerConfig
+	users                 *settings.UserIndex
 }
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 	ReadBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
 	WriteBufferSize: settings.EnvInt("WS_BUFF_SIZE", 0),
+}
+
+func GetDCMasterPort(l *cio.Logger) (dcMasterPort string, err error) {
+	dbIP := os.Getenv("DB_HOST")
+	if len(dbIP) == 0 {
+		l.Infof("could not get DB_HOST")
+		return
+	}
+	dbUser := os.Getenv("DB_USER")
+	if len(dbUser) == 0 {
+		l.Infof("could not get DB_USER")
+		return
+	}
+	dbPass := os.Getenv("DB_PASS")
+	if len(dbPass) == 0 {
+		l.Infof("could not get DB_PASS")
+		return
+	}
+	dbName := os.Getenv("DB_NAME")
+	if len(dbName) == 0 {
+		l.Infof("could not get DB_NAME")
+		return
+	}
+
+	pgString := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", dbUser, dbPass, dbIP, dbName)
+
+	// urlExample := "postgres://username:password@localhost:5432/database_name"
+	conn, err := pgx.Connect(context.Background(), pgString)
+	if err != nil {
+		l.Infof("Unable to connect to database: %v", err)
+		return
+	}
+	defer conn.Close(context.Background())
+	rows, err := conn.Query(context.Background(), "SELECT \"Value\" FROM build_deploymentsetting where \"Key\" = 'DCMASTER_PORT';")
+	if err != nil {
+		l.Infof("Query failed: %v", err)
+		return
+	}
+
+	for rows.Next() {
+		err = rows.Scan(&dcMasterPort)
+		if err != nil {
+			l.Infof("Row scanning failed: %v", err)
+			return
+		}
+		defer rows.Close()
+	}
+	if err = rows.Err(); err != nil {
+		l.Infof("rows error: %v", err)
+		return
+	}
+	return
 }
 
 // NewServer creates and returns a new chisel server
@@ -111,6 +181,12 @@ func NewServer(c *Config) (*Server, error) {
 			r.Host = u.Host
 		}
 	}
+	c.DCMasterPort, err = GetDCMasterPort(server.Logger)
+	if len(c.DCMasterPort) == 0 || err != nil {
+		return nil, server.Errorf("Failed to get DCMasterPort. Error: %v", err)
+	}
+	server.Infof("Got dcmaster port: %v", c.DCMasterPort)
+	server.dynamicReverseProxies = make(map[string]*DynamicReverseProxy)
 	//print when reverse tunnelling is enabled
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
