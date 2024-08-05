@@ -1,6 +1,6 @@
-# test this goreleaser config with:
-# - cd chisel
-# - goreleaser --skip-publish --rm-dist --config .github/goreleaser.yml
+# test this file with
+#   goreleaser release --config goreleaser.yml --clean --snapshot
+version: 2
 builds:
   - env:
       - CGO_ENABLED=0
@@ -12,6 +12,7 @@ builds:
       - linux
       - darwin
       - windows
+      - openbsd
     goarch:
       - 386
       - amd64
@@ -31,6 +32,12 @@ builds:
     gomips:
       - hardfloat
       - softfloat
+nfpms:
+  - maintainer: "https://github.com/{{ .Env.GITHUB_USER }}"
+    formats:
+      - deb
+      - rpm
+      - apk
 archives:
   - format: gz
     files:

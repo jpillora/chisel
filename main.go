@@ -240,6 +240,9 @@ func server(args []string) {
 	} else if config.KeySeed == "" {
 		config.KeySeed = settings.Env("KEY")
 	}
+	if config.Auth == "" {
+		config.Auth = os.Getenv("AUTH")
+	}
 	s, err := chserver.NewServer(config)
 	if err != nil {
 		log.Fatal(err)
