@@ -2,7 +2,7 @@ package settings
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 )
 
 type Config struct {
@@ -14,7 +14,7 @@ func DecodeConfig(b []byte) (*Config, error) {
 	c := &Config{}
 	err := json.Unmarshal(b, c)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid JSON config")
+		return nil, errors.New("Invalid JSON config")
 	}
 	return c, nil
 }
