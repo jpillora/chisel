@@ -52,6 +52,9 @@ type TLSConfig struct {
 	Cert       string
 	Key        string
 	ServerName string
+	CipherSuites []uint16
+	MinVersion uint16
+	MaxVersion uint16
 }
 
 // Client represents a client instance
@@ -155,6 +158,13 @@ func NewClient(c *Config) (*Client, error) {
 		} else if c.TLS.Cert != "" || c.TLS.Key != "" {
 			return nil, fmt.Errorf("Please specify client BOTH cert and key")
 		}
+
+		// Set TLS version and Cipher Suites
+		client.Infof("Initializing TLS cipher suites")
+		tc.CipherSuites = c.TLS.CipherSuites
+		tc.MinVersion = c.TLS.MinVersion
+		tc.MaxVersion = c.TLS.MaxVersion
+
 		client.tlsConfig = tc
 	}
 	//validate remotes
