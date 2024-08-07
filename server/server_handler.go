@@ -157,10 +157,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		//block
 		return tunnel.BindRemotes(ctx, serverInbound)
 	})
+	activeSessions.Inc()
 	err = eg.Wait()
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
 		l.Debugf("Closed connection (%s)", err)
 	} else {
 		l.Debugf("Closed connection")
 	}
+	activeSessions.Dec()
 }
