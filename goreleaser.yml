@@ -1,0 +1,41 @@
+# test this goreleaser config with:
+# - cd chisel
+# - goreleaser --clean --snapshot --config goreleaser.yml
+version: 2
+project_name: chisel
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/outsystems/chisel/share.BuildVersion={{.Version}}
+    flags:
+      - -trimpath
+    goos:
+      - linux
+dockers: 
+  - image_templates: 
+    - "ghcr.io/outsystems/{{ .ProjectName }}:{{ .Version }}"
+    - "ghcr.io/outsystems/{{ .ProjectName }}:latest"
+    build_flag_templates:
+    - --platform=linux/amd64
+    - --label=org.opencontainers.image.title=OutSystems Chisel
+    - --label=org.opencontainers.image.description=OutSystems Chisel
+    - --label=org.opencontainers.image.url=https://github.com/outsystems/chisel
+    - --label=org.opencontainers.image.source=https://github.com/outsystems/chisel
+    - --label=org.opencontainers.image.version={{ .Version }}
+    - --label=org.opencontainers.image.created={{ .Date }}
+    - --label=org.opencontainers.image.revision={{ .FullCommit }}
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
