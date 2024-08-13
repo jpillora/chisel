@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//Config a Tunnel
+// Config a Tunnel
 type Config struct {
 	*cio.Logger
 	Inbound   bool
@@ -27,13 +27,13 @@ type Config struct {
 	KeepAlive time.Duration
 }
 
-//Tunnel represents an SSH tunnel with proxy capabilities.
-//Both chisel client and server are Tunnels.
-//chisel client has a single set of remotes, whereas
-//chisel server has multiple sets of remotes (one set per client).
-//Each remote has a 1:1 mapping to a proxy.
-//Proxies listen, send data over ssh, and the other end of the ssh connection
-//communicates with the endpoint and returns the response.
+// Tunnel represents an SSH tunnel with proxy capabilities.
+// Both chisel client and server are Tunnels.
+// chisel client has a single set of remotes, whereas
+// chisel server has multiple sets of remotes (one set per client).
+// Each remote has a 1:1 mapping to a proxy.
+// Proxies listen, send data over ssh, and the other end of the ssh connection
+// communicates with the endpoint and returns the response.
 type Tunnel struct {
 	Config
 	//ssh connection
@@ -47,7 +47,7 @@ type Tunnel struct {
 	socksServer *socks5.Server
 }
 
-//New Tunnel from the given Config
+// New Tunnel from the given Config
 func New(c Config) *Tunnel {
 	c.Logger = c.Logger.Fork("tun")
 	t := &Tunnel{
@@ -68,7 +68,7 @@ func New(c Config) *Tunnel {
 	return t
 }
 
-//BindSSH provides an active SSH for use for tunnelling
+// BindSSH provides an active SSH for use for tunnelling
 func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel) error {
 	//link ctx to ssh-conn
 	go func() {
@@ -104,7 +104,7 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	return err
 }
 
-//getSSH blocks while connecting
+// getSSH blocks while connecting
 func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 	//cancelled already?
 	if isDone(ctx) {
@@ -140,8 +140,8 @@ func (t *Tunnel) activatingConnWait() <-chan struct{} {
 	return ch
 }
 
-//BindRemotes converts the given remotes into proxies, and blocks
-//until the caller cancels the context or there is a proxy error.
+// BindRemotes converts the given remotes into proxies, and blocks
+// until the caller cancels the context or there is a proxy error.
 func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) error {
 	if len(remotes) == 0 {
 		return errors.New("no remotes")
@@ -174,14 +174,46 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 
 func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 	//ping forever
+
+	//reply_timeout set to KeepAlive interval, if KeepAlive is less than 10s, set reply_timeout to 10s
+	//maybe a new config option for reply_timeout is also fine
+	reply_timeout := t.Config.KeepAlive
+
+	if reply_timeout < 10*time.Second {
+		reply_timeout = 10 * time.Second
+	}
+
 	for {
 		time.Sleep(t.Config.KeepAlive)
-		_, b, err := sshConn.SendRequest("ping", true, nil)
+
+		errChannel := make(chan error, 2)
+
+		timeoutTimer := time.AfterFunc(reply_timeout, func() {
+			errChannel <- errors.New("KEEPALIVE REPLY TIMEOUT ERROR")
+		})
+
+		go func() {
+			_, b, err := sshConn.SendRequest("ping", true, nil)
+
+			ret_err := err
+
+			if err == nil && len(b) > 0 && !bytes.Equal(b, []byte("pong")) {
+				t.Debugf("strange ping response")
+				ret_err = errors.New("strange ping response")
+			}
+
+			errChannel <- ret_err
+		}()
+
+		err := <-errChannel
+
+		// explicitly stop the timer, as it's no longer needed at this point.
+		timeoutTimer.Stop()
+		// errChannel should be garbage collected, as it won't be in use, even on a timeout,
+		// 	as SendRequest will be unblocked on connection closure, the goroutine will send
+		// 	 an error message and finish, therefore releasing the channel.
+
 		if err != nil {
-			break
-		}
-		if len(b) > 0 && !bytes.Equal(b, []byte("pong")) {
-			t.Debugf("strange ping response")
 			break
 		}
 	}
