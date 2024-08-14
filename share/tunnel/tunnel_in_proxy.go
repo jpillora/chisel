@@ -6,8 +6,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/settings"
+	"github.com/OutSystems/chisel/share/cio"
+	"github.com/OutSystems/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
 )

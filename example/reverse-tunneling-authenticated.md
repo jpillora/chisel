@@ -63,7 +63,7 @@ version: '3'
 
 services:
   chisel:
-    image: jpillora/chisel
+    image: OutSystems/chisel
     restart: unless-stopped
     container_name: chisel
     # ⬇️ Pass CLI arguments one at a time in an array, as required by Docker compose.
