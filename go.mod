@@ -1,4 +1,4 @@
-module github.com/OutSystems/chisel
+module github.com/jpillora/chisel
 
 go 1.21
 
@@ -21,3 +21,5 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 )
+
+replace github.com/jpillora/chisel => ../chisel
