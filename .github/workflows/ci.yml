@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         # optionally test/build across multiple platforms/Go-versions
-        go-version: ['1.22'] # '1.16', '1.17', '1.18,
+        go-version: ["1.22"] # '1.16', '1.17', '1.18,
         platform: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -80,6 +80,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
+          context: .
           file: .github/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/386,linux/arm/v7,linux/arm/v6
           push: true
