@@ -423,7 +423,7 @@ Since WebSockets support is required:
 - `1.7` - Added UDP support
 - `1.8` - Move to a `scratch`Docker image
 - `1.9` - Bump to Go 1.21. Switch from `--key` seed to P256 key strings with `--key{gen,file}` (by @cmenginnz)
-- `1.10` - Bump to Go 1.22. Add `.rpm` `.deb` and `.akp` to releases. Fix bad version comparison.
+- `1.10` - Bump to Go 1.22. Add `.rpm` `.deb` and `.apk` to releases. Fix bad version comparison.
 
 ## License
 
