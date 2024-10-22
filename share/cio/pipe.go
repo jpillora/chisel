@@ -6,23 +6,31 @@ import (
 	"sync"
 )
 
+type ReadWriteWriterCloser interface {
+	io.ReadWriteCloser
+	CloseWrite() error
+}
+
 func Pipe(src io.ReadWriteCloser, dst io.ReadWriteCloser) (int64, int64) {
 	var sent, received int64
 	var wg sync.WaitGroup
-	var o sync.Once
-	close := func() {
-		src.Close()
-		dst.Close()
-	}
 	wg.Add(2)
 	go func() {
-		received, _ = io.Copy(src, dst)
-		o.Do(close)
+		received, _ = io.Copy(dst, src)
+		if dst2, ok := dst.(ReadWriteWriterCloser); ok {
+			dst2.CloseWrite()
+		} else {
+			dst.Close()
+		}
 		wg.Done()
 	}()
 	go func() {
-		sent, _ = io.Copy(dst, src)
-		o.Do(close)
+		sent, _ = io.Copy(src, dst)
+		if src2, ok := src.(ReadWriteWriterCloser); ok {
+			src2.CloseWrite()
+		} else {
+			src.Close()
+		}
 		wg.Done()
 	}()
 	wg.Wait()
