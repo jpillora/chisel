@@ -19,7 +19,7 @@ import (
 
 func (c *Client) connectionLoop(ctx context.Context) error {
 	//connection loop!
-	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
+	b := &backoff.Backoff{Max: c.config.MaxRetryInterval, Min: c.config.MinRetryInterval}
 	for {
 		connected, err := c.connectionOnce(ctx)
 		//reset backoff after successful connections
