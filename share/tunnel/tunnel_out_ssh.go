@@ -31,6 +31,9 @@ func (t *Tunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
 }
 
 func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
+	var dst net.Conn
+	var err error
+
 	if !t.Config.Outbound {
 		t.Debugf("Denied outbound connection")
 		ch.Reject(ssh.Prohibited, "Denied outbound connection")
@@ -41,10 +44,20 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	hostPort, proto := settings.L4Proto(remote)
 	udp := proto == "udp"
 	socks := hostPort == "socks"
+	tcp := !(udp || socks)
 	if socks && t.socksServer == nil {
 		t.Debugf("Denied socks request, please enable socks")
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
 		return
+	}
+	if tcp {
+		dst, err = net.Dial("tcp", hostPort)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to connect to %s: %s", hostPort, err)
+			t.Debugf(msg)
+			ch.Reject(ssh.ConnectionFailed, msg)
+			return
+		}
 	}
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
@@ -64,7 +77,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)
 	} else {
-		err = t.handleTCP(l, stream, hostPort)
+		err = t.handleTCP(l, stream, dst)
 	}
 	t.connStats.Close()
 	errmsg := ""
@@ -78,11 +91,9 @@ func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
 }
 
-func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
-	dst, err := net.Dial("tcp", hostPort)
-	if err != nil {
-		return err
-	}
+func (t *Tunnel) handleTCP(l *cio.Logger, src, dst io.ReadWriteCloser) error {
+	// No need to do it in Pipe() when CloseWrite() is used
+	defer dst.Close()
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil
