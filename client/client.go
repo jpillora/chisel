@@ -37,6 +37,7 @@ type Config struct {
 	MaxRetryCount    int
 	MinRetryInterval time.Duration
 	MaxRetryInterval time.Duration
+	RetryJitter      bool
 	Server           string
 	Proxy            string
 	Remotes          []string

@@ -388,6 +388,8 @@ var clientHelp = `
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
+    --retry-jitter, Enable jitter in the retry interval. Defaults to false.
+
     --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
     used to reach the chisel server. Authentication can be specified
     inside the URL.
@@ -432,6 +434,7 @@ func client(args []string) {
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
 	flags.DurationVar(&config.MinRetryInterval, "min-retry-interval", 0, "")
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
+	flags.BoolVar(&config.RetryJitter, "retry-jitter", false, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
