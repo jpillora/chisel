@@ -117,7 +117,7 @@ $ chisel server --help
     (defaults the environment variable HOST and falls back to 0.0.0.0).
 
     --port, -p, Defines the HTTP listening port (defaults to the environment
-    variable PORT and fallsback to port 8080).
+    variable PORT and fallback to port 8080).
 
     --key, (deprecated use --keygen and --keyfile instead)
     An optional string to seed the generation of a ECDSA public
