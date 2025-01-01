@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/valkyrie-io/connector-tunnel/shared"
 	"os"
 	"regexp"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/jpillora/chisel/share/cio"
 )
 
 type Users struct {
@@ -70,13 +70,13 @@ func (u *Users) Reset(users []*User) {
 
 // UserIndex is a reloadable user source
 type UserIndex struct {
-	*cio.Logger
+	*shared.Logger
 	*Users
 	configFile string
 }
 
 // NewUserIndex creates a source for users
-func NewUserIndex(logger *cio.Logger) *UserIndex {
+func NewUserIndex(logger *shared.Logger) *UserIndex {
 	return &UserIndex{
 		Logger: logger.Fork("users"),
 		Users:  NewUsers(),
@@ -111,9 +111,9 @@ func (u *UserIndex) addWatchEvents() error {
 				continue
 			}
 			if err := u.loadUserIndex(); err != nil {
-				u.Infof("Failed to reload the users configuration: %s", err)
+				u.Infof("Failed to reload the users config file: %s", err)
 			} else {
-				u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+				u.Debugf("Users configuration reloaded successfully from: %s", u.configFile)
 			}
 		}
 	}()

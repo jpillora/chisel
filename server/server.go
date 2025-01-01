@@ -8,36 +8,30 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"regexp"
 	"time"
 
 	"github.com/gorilla/websocket"
-	chshare "github.com/jpillora/chisel/share"
-	"github.com/jpillora/chisel/share/ccrypto"
-	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
+	shared "github.com/valkyrie-io/connector-tunnel/shared"
+	"github.com/valkyrie-io/connector-tunnel/shared/cnet"
+	"github.com/valkyrie-io/connector-tunnel/shared/settings"
 	"golang.org/x/crypto/ssh"
 )
 
-// Config is the configuration for the chisel service
-type Config struct {
-	KeySeed   string
+// Options is the configuration for the chisel service
+type Options struct {
 	KeyFile   string
 	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
 	Reverse   bool
+	Proxy     string
 	KeepAlive time.Duration
 	TLS       TLSConfig
 }
 
 // Server respresent a chisel service
 type Server struct {
-	*cio.Logger
-	config       *Config
+	*shared.Logger
+	config       *Options
 	fingerprint  string
 	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
@@ -54,11 +48,11 @@ var upgrader = websocket.Upgrader{
 }
 
 // NewServer creates and returns a new chisel server
-func NewServer(c *Config) (*Server, error) {
+func NewServer(c *Options) (*Server, error) {
 	server := &Server{
 		config:     c,
 		httpServer: cnet.NewHTTPServer(),
-		Logger:     cio.NewLogger("server"),
+		Logger:     shared.NewLogger("server"),
 		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
@@ -68,53 +62,31 @@ func NewServer(c *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	if c.Auth != "" {
-		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
-		u.Name, u.Pass = settings.ParseAuth(c.Auth)
-		if u.Name != "" {
-			server.users.AddUser(u)
-		}
+
+	//create ssh config
+	server.sshConfig = &ssh.ServerConfig{
+		ServerVersion:    "SSH-" + shared.ProtocolVersion + "-server",
+		PasswordCallback: server.authUser,
 	}
 
 	var pemBytes []byte
 	var err error
 	if c.KeyFile != "" {
-		var key []byte
-
-		if ccrypto.IsChiselKey([]byte(c.KeyFile)) {
-			key = []byte(c.KeyFile)
-		} else {
-			key, err = os.ReadFile(c.KeyFile)
-			if err != nil {
-				log.Fatalf("Failed to read key file %s", c.KeyFile)
-			}
-		}
-
-		pemBytes = key
-		if ccrypto.IsChiselKey(key) {
-			pemBytes, err = ccrypto.ChiselKey2PEM(key)
-			if err != nil {
-				log.Fatalf("Invalid key %s", string(key))
-			}
-		}
-	} else {
-		//generate private key (optionally using seed)
-		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
+		pemBytes, err = os.ReadFile(c.KeyFile)
 		if err != nil {
-			log.Fatal("Failed to generate key")
+			log.Fatalf("Failed to read key file %s", c.KeyFile)
 		}
 	}
-
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
 		log.Fatal("Failed to parse key")
 	}
 	//fingerprint this key
-	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
+	server.fingerprint = shared.CalculateFP4Key(private.PublicKey())
 	//create ssh config
 	server.sshConfig = &ssh.ServerConfig{
-		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",
+		ServerVersion:    "SSH-" + shared.ProtocolVersion + "-server",
 		PasswordCallback: server.authUser,
 	}
 	server.sshConfig.AddHostKey(private)
@@ -154,12 +126,7 @@ func (s *Server) Run(host, port string) error {
 
 // Start is responsible for kicking off the http server
 func (s *Server) Start(host, port string) error {
-	return s.StartContext(context.Background(), host, port)
-}
-
-// StartContext is responsible for kicking off the http server,
-// and can be closed by cancelling the provided context
-func (s *Server) StartContext(ctx context.Context, host, port string) error {
+	ctx := context.Background()
 	s.Infof("Fingerprint %s", s.fingerprint)
 	if s.users.Len() > 0 {
 		s.Infof("User authentication enabled")
@@ -212,33 +179,4 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// TODO this should probably have a lock on it given the map isn't thread-safe
 	s.sessions.Set(string(c.SessionID()), user)
 	return nil, nil
-}
-
-// AddUser adds a new user into the server user index
-func (s *Server) AddUser(user, pass string, addrs ...string) error {
-	authorizedAddrs := []*regexp.Regexp{}
-	for _, addr := range addrs {
-		authorizedAddr, err := regexp.Compile(addr)
-		if err != nil {
-			return err
-		}
-		authorizedAddrs = append(authorizedAddrs, authorizedAddr)
-	}
-	s.users.AddUser(&settings.User{
-		Name:  user,
-		Pass:  pass,
-		Addrs: authorizedAddrs,
-	})
-	return nil
-}
-
-// DeleteUser removes a user from the server user index
-func (s *Server) DeleteUser(user string) {
-	s.users.Del(user)
-}
-
-// ResetUsers in the server user index.
-// Use nil to remove all.
-func (s *Server) ResetUsers(users []*settings.User) {
-	s.users.Reset(users)
 }

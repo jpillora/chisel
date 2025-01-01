@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	chshare "github.com/jpillora/chisel/share"
-	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/settings"
-	"github.com/jpillora/chisel/share/tunnel"
+	shared "github.com/valkyrie-io/connector-tunnel/shared"
+	"github.com/valkyrie-io/connector-tunnel/shared/cnet"
+	"github.com/valkyrie-io/connector-tunnel/shared/link"
+	"github.com/valkyrie-io/connector-tunnel/shared/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -20,13 +20,13 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
 	protocol := r.Header.Get("Sec-WebSocket-Protocol")
 	if upgrade == "websocket" {
-		if protocol == chshare.ProtocolVersion {
-			s.handleWebsocket(w, r)
+		if protocol == shared.ProtocolVersion {
+			s.handleWS(w, r)
 			return
 		}
 		//print into server logs and silently fall-through
 		s.Infof("ignored client connection using protocol '%s', expected '%s'",
-			protocol, chshare.ProtocolVersion)
+			protocol, shared.ProtocolVersion)
 	}
 	//proxy target was provided
 	if s.reverseProxy != nil {
@@ -39,7 +39,7 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK\n"))
 		return
 	case "/version":
-		w.Write([]byte(chshare.BuildVersion))
+		w.Write([]byte(shared.BuildVersion))
 		return
 	}
 	//missing :O
@@ -47,8 +47,8 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Not found"))
 }
 
-// handleWebsocket is responsible for handling the websocket connection
-func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
+// handleWS is responsible for handling the websocket connection
+func (s *Server) handleWS(w http.ResponseWriter, req *http.Request) {
 	id := atomic.AddInt32(&s.sessCount, 1)
 	l := s.Fork("session#%d", id)
 	wsConn, err := upgrader.Upgrade(w, req, nil)
@@ -105,7 +105,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	if cv == "" {
 		cv = "<unknown>"
 	}
-	sv := strings.TrimPrefix(chshare.BuildVersion, "v")
+	sv := strings.TrimPrefix(shared.BuildVersion, "v")
 	if cv != sv {
 		l.Infof("Client version (%s) differs from server version (%s)", cv, sv)
 	}
@@ -126,7 +126,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			failed(s.Errorf("Reverse port forwaring not enabled on server"))
 			return
 		}
-		//confirm reverse tunnel is available
+		//confirm reverse link is available
 		if r.Reverse && !r.CanListen() {
 			failed(s.Errorf("Server cannot listen on %s", r.String()))
 			return
@@ -134,18 +134,17 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	//successfuly validated config!
 	r.Reply(true, nil)
-	//tunnel per ssh connection
-	tunnel := tunnel.New(tunnel.Config{
-		Logger:    l,
-		Inbound:   s.config.Reverse,
-		Outbound:  true, //server always accepts outbound
-		Socks:     s.config.Socks5,
-		KeepAlive: s.config.KeepAlive,
+	//link per ssh connection
+	tunnel := link.New(link.Options{
+		Logger:        l,
+		AllowInbound:  s.config.Reverse,
+		AllowOutbound: true, //server always accepts outbound
+		Heartbeat:     s.config.KeepAlive,
 	})
 	//bind
 	eg, ctx := errgroup.WithContext(req.Context())
 	eg.Go(func() error {
-		//connected, handover ssh connection for tunnel to use, and block
+		//connected, handover ssh connection for link to use, and block
 		return tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	})
 	eg.Go(func() error {

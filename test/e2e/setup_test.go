@@ -10,19 +10,17 @@ import (
 	"testing"
 	"time"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	chclient "github.com/valkyrie-io/connector-tunnel/client"
+	chserver "github.com/valkyrie-io/connector-tunnel/server"
 )
 
 const debug = true
 
 // test layout configuration
 type testLayout struct {
-	server     *chserver.Config
+	server     *chserver.Options
 	client     *chclient.Config
 	fileServer bool
-	udpEcho    bool
-	udpServer  bool
 }
 
 func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown func()) {
@@ -61,7 +59,7 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	}
 	server.Debug = debug
 	port := availablePort()
-	if err := server.StartContext(ctx, "127.0.0.1", port); err != nil {
+	if err := server.Start("127.0.0.1", port); err != nil {
 		t.Fatal(err)
 	}
 	go func() {
@@ -70,7 +68,6 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		cancel()
 	}()
 	//client (with defaults)
-	tl.client.Fingerprint = server.GetFingerprint()
 	if tl.server.TLS.Key != "" {
 		//the domain name has to be localhost to match the ssl cert
 		tl.client.Server = "https://localhost:" + port
@@ -118,7 +115,7 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	return server, client, teardown
 }
 
-func simpleSetup(t *testing.T, s *chserver.Config, c *chclient.Config) context.CancelFunc {
+func simpleSetup(t *testing.T, s *chserver.Options, c *chclient.Config) context.CancelFunc {
 	conf := testLayout{
 		server:     s,
 		client:     c,

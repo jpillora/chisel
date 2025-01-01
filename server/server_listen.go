@@ -9,11 +9,11 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/jpillora/chisel/share/settings"
+	"github.com/valkyrie-io/connector-tunnel/shared/settings"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-//TLSConfig enables configures TLS
+// TLSConfig enables configures TLS
 type TLSConfig struct {
 	Key     string
 	Cert    string
@@ -78,7 +78,7 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 				h = u.HomeDir
 			}
 		}
-		c = filepath.Join(h, ".cache", "chisel")
+		c = filepath.Join(h, ".cache", "valkyrie")
 	}
 	if c != "-" {
 		s.Infof("LetsEncrypt cache directory %s", c)
