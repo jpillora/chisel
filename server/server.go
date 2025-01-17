@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	chshare "github.com/jpillora/chisel/share"
-	"github.com/jpillora/chisel/share/ccrypto"
-	"github.com/jpillora/chisel/share/cio"
-	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
+	chshare "github.com/valkyrie-io/connector-tunnel/share"
+	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/share/cio"
+	"github.com/valkyrie-io/connector-tunnel/share/cnet"
+	"github.com/valkyrie-io/connector-tunnel/share/settings"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -81,7 +81,7 @@ func NewServer(c *Config) (*Server, error) {
 	if c.KeyFile != "" {
 		var key []byte
 
-		if ccrypto.IsChiselKey([]byte(c.KeyFile)) {
+		if ccrypto.IsValkyrieKey([]byte(c.KeyFile)) {
 			key = []byte(c.KeyFile)
 		} else {
 			key, err = os.ReadFile(c.KeyFile)
@@ -91,8 +91,8 @@ func NewServer(c *Config) (*Server, error) {
 		}
 
 		pemBytes = key
-		if ccrypto.IsChiselKey(key) {
-			pemBytes, err = ccrypto.ChiselKey2PEM(key)
+		if ccrypto.IsValkyrieKey(key) {
+			pemBytes, err = ccrypto.ValkyrieKey2PEM(key)
 			if err != nil {
 				log.Fatalf("Invalid key %s", string(key))
 			}

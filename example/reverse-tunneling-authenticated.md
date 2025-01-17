@@ -14,7 +14,7 @@ Setup a relay server on the VPS to bounce down TCP traffic on port 80:
 #!/bin/bash
 
 # ⬇️ Start Chisel server in Reverse mode
-chisel server --reverse \
+valkyrie server --reverse \
 
 # ⬇️ Use the include users.json as an authfile
 --authfile="./users.json" \
@@ -30,17 +30,17 @@ The corresponding `authfile` might look like this:
 
 ### Client
 
-Setup a chisel client to receive bounced-down traffic and forward it to the webserver running on the Pi:
+Setup a valkyrie client to receive bounced-down traffic and forward it to the webserver running on the Pi:
 
 ```bash
 #!/bin/bash
 
-chisel client \
+valkyrie client \
 
 # ⬇️ Authenticates user "foo" with password "bar"
 --auth="foo:bar" \
 
-# ⬇️ Connects to chisel relay server example.com
+# ⬇️ Connects to valkyrie relay server example.com
 # listening on the default ("fallback") port, 8080
 example.com \
 
@@ -62,10 +62,10 @@ Setup a relay server on the VPS to bounce down TCP traffic on port 80:
 version: '3'
 
 services:
-  chisel:
-    image: jpillora/chisel
+  valkyrie:
+    image: valkyrie-io/connector-tunnel
     restart: unless-stopped
-    container_name: chisel
+    container_name: valkyrie
     # ⬇️ Pass CLI arguments one at a time in an array, as required by Docker compose.
     command:
       - 'server'
@@ -95,20 +95,20 @@ Setup an instance of the Chisel client on the Pi to receive relayed TCP traffic 
 version: '3'
 
 services:
-  chisel:
+  valkyrie:
     # ⬇️ Delay starting Chisel server until the web server container is started.
     depends_on:
       - webserver
-    image: jpillora/chisel
+    image: valkyrie-io/connector-tunnel
     restart: unless-stopped
-    container_name: 'chisel'
+    container_name: 'valkyrie'
     command:
       - 'client'
       # ⬇️ Use username `foo` and password `bar` to authenticate with Chisel server.
       - '--auth=foo:bar'
       # ⬇️ Domain & port of Chisel server. Port defaults to 8080 on server, but must be manually set on client.
       - 'proxy.example.com:8080'
-      # ⬇️ Reverse tunnel traffic from the chisel server to the web server container, identified in Docker using DNS by its service name `webserver`.
+      # ⬇️ Reverse tunnel traffic from the valkyrie server to the web server container, identified in Docker using DNS by its service name `webserver`.
       - 'R:80:webserver:80'
     networks:
       - internal

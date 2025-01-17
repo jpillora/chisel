@@ -7,29 +7,28 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
-	chshare "github.com/jpillora/chisel/share"
-	"github.com/jpillora/chisel/share/ccrypto"
-	"github.com/jpillora/chisel/share/cos"
-	"github.com/jpillora/chisel/share/settings"
+	chclient "github.com/valkyrie-io/connector-tunnel/client"
+	chserver "github.com/valkyrie-io/connector-tunnel/server"
+	chshare "github.com/valkyrie-io/connector-tunnel/share"
+	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/share/cos"
+	"github.com/valkyrie-io/connector-tunnel/share/settings"
 )
 
 var help = `
-  Usage: chisel [command] [--help]
+  Usage: valkyrie [command] [--help]
 
   Version: ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
 
   Commands:
-    server - runs chisel in server mode
-    client - runs chisel in client mode
+    server - runs valkyrie in server mode
+    client - runs valkyrie in client mode
 
   Read more:
-    https://github.com/jpillora/chisel
+    https://github.com/valkyrie-io/connector-tunnel
 
 `
 
@@ -67,34 +66,21 @@ func main() {
 }
 
 var commonHelp = `
-    --pid Generate pid file in current working directory
-
     -v, Enable verbose logging
 
     --help, This help text
 
   Signals:
-    The chisel process is listening for:
+    The valkyrie process is listening for:
       a SIGUSR2 to print process stats, and
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
     ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
-
-  Read more:
-    https://github.com/jpillora/chisel
-
 `
 
-func generatePidFile() {
-	pid := []byte(strconv.Itoa(os.Getpid()))
-	if err := os.WriteFile("chisel.pid", pid, 0644); err != nil {
-		log.Fatal(err)
-	}
-}
-
 var serverHelp = `
-  Usage: chisel server [options]
+  Usage: valkyrie server [options]
 
   Options:
 
@@ -108,7 +94,7 @@ var serverHelp = `
     An optional string to seed the generation of a ECDSA public
     and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
-    of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
+    of man-in-the-middle attacks (defaults to the VALKYRIE_KEY environment
     variable, otherwise a new key is generate each run).
 
     --keygen, A path to write a newly generated PEM-encoded SSH private key file.
@@ -117,9 +103,9 @@ var serverHelp = `
 
     --keyfile, An optional path to a PEM-encoded SSH private key. When
     this flag is set, the --key option is ignored, and the provided private key
-    is used to secure all communications. (defaults to the CHISEL_KEY_FILE
+    is used to secure all communications. (defaults to the VALKYRIE_KEY_FILE
     environment variable). Since ECDSA keys are short, you may also set keyfile
-    to an inline base64 private key (e.g. chisel server --keygen - | base64).
+    to an inline base64 private key (e.g. valkyrie server --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -145,11 +131,11 @@ var serverHelp = `
     to '25s' (set to 0s to disable).
 
     --backend, Specifies another HTTP server to proxy requests to when
-    chisel receives a normal HTTP request. Useful for hiding chisel in
+    valkyrie receives a normal HTTP request. Useful for hiding valkyrie in
     plain sight.
 
     --socks5, Allow clients to access the internal SOCKS5 proxy. See
-    chisel client --help for more information.
+    valkyrie client --help for more information.
 
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
@@ -165,10 +151,10 @@ var serverHelp = `
     --tls-domain, Enables TLS and automatically acquires a TLS key and
     certificate using LetsEncrypt. Setting --tls-domain requires port 443.
     You may specify multiple --tls-domain flags to serve multiple domains.
-    The resulting files are cached in the "$HOME/.cache/chisel" directory.
-    You can modify this path by setting the CHISEL_LE_CACHE variable,
+    The resulting files are cached in the "$HOME/.cache/valkyrie" directory.
+    You can modify this path by setting the VALKYRIE_LE_CACHE variable,
     or disable caching by setting this variable to "-". You can optionally
-    provide a certificate notification email by setting CHISEL_LE_EMAIL.
+    provide a certificate notification email by setting VALKYRIE_LE_EMAIL.
 
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
     holding multiple PEM encode CA certificate bundle files, which is used to 
@@ -198,7 +184,6 @@ func server(args []string) {
 	host := flags.String("host", "", "")
 	p := flags.String("p", "", "")
 	port := flags.String("port", "", "")
-	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	keyGen := flags.String("keygen", "", "")
 
@@ -216,8 +201,8 @@ func server(args []string) {
 	}
 
 	if config.KeySeed != "" {
-		log.Print("Option `--key` is deprecated and will be removed in a future version of chisel.")
-		log.Print("Please use `chisel server --keygen /file/path`, followed by `chisel server --keyfile /file/path` to specify the SSH private key")
+		log.Print("Option `--key` is deprecated and will be removed in a future version of valkyrie.")
+		log.Print("Please use `valkyrie server --keygen /file/path`, followed by `valkyrie server --keyfile /file/path` to specify the SSH private key")
 	}
 
 	if *host == "" {
@@ -248,9 +233,7 @@ func server(args []string) {
 		log.Fatal(err)
 	}
 	s.Debug = *verbose
-	if *pid {
-		generatePidFile()
-	}
+
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
 	if err := s.StartContext(ctx, *host, *port); err != nil {
@@ -301,9 +284,9 @@ func (flag *headerFlags) Set(arg string) error {
 }
 
 var clientHelp = `
-  Usage: chisel client [options] <server> <remote> [remote] [remote] ...
+  Usage: valkyrie client [options] <server> <remote> [remote] [remote] ...
 
-  <server> is the URL to the chisel server.
+  <server> is the URL to the valkyrie server.
 
   <remote>s are remote connections tunneled through the server, each of
   which come in the form:
@@ -338,13 +321,13 @@ var clientHelp = `
       stdio:example.com:22
       1.1.1.1:53/udp
 
-    When the chisel server has --socks5 enabled, remotes can
+    When the valkyrie server has --socks5 enabled, remotes can
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy.
 
-    When the chisel server has --reverse enabled, remotes can
+    When the valkyrie server has --reverse enabled, remotes can
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
@@ -355,7 +338,7 @@ var clientHelp = `
     When stdio is used as local-host, the tunnel will connect standard
     input/output of this program with the remote. This is useful when 
     combined with ssh ProxyCommand. You can use
-      ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
+      ssh -o ProxyCommand='valkyrie client valkyrieserver stdio:%h:%p' \
           user@example.com
     to connect to an SSH server through the tunnel.
 
@@ -386,7 +369,7 @@ var clientHelp = `
     disconnection. Defaults to 5 minutes.
 
     --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
-    used to reach the chisel server. Authentication can be specified
+    used to reach the valkyrie server. Authentication can be specified
     inside the URL.
     For example, http://admin:password@my-server.com:8081
             or: socks://admin:password@my-server.com:1080
@@ -401,14 +384,14 @@ var clientHelp = `
     hostname).
 
     --tls-ca, An optional root certificate bundle used to verify the
-    chisel server. Only valid when connecting to the server with
+    valkyrie server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
 
     --tls-skip-verify, Skip server TLS certificate verification of
     chain and host name (if TLS is used for transport connections to
     server). If set, client accepts any TLS certificate presented by
     the server and any host name in that certificate. This only affects
-    transport https (wss) connection. Chisel server's public key
+    transport https (wss) connection. Valkyrie server's public key
     may be still verified (see --fingerprint) after inner connection
     is established.
 
@@ -436,7 +419,6 @@ func client(args []string) {
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	sni := flags.String("sni", "", "")
-	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
@@ -470,9 +452,6 @@ func client(args []string) {
 		log.Fatal(err)
 	}
 	c.Debug = *verbose
-	if *pid {
-		generatePidFile()
-	}
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
 	if err := c.Start(ctx); err != nil {

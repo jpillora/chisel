@@ -17,8 +17,8 @@ import (
 	"path"
 	"time"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	chclient "github.com/valkyrie-io/connector-tunnel/client"
+	chserver "github.com/valkyrie-io/connector-tunnel/server"
 )
 
 type tlsConfig struct {
@@ -186,7 +186,7 @@ func certGetCertificate(c *certConfig) (*x509.Certificate, []byte, []byte, error
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			OrganizationalUnit: []string{"test"},
-			Organization:       []string{"Chisel"},
+			Organization:       []string{"Valkyrie"},
 			Country:            []string{"us"},
 			Province:           []string{"ma"},
 			Locality:           []string{"Boston"},

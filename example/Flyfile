@@ -1,2 +1,2 @@
-FROM jpillora/chisel
-ENTRYPOINT ["/app/bin", "server", "--port", "443", "--tls-domain", "chisel.jpillora.com"]
+FROM valkyrie-io/connector-tunnel
+ENTRYPOINT ["/app/bin", "server", "--port", "443", "--tls-domain", "valkyrie.jpillora.com"]

@@ -8,7 +8,7 @@ In this simple benchmark, we have:
 ```
 					(direct)
         .--------------->----------------.
-       /    chisel         chisel         \
+       /    valkyrie         valkyrie         \
 request--->client:2001--->server:2002---->fileserver:3000
        \                                  /
         '--> crowbar:4001--->crowbar:4002'
@@ -31,7 +31,7 @@ _direct_
 :3000 => 100000000 bytes in 76.3939ms
 ```
 
-`chisel`
+`valkyrie`
 
 ```
 :2001 => 1 bytes in 1.351976ms

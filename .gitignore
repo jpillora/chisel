@@ -1,7 +1,7 @@
 dist/
 *.swp
 .idea/
-chisel
+valkyrie
 bin/
 release/
 tmp/
