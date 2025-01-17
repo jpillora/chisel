@@ -1,4 +1,4 @@
-package client
+package chclient
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	chshare "github.com/valkyrie-io/connector-tunnel/shared"
-	"github.com/valkyrie-io/connector-tunnel/shared/cnet"
-	"github.com/valkyrie-io/connector-tunnel/shared/cos"
-	"github.com/valkyrie-io/connector-tunnel/shared/settings"
+	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -126,7 +126,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		return false, errors.New(string(configerr))
 	}
 	c.Infof("Connected (Latency %s)", time.Since(t0))
-	//connected, handover ssh connection for link to use, and block
+	//connected, handover ssh connection for tunnel to use, and block
 	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	c.Infof("Disconnected")
 	connected = time.Since(t0) > 5*time.Second

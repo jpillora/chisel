@@ -24,7 +24,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/valkyrie-io/connector-tunnel/shared/cnet"
+	"github.com/jpillora/chisel/share/cnet"
 
 	"time"
 )
@@ -175,7 +175,7 @@ func main() {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hd := exec.Command("valkyrie", "server",
+	hd := exec.Command("chisel", "server",
 		// "-v",
 		"--key", "foobar",
 		"--port", "2002")
@@ -187,7 +187,7 @@ func main() {
 
 	time.Sleep(100 * time.Millisecond)
 
-	hf := exec.Command("valkyrie", "client",
+	hf := exec.Command("chisel", "client",
 		// "-v",
 		"--fingerprint", "mOz4rg9zlQ409XAhhj6+fDDVwQMY42CL3Zg2W2oTYxA=",
 		"127.0.0.1:2002",

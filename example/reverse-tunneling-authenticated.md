@@ -108,7 +108,7 @@ services:
       - '--auth=foo:bar'
       # ⬇️ Domain & port of Chisel server. Port defaults to 8080 on server, but must be manually set on client.
       - 'proxy.example.com:8080'
-      # ⬇️ Reverse link traffic from the chisel server to the web server container, identified in Docker using DNS by its service name `webserver`.
+      # ⬇️ Reverse tunnel traffic from the chisel server to the web server container, identified in Docker using DNS by its service name `webserver`.
       - 'R:80:webserver:80'
     networks:
       - internal

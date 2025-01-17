@@ -9,7 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/valkyrie-io/connector-tunnel/shared/settings"
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -78,7 +78,7 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 				h = u.HomeDir
 			}
 		}
-		c = filepath.Join(h, ".cache", "valkyrie")
+		c = filepath.Join(h, ".cache", "chisel")
 	}
 	if c != "-" {
 		s.Infof("LetsEncrypt cache directory %s", c)

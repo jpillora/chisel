@@ -1,4 +1,4 @@
-package client
+package chclient
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,12 +17,15 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	shared "github.com/valkyrie-io/connector-tunnel/shared"
-	"github.com/valkyrie-io/connector-tunnel/shared/cnet"
-	"github.com/valkyrie-io/connector-tunnel/shared/link"
-	"github.com/valkyrie-io/connector-tunnel/shared/settings"
+	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/ccrypto"
+	"github.com/jpillora/chisel/share/cio"
+	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/chisel/share/tunnel"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,19 +33,21 @@ import (
 type Config struct {
 	Fingerprint      string
 	Auth             string
-	Server           string
 	KeepAlive        time.Duration
-	MaxRetryInterval time.Duration
-	Remotes          []string
 	MaxRetryCount    int
+	MaxRetryInterval time.Duration
+	Server           string
+	Proxy            string
+	Remotes          []string
 	Headers          http.Header
-	Verbose          bool
-	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
 	TLS              TLSConfig
+	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Verbose          bool
 }
 
 // TLSConfig for a Client
 type TLSConfig struct {
+	SkipVerify bool
 	CA         string
 	Cert       string
 	Key        string
@@ -50,7 +56,7 @@ type TLSConfig struct {
 
 // Client represents a client instance
 type Client struct {
-	*shared.Logger
+	*cio.Logger
 	config    *Config
 	computed  settings.Config
 	sshConfig *ssh.ClientConfig
@@ -60,7 +66,7 @@ type Client struct {
 	connCount cnet.ConnCount
 	stop      func()
 	eg        *errgroup.Group
-	tunnel    *link.Link
+	tunnel    *tunnel.Tunnel
 }
 
 // NewClient creates a new client instance
@@ -87,11 +93,13 @@ func NewClient(c *Config) (*Client, error) {
 		}
 	}
 	hasReverse := false
+	hasSocks := false
+	hasStdio := false
 	client := &Client{
-		Logger: shared.NewLogger("client"),
+		Logger: cio.NewLogger("client"),
 		config: c,
 		computed: settings.Config{
-			Version: shared.BuildVersion,
+			Version: chshare.BuildVersion,
 		},
 		server:    u.String(),
 		tlsConfig: nil,
@@ -105,7 +113,10 @@ func NewClient(c *Config) (*Client, error) {
 			tc.ServerName = c.TLS.ServerName
 		}
 		//certificate verification config
-		if c.TLS.CA != "" {
+		if c.TLS.SkipVerify {
+			client.Infof("TLS verification disabled")
+			tc.InsecureSkipVerify = true
+		} else if c.TLS.CA != "" {
 			rootCAs := x509.NewCertPool()
 			if b, err := os.ReadFile(c.TLS.CA); err != nil {
 				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
@@ -134,30 +145,47 @@ func NewClient(c *Config) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
+		if r.Socks {
+			hasSocks = true
+		}
 		if r.Reverse {
 			hasReverse = true
 		}
-		//confirm non-reverse link is available
-		if !r.Reverse && !r.CanListen() {
+		if r.Stdio {
+			if hasStdio {
+				return nil, errors.New("Only one stdio is allowed")
+			}
+			hasStdio = true
+		}
+		//confirm non-reverse tunnel is available
+		if !r.Reverse && !r.Stdio && !r.CanListen() {
 			return nil, fmt.Errorf("Client cannot listen on %s", r.String())
 		}
 		client.computed.Remotes = append(client.computed.Remotes, r)
+	}
+	//outbound proxy
+	if p := c.Proxy; p != "" {
+		client.proxyURL, err = url.Parse(p)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
+		}
 	}
 	//ssh auth and config
 	user, pass := settings.ParseAuth(c.Auth)
 	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},
-		ClientVersion:   "SSH-" + shared.ProtocolVersion + "-client",
+		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
-	//prepare client link
-	client.tunnel = link.New(link.Options{
-		Logger:        client.Logger,
-		AllowInbound:  true, //client always accepts inbound
-		AllowOutbound: hasReverse,
-		Heartbeat:     client.config.KeepAlive,
+	//prepare client tunnel
+	client.tunnel = tunnel.New(tunnel.Config{
+		Logger:    client.Logger,
+		Inbound:   true, //client always accepts inbound
+		Outbound:  hasReverse,
+		Socks:     hasReverse && hasSocks,
+		KeepAlive: client.config.KeepAlive,
 	})
 	return client, nil
 }
@@ -177,7 +205,7 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	if expect == "" {
 		return nil
 	}
-	got := shared.CalculateFP4Key(key)
+	got := ccrypto.FingerprintKey(key)
 	_, err := base64.StdEncoding.DecodeString(expect)
 	if _, ok := err.(base64.CorruptInputError); ok {
 		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)
@@ -235,9 +263,33 @@ func (c *Client) Start(ctx context.Context) error {
 }
 
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
-	d.Proxy = func(*http.Request) (*url.URL, error) {
-		return u, nil
+	// CONNECT proxy
+	if !strings.HasPrefix(u.Scheme, "socks") {
+		d.Proxy = func(*http.Request) (*url.URL, error) {
+			return u, nil
+		}
+		return nil
 	}
+	// SOCKS5 proxy
+	if u.Scheme != "socks" && u.Scheme != "socks5h" {
+		return fmt.Errorf(
+			"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+			u.Scheme,
+		)
+	}
+	var auth *proxy.Auth
+	if u.User != nil {
+		pass, _ := u.User.Password()
+		auth = &proxy.Auth{
+			User:     u.User.Username(),
+			Password: pass,
+		}
+	}
+	socksDialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
+	if err != nil {
+		return err
+	}
+	d.NetDial = socksDialer.Dial
 	return nil
 }
 
