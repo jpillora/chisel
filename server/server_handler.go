@@ -139,7 +139,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		Logger:    l,
 		Inbound:   s.config.Reverse,
 		Outbound:  true, //server always accepts outbound
-		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	})
 	//bind

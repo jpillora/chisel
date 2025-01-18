@@ -35,7 +35,7 @@ import (
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Socks, Reverse, Stdio               bool
+	Reverse, Stdio                      bool
 }
 
 const revPrefix = "R:"
@@ -56,11 +56,6 @@ func DecodeRemote(s string) (*Remote, error) {
 	//to provide the defaults)
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i][1]
-		//remote portion is socks?
-		if i == len(parts)-1 && p == "socks" {
-			r.Socks = true
-			continue
-		}
 		//local portion is stdio?
 		if i == 0 && p == "stdio" {
 			r.Stdio = true
@@ -74,42 +69,24 @@ func DecodeRemote(s string) (*Remote, error) {
 				r.LocalProto = proto
 			}
 		}
-		if isPort(p) {
-			if !r.Socks && r.RemotePort == "" {
-				r.RemotePort = p
-			}
-			r.LocalPort = p
-			continue
-		}
-		if !r.Socks && (r.RemotePort == "" && r.LocalPort == "") {
+		if r.RemotePort == "" && r.LocalPort == "" {
 			return nil, errors.New("Missing ports")
 		}
 		if !isHost(p) {
 			return nil, errors.New("Invalid host")
 		}
-		if !r.Socks && r.RemoteHost == "" {
+		if r.RemoteHost == "" {
 			r.RemoteHost = p
 		} else {
 			r.LocalHost = p
 		}
 	}
 	//remote string parsed, apply defaults...
-	if r.Socks {
-		//socks defaults
-		if r.LocalHost == "" {
-			r.LocalHost = "127.0.0.1"
-		}
-		if r.LocalPort == "" {
-			r.LocalPort = "1080"
-		}
-	} else {
-		//non-socks defaults
-		if r.LocalHost == "" {
-			r.LocalHost = "0.0.0.0"
-		}
-		if r.RemoteHost == "" {
-			r.RemoteHost = "127.0.0.1"
-		}
+	if r.LocalHost == "" {
+		r.LocalHost = "0.0.0.0"
+	}
+	if r.RemoteHost == "" {
+		r.RemoteHost = "127.0.0.1"
 	}
 	if r.RemoteProto == "" {
 		r.RemoteProto = "tcp"
@@ -122,9 +99,6 @@ func DecodeRemote(s string) (*Remote, error) {
 		//tcp <-> udp, is faily straight forward
 		//udp <-> tcp, is trickier since udp is stateless and tcp is not
 		return nil, errors.New("cross-protocol remotes are not supported yet")
-	}
-	if r.Socks && r.RemoteProto != "tcp" {
-		return nil, errors.New("only TCP SOCKS is supported")
 	}
 	if r.Stdio && r.Reverse {
 		return nil, errors.New("stdio cannot be reversed")
@@ -206,9 +180,6 @@ func (r Remote) Local() string {
 
 // Remote is the decodable remote portion
 func (r Remote) Remote() string {
-	if r.Socks {
-		return "socks"
-	}
 	if r.RemoteHost == "" {
 		r.RemoteHost = "127.0.0.1"
 	}

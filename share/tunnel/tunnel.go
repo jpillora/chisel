@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/armon/go-socks5"
-	"io"
-	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -23,7 +19,6 @@ type Config struct {
 	*cio.Logger
 	Inbound   bool
 	Outbound  bool
-	Socks     bool
 	KeepAlive time.Duration
 }
 
@@ -43,8 +38,7 @@ type Tunnel struct {
 	//proxies
 	proxyCount int
 	//internals
-	connStats   cnet.ConnCount
-	socksServer *socks5.Server
+	connStats cnet.ConnCount
 }
 
 // New Tunnel from the given Config
@@ -54,17 +48,6 @@ func New(c Config) *Tunnel {
 		Config: c,
 	}
 	t.activatingConn.Add(1)
-	//setup socks server (not listening on any port!)
-	extra := ""
-	if c.Socks {
-		sl := log.New(io.Discard, "", 0)
-		if t.Logger.Debug {
-			sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
-		}
-		t.socksServer, _ = socks5.New(&socks5.Config{Logger: sl})
-		extra += " (SOCKS enabled)"
-	}
-	t.Debugf("Created%s", extra)
 	return t
 }
 

@@ -50,24 +50,6 @@ func TestRemoteDecode(t *testing.T) {
 			"0.0.0.0:80:示例網站.com:80",
 		},
 		{
-			"socks",
-			Remote{
-				LocalHost: "127.0.0.1",
-				LocalPort: "1080",
-				Socks:     true,
-			},
-			"127.0.0.1:1080:socks",
-		},
-		{
-			"127.0.0.1:1081:socks",
-			Remote{
-				LocalHost: "127.0.0.1",
-				LocalPort: "1081",
-				Socks:     true,
-			},
-			"127.0.0.1:1081:socks",
-		},
-		{
 			"1.1.1.1:53/udp",
 			Remote{
 				LocalPort:   "53",

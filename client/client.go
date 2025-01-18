@@ -25,7 +25,6 @@ import (
 	"github.com/valkyrie-io/connector-tunnel/share/tunnel"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -93,7 +92,6 @@ func NewClient(c *Config) (*Client, error) {
 		}
 	}
 	hasReverse := false
-	hasSocks := false
 	hasStdio := false
 	client := &Client{
 		Logger: cio.NewLogger("client"),
@@ -145,9 +143,6 @@ func NewClient(c *Config) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
 		}
-		if r.Socks {
-			hasSocks = true
-		}
 		if r.Reverse {
 			hasReverse = true
 		}
@@ -184,7 +179,6 @@ func NewClient(c *Config) (*Client, error) {
 		Logger:    client.Logger,
 		Inbound:   true, //client always accepts inbound
 		Outbound:  hasReverse,
-		Socks:     hasReverse && hasSocks,
 		KeepAlive: client.config.KeepAlive,
 	})
 	return client, nil
@@ -264,32 +258,9 @@ func (c *Client) Start(ctx context.Context) error {
 
 func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	// CONNECT proxy
-	if !strings.HasPrefix(u.Scheme, "socks") {
-		d.Proxy = func(*http.Request) (*url.URL, error) {
-			return u, nil
-		}
-		return nil
+	d.Proxy = func(*http.Request) (*url.URL, error) {
+		return u, nil
 	}
-	// SOCKS5 proxy
-	if u.Scheme != "socks" && u.Scheme != "socks5h" {
-		return fmt.Errorf(
-			"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
-			u.Scheme,
-		)
-	}
-	var auth *proxy.Auth
-	if u.User != nil {
-		pass, _ := u.User.Password()
-		auth = &proxy.Auth{
-			User:     u.User.Username(),
-			Password: pass,
-		}
-	}
-	socksDialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
-	if err != nil {
-		return err
-	}
-	d.NetDial = socksDialer.Dial
 	return nil
 }
 
