@@ -69,6 +69,13 @@ func DecodeRemote(s string) (*Remote, error) {
 				r.LocalProto = proto
 			}
 		}
+		if isPort(p) {
+			if r.RemotePort == "" {
+				r.RemotePort = p
+			}
+			r.LocalPort = p
+			continue
+		}
 		if r.RemotePort == "" && r.LocalPort == "" {
 			return nil, errors.New("Missing ports")
 		}
