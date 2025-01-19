@@ -169,7 +169,6 @@ func server(args []string) {
 	flags.BoolVar(&config.Reverse, "reverse", false, "")                  // Used by Valkyrie
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                   // Used by Valkyrie
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                 // Used by Valkyrie
-	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")           // Not used but check if needed
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted
 
 	host := flags.String("host", "", "")  // Used by Valkyrie
@@ -215,19 +214,6 @@ func server(args []string) {
 	if err := s.Wait(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-type multiFlag struct {
-	values *[]string
-}
-
-func (flag multiFlag) String() string {
-	return strings.Join(*flag.values, ", ")
-}
-
-func (flag multiFlag) Set(arg string) error {
-	*flag.values = append(*flag.values, arg)
-	return nil
 }
 
 type headerFlags struct {

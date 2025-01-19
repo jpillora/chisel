@@ -22,15 +22,8 @@ type TLSConfig struct {
 }
 
 func (s *Server) listener(host, port string) (net.Listener, error) {
-	hasDomains := len(s.config.TLS.Domains) > 0
 	hasKeyCert := s.config.TLS.Key != "" && s.config.TLS.Cert != ""
-	if hasDomains && hasKeyCert {
-		return nil, errors.New("cannot use key/cert and domains")
-	}
 	var tlsConf *tls.Config
-	if hasDomains {
-		tlsConf = s.tlsLetsEncrypt(s.config.TLS.Domains)
-	}
 	extra := ""
 	if hasKeyCert {
 		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert, s.config.TLS.CA)
@@ -38,7 +31,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 			return nil, err
 		}
 		tlsConf = c
-		if port != "443" && hasDomains {
+		if port != "443" {
 			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
 		}
 	}
