@@ -164,24 +164,24 @@ func server(args []string) {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	config := &chserver.Config{}
-	flags.StringVar(&config.KeySeed, "key", "", "")
-	flags.StringVar(&config.KeyFile, "keyfile", "", "")
-	flags.StringVar(&config.AuthFile, "authfile", "", "")
-	flags.StringVar(&config.Auth, "auth", "", "")
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
-	flags.StringVar(&config.Proxy, "proxy", "", "")
-	flags.StringVar(&config.Proxy, "backend", "", "")
-	flags.BoolVar(&config.Reverse, "reverse", false, "")
-	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
-	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
-	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
+	flags.StringVar(&config.KeySeed, "key", "", "")                       // Can be deleted
+	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Can be deleted
+	flags.StringVar(&config.AuthFile, "authfile", "", "")                 // Used by Valkyrie
+	flags.StringVar(&config.Auth, "auth", "", "")                         // Can be deleted
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "") // Check if can remove
+	flags.StringVar(&config.Proxy, "proxy", "", "")                       // Check if can be removed
+	flags.StringVar(&config.Proxy, "backend", "", "")                     // Can be removed
+	flags.BoolVar(&config.Reverse, "reverse", false, "")                  // Used by Valkyrie
+	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                   // Used by Valkyrie
+	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                 // Used by Valkyrie
+	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")           // Not used but check if needed
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted
 
-	host := flags.String("host", "", "")
-	p := flags.String("p", "", "")
-	port := flags.String("port", "", "")
-	verbose := flags.Bool("v", false, "")
-	keyGen := flags.String("keygen", "", "")
+	host := flags.String("host", "", "")     // Used by Valkyrie
+	p := flags.String("p", "", "")           // Used by Valkyrie
+	port := flags.String("port", "", "")     // Used by Valkyrie
+	verbose := flags.Bool("v", false, "")    // Used by Valkyrie
+	keyGen := flags.String("keygen", "", "") // Should be used by Valkyrie
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
@@ -377,22 +377,22 @@ var clientHelp = `
 ` + commonHelp
 
 func client(args []string) {
-	flags := flag.NewFlagSet("client", flag.ContinueOnError)
+	flags := flag.NewFlagSet("client", flag.ContinueOnError) // Used by Valkyrie
 	config := chclient.Config{Headers: http.Header{}}
-	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
-	flags.StringVar(&config.Auth, "auth", "", "")
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
-	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
-	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
-	flags.StringVar(&config.Proxy, "proxy", "", "")
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
-	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
-	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
-	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
-	flags.Var(&headerFlags{config.Headers}, "header", "")
-	hostname := flags.String("hostname", "", "")
-	sni := flags.String("sni", "", "")
-	verbose := flags.Bool("v", false, "")
+	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Validate if not needed by Valkyrie
+	flags.StringVar(&config.Auth, "auth", "", "")                            // Used by Valkyrie
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Not used but let's keep (alive)
+	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")           // Not used but let's keep
+	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
+	flags.StringVar(&config.Proxy, "proxy", "", "")                          // Not in use
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Optional but not really needed
+	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")      // Delete ASAP
+	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                    // Will not be used
+	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                      // Will not be used
+	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
+	hostname := flags.String("hostname", "", "")                             // Can be removed
+	sni := flags.String("sni", "", "")                                       // Can be deleted
+	verbose := flags.Bool("v", false, "")                                    // Used by Valkyrie
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(0)

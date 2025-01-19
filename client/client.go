@@ -30,7 +30,7 @@ import (
 // Config represents a client configuration
 type Config struct {
 	Fingerprint      string
-	Auth             string
+	Auth             string // Used by Valkyrie
 	KeepAlive        time.Duration
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration

@@ -2,7 +2,6 @@ package cio
 
 import (
 	"io"
-	"log"
 	"sync"
 )
 
@@ -27,22 +26,4 @@ func Pipe(src io.ReadWriteCloser, dst io.ReadWriteCloser) (int64, int64) {
 	}()
 	wg.Wait()
 	return sent, received
-}
-
-const vis = false
-
-type pipeVisPrinter struct {
-	name string
-}
-
-func (p pipeVisPrinter) Write(b []byte) (int, error) {
-	log.Printf(">>> %s: %x", p.name, b)
-	return len(b), nil
-}
-
-func pipeVis(name string, r io.Reader) io.Reader {
-	if vis {
-		return io.TeeReader(r, pipeVisPrinter{name})
-	}
-	return r
 }
