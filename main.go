@@ -165,9 +165,7 @@ func server(args []string) {
 	config := &chserver.Config{}
 	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Should be used for Secure SSH and FP
 	flags.StringVar(&config.AuthFile, "authfile", "", "")                 // Used by Valkyrie
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "") // Check if can remove
-	flags.StringVar(&config.Proxy, "proxy", "", "")                       // Check if can be removed
-	flags.StringVar(&config.Proxy, "backend", "", "")                     // Can be removed
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "") // Should use explicitly to our desired window
 	flags.BoolVar(&config.Reverse, "reverse", false, "")                  // Used by Valkyrie
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                   // Used by Valkyrie
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                 // Used by Valkyrie
