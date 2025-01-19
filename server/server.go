@@ -25,7 +25,6 @@ import (
 type Config struct {
 	KeyFile   string
 	AuthFile  string
-	Auth      string
 	Proxy     string
 	Reverse   bool
 	KeepAlive time.Duration
@@ -64,13 +63,6 @@ func NewServer(c *Config) (*Server, error) {
 	if c.AuthFile != "" {
 		if err := server.users.LoadUsers(c.AuthFile); err != nil {
 			return nil, err
-		}
-	}
-	if c.Auth != "" {
-		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
-		u.Name, u.Pass = settings.ParseAuth(c.Auth)
-		if u.Name != "" {
-			server.users.AddUser(u)
 		}
 	}
 

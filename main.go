@@ -163,9 +163,8 @@ func server(args []string) {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	config := &chserver.Config{}
-	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Can be deleted
+	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Should be used for Secure SSH and FP
 	flags.StringVar(&config.AuthFile, "authfile", "", "")                 // Used by Valkyrie
-	flags.StringVar(&config.Auth, "auth", "", "")                         // Can be deleted
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "") // Check if can remove
 	flags.StringVar(&config.Proxy, "proxy", "", "")                       // Check if can be removed
 	flags.StringVar(&config.Proxy, "backend", "", "")                     // Can be removed
@@ -203,9 +202,6 @@ func server(args []string) {
 	}
 	if config.KeyFile == "" {
 		config.KeyFile = settings.Env("KEY_FILE")
-	}
-	if config.Auth == "" {
-		config.Auth = os.Getenv("AUTH")
 	}
 	s, err := chserver.NewServer(config)
 	if err != nil {

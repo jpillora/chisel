@@ -12,13 +12,13 @@ import (
 // - dynamic auth (server add/remove user)
 // - watch auth file
 
-func TestAuth(t *testing.T) {
+func TestAuthFile(t *testing.T) {
 	tmpPort1 := availablePort()
 	tmpPort2 := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			Auth: "../bench/userfile",
+			AuthFile: "../bench/userfile",
 		},
 		&chclient.Config{
 			Remotes: []string{
