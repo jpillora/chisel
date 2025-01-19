@@ -70,7 +70,7 @@ func (p *Proxy) Run(ctx context.Context) error {
 
 func (p *Proxy) runTCP(ctx context.Context) error {
 	done := make(chan struct{})
-	//implements missing net.ListenContext
+	//implements missing netext.ListenContext
 	go func() {
 		select {
 		case <-ctx.Done():

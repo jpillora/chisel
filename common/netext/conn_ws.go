@@ -1,4 +1,4 @@
-package cnet
+package netext
 
 import (
 	"net"
@@ -12,7 +12,7 @@ type wsConn struct {
 	buff []byte
 }
 
-// NewWebSocketConn converts a websocket.Conn into a net.Conn
+// NewWebSocketConn converts a websocket.Conn into a netext.Conn
 func NewWebSocketConn(websocketConn *websocket.Conn) net.Conn {
 	c := wsConn{
 		Conn: websocketConn,

@@ -17,9 +17,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
 	"github.com/valkyrie-io/connector-tunnel/common/cio"
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/crypto"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
 
@@ -61,7 +61,7 @@ type Client struct {
 	tlsConfig *tls.Config
 	proxyURL  *url.URL
 	server    string
-	connCount cnet.ConnCount
+	connCount netext.ConnCount
 	stop      func()
 	eg        *errgroup.Group
 	tunnel    *tunnel.Tunnel
@@ -191,7 +191,7 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	if expect == "" {
 		return nil
 	}
-	got := ccrypto.FingerprintKey(key)
+	got := crypto.FingerprintKey(key)
 	_, err := base64.StdEncoding.DecodeString(expect)
 	if _, ok := err.(base64.CorruptInputError); ok {
 		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)

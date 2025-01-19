@@ -11,8 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
 	"github.com/valkyrie-io/connector-tunnel/common/cos"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
@@ -94,8 +94,8 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	if err != nil {
 		return false, err
 	}
-	conn := cnet.NewWebSocketConn(wsConn)
-	// perform SSH handshake on net.Conn
+	conn := netext.NewWebSocketConn(wsConn)
+	// perform SSH handshake on netext.Conn
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
 	if err != nil {

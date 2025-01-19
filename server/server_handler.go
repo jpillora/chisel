@@ -7,7 +7,7 @@ import (
 	"time"
 
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
 	"golang.org/x/crypto/ssh"
@@ -51,8 +51,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		l.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
-	conn := cnet.NewWebSocketConn(wsConn)
-	// perform SSH handshake on net.Conn
+	conn := netext.NewWebSocketConn(wsConn)
+	// perform SSH handshake on netext.Conn
 	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/valkyrie-io/connector-tunnel/common/cio"
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
@@ -38,7 +38,7 @@ type Tunnel struct {
 	//proxies
 	proxyCount int
 	//internals
-	connStats cnet.ConnCount
+	connStats netext.ConnCount
 }
 
 // New Tunnel from the given Config

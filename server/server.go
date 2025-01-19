@@ -12,9 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/requestlog"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
 	"github.com/valkyrie-io/connector-tunnel/common/cio"
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/crypto"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
@@ -33,7 +33,7 @@ type Server struct {
 	*cio.Logger
 	config      *Config
 	fingerprint string
-	httpServer  *cnet.HTTPServer
+	httpServer  *netext.HTTPServer
 	sessCount   int32
 	sessions    *settings.Users
 	sshConfig   *ssh.ServerConfig
@@ -50,7 +50,7 @@ var upgrader = websocket.Upgrader{
 func NewServer(c *Config) (*Server, error) {
 	server := &Server{
 		config:     c,
-		httpServer: cnet.NewHTTPServer(),
+		httpServer: netext.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
 		sessions:   settings.NewUsers(),
 	}
@@ -83,7 +83,7 @@ func NewServer(c *Config) (*Server, error) {
 		log.Fatal("Failed to parse key")
 	}
 	//fingerprint this key
-	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
+	server.fingerprint = crypto.FingerprintKey(private.PublicKey())
 	//create ssh config
 	server.sshConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",

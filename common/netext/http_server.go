@@ -1,4 +1,4 @@
-package cnet
+package netext
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// HTTPServer extends net/http Server and
+// HTTPServer extends netext/http Server and
 // adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server

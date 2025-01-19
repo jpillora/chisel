@@ -1,4 +1,4 @@
-package ccrypto
+package crypto
 
 import (
 	"crypto/sha256"

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/common/crypto"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -86,7 +86,7 @@ func TestVerifyFingerprint(t *testing.T) {
 	rand := NewDetermRand([]byte("test123"))
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand)
 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-	fp := ccrypto.FingerprintKey(pub)
+	fp := crypto.FingerprintKey(pub)
 
 	config := Config{
 		Fingerprint: fp,

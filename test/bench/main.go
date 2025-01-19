@@ -24,7 +24,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/netext"
 
 	"time"
 )
@@ -104,7 +104,7 @@ func requestFile(port string, size int) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func makeFileServer() *cnet.HTTPServer {
+func makeFileServer() *netext.HTTPServer {
 	bsize := 3 * MB
 	bytes := make([]byte, bsize)
 	//filling huge buffer
@@ -112,7 +112,7 @@ func makeFileServer() *cnet.HTTPServer {
 		bytes[i] = byte(i)
 	}
 
-	s := cnet.NewHTTPServer()
+	s := netext.NewHTTPServer()
 	s.Server.SetKeepAlivesEnabled(false)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rsize, _ := strconv.Atoi(r.URL.Path[1:])

@@ -1,4 +1,4 @@
-package cnet
+package netext
 
 import (
 	"fmt"
