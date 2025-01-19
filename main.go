@@ -89,18 +89,7 @@ var serverHelp = `
     --port, -p, Defines the HTTP listening port (defaults to the environment
     variable PORT and fallsback to port 8080).
 
-    --key, (deprecated use --keygen and --keyfile instead)
-    An optional string to seed the generation of a ECDSA public
-    and private key pair. All communications will be secured using this
-    key pair. Share the subsequent fingerprint with clients to enable detection
-    of man-in-the-middle attacks (defaults to the VALKYRIE_KEY environment
-    variable, otherwise a new key is generate each run).
-
-    --keygen, A path to write a newly generated PEM-encoded SSH private key file.
-    If users depend on your --key fingerprint, you may also include your --key to
-    output your existing key. Use - (dash) to output the generated key to stdout.
-
-    --keyfile, An optional path to a PEM-encoded SSH private key. When
+    --keyfile, An mandatory path to a PEM-encoded SSH private key. When
     this flag is set, the --key option is ignored, and the provided private key
     is used to secure all communications. (defaults to the VALKYRIE_KEY_FILE
     environment variable). Since ECDSA keys are short, you may also set keyfile
@@ -118,20 +107,11 @@ var serverHelp = `
     and "R:<local-interface>:<local-port>" for reverse port forwarding
     remotes. This file will be automatically reloaded on change.
 
-    --auth, An optional string representing a single user with full
-    access, in the form of <user:pass>. It is equivalent to creating an
-    authfile with {"<user:pass>": [""]}. If unset, it will use the
-    environment variable AUTH.
-
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
     specify a time with a unit, for example '5s' or '2m'. Defaults
     to '25s' (set to 0s to disable).
-
-    --backend, Specifies another HTTP server to proxy requests to when
-    valkyrie receives a normal HTTP request. Useful for hiding valkyrie in
-    plain sight.
 
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
@@ -143,14 +123,6 @@ var serverHelp = `
     --tls-cert, Enables TLS and provides optional path to a PEM-encoded
     TLS certificate. When this flag is set, you must also set --tls-key,
     and you cannot set --tls-domain.
-
-    --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
-    You may specify multiple --tls-domain flags to serve multiple domains.
-    The resulting files are cached in the "$HOME/.cache/valkyrie" directory.
-    You can modify this path by setting the VALKYRIE_LE_CACHE variable,
-    or disable caching by setting this variable to "-". You can optionally
-    provide a certificate notification email by setting VALKYRIE_LE_EMAIL.
 
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
     holding multiple PEM encode CA certificate bundle files, which is used to 
@@ -169,7 +141,7 @@ func server(args []string) {
 	flags.BoolVar(&config.Reverse, "reverse", false, "")                  // Used by Valkyrie
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                   // Used by Valkyrie
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                 // Used by Valkyrie
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted but left for optional use
 
 	host := flags.String("host", "", "")  // Used by Valkyrie
 	p := flags.String("p", "", "")        // Used by Valkyrie
