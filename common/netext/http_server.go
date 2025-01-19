@@ -80,7 +80,7 @@ func (h *HTTPServer) Wait() error {
 	wait := h.waiter.Wait
 	h.waiterMux.Unlock()
 	err := wait()
-	if err == http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		err = nil //success
 	}
 	return err
