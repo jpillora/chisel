@@ -37,8 +37,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	}
 	remote := string(ch.ExtraData())
 	//extract protocol
-	hostPort, proto := settings.L4Proto(remote)
-	udp := proto == "udp"
+	hostPort := settings.L4Proto(remote)
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)
@@ -52,11 +51,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
-	if udp {
-		err = t.handleUDP(l, stream, hostPort)
-	} else {
-		err = t.handleTCP(l, stream, hostPort)
-	}
+	err = t.handleTCP(l, stream, hostPort)
 	t.connStats.Close()
 	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {

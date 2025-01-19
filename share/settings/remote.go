@@ -28,9 +28,6 @@ import (
 //   stdio:example.com:22
 //     local  stdio
 //     remote example.com:22
-//   1.1.1.1:53/udp
-//     local  127.0.0.1:53/udp
-//     remote 1.1.1.1:53/udp
 
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
@@ -56,14 +53,6 @@ func DecodeRemote(s string) (*Remote, error) {
 	//to provide the defaults)
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i][1]
-		p, proto := L4Proto(p)
-		if proto != "" {
-			if r.RemotePort == "" {
-				r.RemoteProto = proto
-			} else if r.LocalProto == "" {
-				r.LocalProto = proto
-			}
-		}
 		if isPort(p) {
 			if r.RemotePort == "" {
 				r.RemotePort = p
@@ -96,12 +85,6 @@ func DecodeRemote(s string) (*Remote, error) {
 	if r.LocalProto == "" {
 		r.LocalProto = r.RemoteProto
 	}
-	if r.LocalProto != r.RemoteProto {
-		//TODO support cross protocol
-		//tcp <-> udp, is faily straight forward
-		//udp <-> tcp, is trickier since udp is stateless and tcp is not
-		return nil, errors.New("cross-protocol remotes are not supported yet")
-	}
 	return r, nil
 }
 
@@ -124,15 +107,15 @@ func isHost(s string) bool {
 	return true
 }
 
-var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
+var l4Proto = regexp.MustCompile(`(?i)\/tcp$`)
 
 // L4Proto extacts the layer-4 protocol from the given string
-func L4Proto(s string) (head, proto string) {
+func L4Proto(s string) (head string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
-		return strings.ToLower(s[:l-4]), s[l-3:]
+		return strings.ToLower(s[:l-4])
 	}
-	return s, ""
+	return s
 }
 
 // implement Stringer
@@ -144,9 +127,6 @@ func (r Remote) String() string {
 	sb.WriteString(strings.TrimPrefix(r.Local(), "0.0.0.0:"))
 	sb.WriteString("=>")
 	sb.WriteString(strings.TrimPrefix(r.Remote(), "127.0.0.1:"))
-	if r.RemoteProto == "udp" {
-		sb.WriteString("/udp")
-	}
 	return sb.String()
 }
 
@@ -157,9 +137,6 @@ func (r Remote) Encode() string {
 	}
 	local := r.Local()
 	remote := r.Remote()
-	if r.RemoteProto == "udp" {
-		remote += "/udp"
-	}
 	if r.Reverse {
 		return "R:" + local + ":" + remote
 	}
@@ -193,28 +170,11 @@ func (r Remote) UserAddr() string {
 
 // CanListen checks if the port can be listened on
 func (r Remote) CanListen() bool {
-	//valid protocols
-	switch r.LocalProto {
-	case "tcp":
-		conn, err := net.Listen("tcp", r.Local())
-		if err == nil {
-			conn.Close()
-			return true
-		}
-		return false
-	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", r.Local())
-		if err != nil {
-			return false
-		}
-		conn, err := net.ListenUDP(r.LocalProto, addr)
-		if err == nil {
-			conn.Close()
-			return true
-		}
-		return false
+	conn, err := net.Listen("tcp", r.Local())
+	if err == nil {
+		conn.Close()
+		return true
 	}
-	//invalid
 	return false
 }
 

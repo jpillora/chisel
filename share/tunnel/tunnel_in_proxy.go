@@ -26,7 +26,6 @@ type Proxy struct {
 	remote *settings.Remote
 	dialer net.Dialer
 	tcp    *net.TCPListener
-	udp    *udpListener
 	mu     sync.Mutex
 }
 
@@ -54,13 +53,6 @@ func (p *Proxy) listen() error {
 		}
 		p.Infof("Listening")
 		p.tcp = l
-	} else if p.remote.LocalProto == "udp" {
-		l, err := listenUDP(p.Logger, p.sshTun, p.remote)
-		if err != nil {
-			return err
-		}
-		p.Infof("Listening")
-		p.udp = l
 	} else {
 		return p.Errorf("unknown local proto")
 	}
@@ -72,8 +64,6 @@ func (p *Proxy) listen() error {
 func (p *Proxy) Run(ctx context.Context) error {
 	if p.remote.LocalProto == "tcp" {
 		return p.runTCP(ctx)
-	} else if p.remote.LocalProto == "udp" {
-		return p.udp.run(ctx)
 	}
 	panic("should not get here")
 }

@@ -310,7 +310,6 @@ var clientHelp = `
       3000:google.com:80
       192.168.0.5:3000:google.com:80
       R:2222:localhost:22
-      1.1.1.1:53/udp
 
     When the valkyrie server has --reverse enabled, remotes can
     be prefixed with R to denote that they are reversed. That

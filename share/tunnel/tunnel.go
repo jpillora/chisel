@@ -171,3 +171,12 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 	//close ssh connection on abnormal ping
 	sshConn.Close()
 }
+
+func isDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}

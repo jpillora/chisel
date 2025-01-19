@@ -21,8 +21,6 @@ type testLayout struct {
 	server     *chserver.Config
 	client     *chclient.Config
 	fileServer bool
-	udpEcho    bool
-	udpServer  bool
 }
 
 func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown func()) {
