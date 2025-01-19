@@ -35,7 +35,7 @@ import (
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Reverse, Stdio                      bool
+	Reverse                             bool
 }
 
 const revPrefix = "R:"
@@ -56,11 +56,6 @@ func DecodeRemote(s string) (*Remote, error) {
 	//to provide the defaults)
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i][1]
-		//local portion is stdio?
-		if i == 0 && p == "stdio" {
-			r.Stdio = true
-			continue
-		}
 		p, proto := L4Proto(p)
 		if proto != "" {
 			if r.RemotePort == "" {
@@ -106,9 +101,6 @@ func DecodeRemote(s string) (*Remote, error) {
 		//tcp <-> udp, is faily straight forward
 		//udp <-> tcp, is trickier since udp is stateless and tcp is not
 		return nil, errors.New("cross-protocol remotes are not supported yet")
-	}
-	if r.Stdio && r.Reverse {
-		return nil, errors.New("stdio cannot be reversed")
 	}
 	return r, nil
 }
@@ -176,9 +168,6 @@ func (r Remote) Encode() string {
 
 // Local is the decodable local portion
 func (r Remote) Local() string {
-	if r.Stdio {
-		return "stdio"
-	}
 	if r.LocalHost == "" {
 		r.LocalHost = "0.0.0.0"
 	}

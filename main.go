@@ -310,20 +310,12 @@ var clientHelp = `
       3000:google.com:80
       192.168.0.5:3000:google.com:80
       R:2222:localhost:22
-      stdio:example.com:22
       1.1.1.1:53/udp
 
     When the valkyrie server has --reverse enabled, remotes can
     be prefixed with R to denote that they are reversed. That
     is, the server will listen and accept connections, and they
     will be proxied through the client which specified the remote.
-    
-    When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when 
-    combined with ssh ProxyCommand. You can use
-      ssh -o ProxyCommand='valkyrie client valkyrieserver stdio:%h:%p' \
-          user@example.com
-    to connect to an SSH server through the tunnel.
 
   Options:
 

@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -92,7 +91,6 @@ func NewClient(c *Config) (*Client, error) {
 		}
 	}
 	hasReverse := false
-	hasStdio := false
 	client := &Client{
 		Logger: cio.NewLogger("client"),
 		config: c,
@@ -146,14 +144,8 @@ func NewClient(c *Config) (*Client, error) {
 		if r.Reverse {
 			hasReverse = true
 		}
-		if r.Stdio {
-			if hasStdio {
-				return nil, errors.New("Only one stdio is allowed")
-			}
-			hasStdio = true
-		}
 		//confirm non-reverse tunnel is available
-		if !r.Reverse && !r.Stdio && !r.CanListen() {
+		if !r.Reverse && !r.CanListen() {
 			return nil, fmt.Errorf("Client cannot listen on %s", r.String())
 		}
 		client.computed.Remotes = append(client.computed.Remotes, r)

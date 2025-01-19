@@ -63,6 +63,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		errmsg = fmt.Sprintf(" (error %s)", err)
 	}
 	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
+	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
 }
 
 func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {

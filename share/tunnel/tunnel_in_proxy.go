@@ -43,9 +43,7 @@ func NewProxy(logger *cio.Logger, sshTun sshTunnel, index int, remote *settings.
 }
 
 func (p *Proxy) listen() error {
-	if p.remote.Stdio {
-		//TODO check if pipes active?
-	} else if p.remote.LocalProto == "tcp" {
+	if p.remote.LocalProto == "tcp" {
 		addr, err := net.ResolveTCPAddr("tcp", p.remote.LocalHost+":"+p.remote.LocalPort)
 		if err != nil {
 			return p.Errorf("resolve: %s", err)
@@ -72,27 +70,12 @@ func (p *Proxy) listen() error {
 // Run enables the proxy and blocks while its active,
 // close the proxy by cancelling the context.
 func (p *Proxy) Run(ctx context.Context) error {
-	if p.remote.Stdio {
-		return p.runStdio(ctx)
-	} else if p.remote.LocalProto == "tcp" {
+	if p.remote.LocalProto == "tcp" {
 		return p.runTCP(ctx)
 	} else if p.remote.LocalProto == "udp" {
 		return p.udp.run(ctx)
 	}
 	panic("should not get here")
-}
-
-func (p *Proxy) runStdio(ctx context.Context) error {
-	defer p.Infof("Closed")
-	for {
-		p.pipeRemote(ctx, cio.Stdio)
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			// the connection is not ready yet, keep waiting
-		}
-	}
 }
 
 func (p *Proxy) runTCP(ctx context.Context) error {
