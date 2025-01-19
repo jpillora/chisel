@@ -28,11 +28,6 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		s.Infof("ignored client connection using protocol '%s', expected '%s'",
 			protocol, chshare.ProtocolVersion)
 	}
-	//proxy target was provided
-	if s.reverseProxy != nil {
-		s.reverseProxy.ServeHTTP(w, r)
-		return
-	}
 	//no proxy defined, provide access to health/version checks
 	switch r.URL.Path {
 	case "/health":
