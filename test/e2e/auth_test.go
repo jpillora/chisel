@@ -18,8 +18,7 @@ func TestAuth(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			KeySeed: "foobar",
-			Auth:    "../bench/userfile",
+			Auth: "../bench/userfile",
 		},
 		&chclient.Config{
 			Remotes: []string{

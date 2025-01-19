@@ -23,7 +23,6 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
 	KeyFile   string
 	AuthFile  string
 	Auth      string
@@ -80,25 +79,14 @@ func NewServer(c *Config) (*Server, error) {
 	if c.KeyFile != "" {
 		var key []byte
 
-		if ccrypto.IsValkyrieKey([]byte(c.KeyFile)) {
-			key = []byte(c.KeyFile)
-		} else {
-			key, err = os.ReadFile(c.KeyFile)
-			if err != nil {
-				log.Fatalf("Failed to read key file %s", c.KeyFile)
-			}
+		key, err = os.ReadFile(c.KeyFile)
+		if err != nil {
+			log.Fatalf("Failed to read key file %s", c.KeyFile)
 		}
 
 		pemBytes = key
-		if ccrypto.IsValkyrieKey(key) {
-			pemBytes, err = ccrypto.ValkyrieKey2PEM(key)
-			if err != nil {
-				log.Fatalf("Invalid key %s", string(key))
-			}
-		}
 	} else {
-		//generate private key (optionally using seed)
-		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
+		pemBytes, err = ccrypto.GeneratePEM()
 		if err != nil {
 			log.Fatal("Failed to generate key")
 		}

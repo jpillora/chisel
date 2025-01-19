@@ -1,7 +1,10 @@
 package chclient
 
 import (
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/sha512"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -44,66 +47,59 @@ func TestCustomHeaders(t *testing.T) {
 	c.Close()
 }
 
-func TestFallbackLegacyFingerprint(t *testing.T) {
-	config := Config{
-		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
+const DetermRandIter = 2048
+
+func NewDetermRand(seed []byte) io.Reader {
+	var out []byte
+	//strengthen seed
+	var next = seed
+	for i := 0; i < DetermRandIter; i++ {
+		next, out = hash(next)
 	}
-	c, err := NewClient(&config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = c.verifyServer("", nil, pub)
-	if err != nil {
-		t.Fatal(err)
+	return &determRand{
+		next: next,
+		out:  out,
 	}
 }
 
-func TestVerifyLegacyFingerprint(t *testing.T) {
-	config := Config{
-		Fingerprint: "a5:32:92:c6:56:7a:9e:61:26:74:1b:81:a6:f5:1b:44",
+type determRand struct {
+	next, out []byte
+}
+
+func (d *determRand) Read(b []byte) (int, error) {
+	n := 0
+	l := len(b)
+	for n < l {
+		next, out := hash(d.next)
+		n += copy(b[n:], out)
+		d.next = next
 	}
-	c, err := NewClient(&config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = c.verifyLegacyFingerprint(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
+	return n, nil
+}
+
+func hash(input []byte) (next []byte, output []byte) {
+	nextout := sha512.Sum512(input)
+	return nextout[:sha512.Size/2], nextout[sha512.Size/2:]
 }
 
 func TestVerifyFingerprint(t *testing.T) {
+	rand := NewDetermRand([]byte("test123"))
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand)
+	pub, err := ssh.NewPublicKey(&priv.PublicKey)
+	fp := ccrypto.FingerprintKey(pub)
+
 	config := Config{
-		Fingerprint: "qmrRoo8MIqePv3jC8+wv49gU6uaFgD3FASQx9V8KdmY=",
+		Fingerprint: fp,
 	}
+
 	c, err := NewClient(&config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := ccrypto.NewDetermRand([]byte("test123"))
-	priv, err := ccrypto.GenerateKeyGo119(elliptic.P256(), r)
+
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub, err := ssh.NewPublicKey(&priv.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}

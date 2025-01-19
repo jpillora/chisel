@@ -1,35 +1,36 @@
 package ccrypto
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
-	"fmt"
-	"os"
-
+	"encoding/pem"
 	"golang.org/x/crypto/ssh"
 )
-
-// GenerateKey generates a PEM key
-func GenerateKey(seed string) ([]byte, error) {
-	return Seed2PEM(seed)
-}
-
-// GenerateKeyFile generates an ChiselKey
-func GenerateKeyFile(keyFilePath, seed string) error {
-	valkyrieKey, err := seed2ValkyrieKey(seed)
-	if err != nil {
-		return err
-	}
-
-	if keyFilePath == "-" {
-		fmt.Print(string(valkyrieKey))
-		return nil
-	}
-	return os.WriteFile(keyFilePath, valkyrieKey, 0600)
-}
 
 // FingerprintKey calculates the SHA256 hash of an SSH public key
 func FingerprintKey(k ssh.PublicKey) string {
 	bytes := sha256.Sum256(k.Marshal())
 	return base64.StdEncoding.EncodeToString(bytes[:])
+}
+
+func GeneratePEM() ([]byte, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return privateKey2PEM(privateKey)
+}
+
+func privateKey2PEM(privateKey *ecdsa.PrivateKey) ([]byte, error) {
+	b, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: b}), nil
 }

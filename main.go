@@ -13,7 +13,6 @@ import (
 	chclient "github.com/valkyrie-io/connector-tunnel/client"
 	chserver "github.com/valkyrie-io/connector-tunnel/server"
 	chshare "github.com/valkyrie-io/connector-tunnel/share"
-	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
 	"github.com/valkyrie-io/connector-tunnel/share/cos"
 	"github.com/valkyrie-io/connector-tunnel/share/settings"
 )
@@ -164,7 +163,6 @@ func server(args []string) {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	config := &chserver.Config{}
-	flags.StringVar(&config.KeySeed, "key", "", "")                       // Can be deleted
 	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Can be deleted
 	flags.StringVar(&config.AuthFile, "authfile", "", "")                 // Used by Valkyrie
 	flags.StringVar(&config.Auth, "auth", "", "")                         // Can be deleted
@@ -177,29 +175,16 @@ func server(args []string) {
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")           // Not used but check if needed
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted
 
-	host := flags.String("host", "", "")     // Used by Valkyrie
-	p := flags.String("p", "", "")           // Used by Valkyrie
-	port := flags.String("port", "", "")     // Used by Valkyrie
-	verbose := flags.Bool("v", false, "")    // Used by Valkyrie
-	keyGen := flags.String("keygen", "", "") // Should be used by Valkyrie
+	host := flags.String("host", "", "")  // Used by Valkyrie
+	p := flags.String("p", "", "")        // Used by Valkyrie
+	port := flags.String("port", "", "")  // Used by Valkyrie
+	verbose := flags.Bool("v", false, "") // Used by Valkyrie
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
 		os.Exit(0)
 	}
 	flags.Parse(args)
-
-	if *keyGen != "" {
-		if err := ccrypto.GenerateKeyFile(*keyGen, config.KeySeed); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-
-	if config.KeySeed != "" {
-		log.Print("Option `--key` is deprecated and will be removed in a future version of valkyrie.")
-		log.Print("Please use `valkyrie server --keygen /file/path`, followed by `valkyrie server --keyfile /file/path` to specify the SSH private key")
-	}
 
 	if *host == "" {
 		*host = os.Getenv("HOST")
@@ -218,8 +203,6 @@ func server(args []string) {
 	}
 	if config.KeyFile == "" {
 		config.KeyFile = settings.Env("KEY_FILE")
-	} else if config.KeySeed == "" {
-		config.KeySeed = settings.Env("KEY")
 	}
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
