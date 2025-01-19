@@ -9,7 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/acme/autocert"
 )
 

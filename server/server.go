@@ -11,11 +11,11 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/requestlog"
-	chshare "github.com/valkyrie-io/connector-tunnel/share"
-	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
-	"github.com/valkyrie-io/connector-tunnel/share/cnet"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	chshare "github.com/valkyrie-io/connector-tunnel/common"
+	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -74,10 +74,7 @@ func NewServer(c *Config) (*Server, error) {
 
 		pemBytes = key
 	} else {
-		pemBytes, err = ccrypto.GeneratePEM()
-		if err != nil {
-			log.Fatal("Failed to generate key")
-		}
+		log.Fatal("Must have a key file to generate secure SSH connection")
 	}
 
 	//convert into ssh.PrivateKey

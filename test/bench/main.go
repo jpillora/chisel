@@ -24,7 +24,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/valkyrie-io/connector-tunnel/share/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/cnet"
 
 	"time"
 )

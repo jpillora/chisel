@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
 )
 
 type Users struct {

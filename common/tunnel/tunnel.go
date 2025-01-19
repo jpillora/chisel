@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
-	"github.com/valkyrie-io/connector-tunnel/share/cnet"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )

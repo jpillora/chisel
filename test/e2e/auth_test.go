@@ -19,6 +19,7 @@ func TestAuthFile(t *testing.T) {
 	teardown := simpleSetup(t,
 		&chserver.Config{
 			AuthFile: "../bench/userfile",
+			KeyFile:  "./ec_private_key.pem",
 		},
 		&chclient.Config{
 			Remotes: []string{

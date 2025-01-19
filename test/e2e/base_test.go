@@ -11,7 +11,9 @@ func TestBase(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
-		&chserver.Config{},
+		&chserver.Config{
+			KeyFile: "./ec_private_key.pem",
+		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 		})
@@ -31,6 +33,7 @@ func TestReverse(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
+			KeyFile: "./ec_private_key.pem",
 			Reverse: true,
 		},
 		&chclient.Config{

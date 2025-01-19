@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jpillora/sizestr"
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
 )
 
 // NewMeter to measure readers/writers

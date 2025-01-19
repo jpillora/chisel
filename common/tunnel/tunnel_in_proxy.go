@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/jpillora/sizestr"
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
 	"golang.org/x/crypto/ssh"
 )
 

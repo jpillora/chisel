@@ -10,10 +10,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	chshare "github.com/valkyrie-io/connector-tunnel/share"
-	"github.com/valkyrie-io/connector-tunnel/share/cnet"
-	"github.com/valkyrie-io/connector-tunnel/share/cos"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	chshare "github.com/valkyrie-io/connector-tunnel/common"
+	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/cos"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 

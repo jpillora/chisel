@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	chshare "github.com/valkyrie-io/connector-tunnel/share"
-	"github.com/valkyrie-io/connector-tunnel/share/ccrypto"
-	"github.com/valkyrie-io/connector-tunnel/share/cio"
-	"github.com/valkyrie-io/connector-tunnel/share/cnet"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
-	"github.com/valkyrie-io/connector-tunnel/share/tunnel"
+	chshare "github.com/valkyrie-io/connector-tunnel/common"
+	"github.com/valkyrie-io/connector-tunnel/common/ccrypto"
+	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/cnet"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"

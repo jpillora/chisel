@@ -19,7 +19,8 @@ func TestTLS(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: *tlsConfig.serverTLS,
+			TLS:     *tlsConfig.serverTLS,
+			KeyFile: "./ec_private_key.pem",
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
@@ -50,7 +51,8 @@ func TestMTLS(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: *tlsConfig.serverTLS,
+			KeyFile: "./ec_private_key.pem",
+			TLS:     *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
@@ -82,7 +84,8 @@ func TestTLSMissingClientCert(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: *tlsConfig.serverTLS,
+			KeyFile: "./ec_private_key.pem",
+			TLS:     *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
@@ -112,7 +115,8 @@ func TestTLSMissingClientCA(t *testing.T) {
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: *tlsConfig.serverTLS,
+			KeyFile: "./ec_private_key.pem",
+			TLS:     *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},

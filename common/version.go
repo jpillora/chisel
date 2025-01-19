@@ -1,4 +1,4 @@
-package chshare
+package common
 
 // ProtocolVersion of chisel. When backwards
 // incompatible changes are made, this will

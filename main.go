@@ -10,17 +10,17 @@ import (
 	"strings"
 	"time"
 
-	chclient "github.com/valkyrie-io/connector-tunnel/client"
-	chserver "github.com/valkyrie-io/connector-tunnel/server"
-	chshare "github.com/valkyrie-io/connector-tunnel/share"
-	"github.com/valkyrie-io/connector-tunnel/share/cos"
-	"github.com/valkyrie-io/connector-tunnel/share/settings"
+	"github.com/valkyrie-io/connector-tunnel/client"
+	"github.com/valkyrie-io/connector-tunnel/common"
+	"github.com/valkyrie-io/connector-tunnel/common/cos"
+	"github.com/valkyrie-io/connector-tunnel/common/settings"
+	"github.com/valkyrie-io/connector-tunnel/server"
 )
 
 var help = `
   Usage: valkyrie [command] [--help]
 
-  Version: ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
+  Version: ` + common.BuildVersion + ` (` + runtime.Version() + `)
 
   Commands:
     server - runs valkyrie in server mode
@@ -41,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	if *version || *v {
-		fmt.Println(chshare.BuildVersion)
+		fmt.Println(common.BuildVersion)
 		os.Exit(0)
 	}
 
@@ -75,7 +75,7 @@ var commonHelp = `
       a SIGHUP to short-circuit the client reconnect timer
 
   Version:
-    ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
+    ` + common.BuildVersion + ` (` + runtime.Version() + `)
 `
 
 var serverHelp = `
