@@ -58,23 +58,20 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 	done := make(chan struct{})
 	go p.handleContextChange(ctx, done)
 	for {
-		p.acceptTCPAndBlock(ctx, done)
-	}
-}
-
-func (p *Proxy) acceptTCPAndBlock(ctx context.Context, done chan struct{}) {
-	src, err := p.tcp.Accept()
-	if err != nil {
-		select {
-		case <-ctx.Done():
-			//listener closed
-			err = nil
-		default:
-			p.Infof("Accept error: %s", err)
+		src, err := p.tcp.Accept()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				//listener closed
+				err = nil
+			default:
+				p.Infof("Accept error: %s", err)
+			}
+			close(done)
+			return err
 		}
-		close(done)
+		go p.pipeRemote(ctx, src)
 	}
-	go p.pipeRemote(ctx, src)
 }
 
 func (p *Proxy) handleContextChange(ctx context.Context, done chan struct{}) {

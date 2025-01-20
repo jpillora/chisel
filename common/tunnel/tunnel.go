@@ -38,7 +38,7 @@ type SSHTunnel struct {
 }
 
 func New(c Config) *SSHTunnel {
-	c.Logger = c.Logger.Fork("tun")
+	c.Logger = c.Logger.Fork("SSHTunnel")
 	t := &SSHTunnel{
 		Config: c,
 	}
