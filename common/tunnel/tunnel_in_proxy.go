@@ -7,20 +7,15 @@ import (
 	"sync"
 
 	"github.com/jpillora/sizestr"
-	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 
-// sshTunnel exposes a subset of Tunnel to subtypes
-type sshTunnel interface {
-	getSSH(ctx context.Context) ssh.Conn
-}
-
-// Proxy is the inbound portion of a Tunnel
+// Proxy is the inbound portion of a SSHTunnel
 type Proxy struct {
-	*cio.Logger
-	sshTun sshTunnel
+	*logging.Logger
+	tunnel *SSHTunnel
 	id     int
 	count  int
 	remote *settings.Remote
@@ -29,12 +24,12 @@ type Proxy struct {
 	mu     sync.Mutex
 }
 
-// NewProxy creates a Proxy
-func NewProxy(logger *cio.Logger, sshTun sshTunnel, index int, remote *settings.Remote) (*Proxy, error) {
+// newProxy creates a Proxy
+func newProxy(logger *logging.Logger, tunnel *SSHTunnel, index int, remote *settings.Remote) (*Proxy, error) {
 	id := index + 1
 	p := &Proxy{
 		Logger: logger.Fork("proxy#%s", remote.String()),
-		sshTun: sshTun,
+		tunnel: tunnel,
 		id:     id,
 		remote: remote,
 	}
@@ -59,65 +54,83 @@ func (p *Proxy) listen() error {
 	return nil
 }
 
-// Run enables the proxy and blocks while its active,
-// close the proxy by cancelling the context.
-func (p *Proxy) Run(ctx context.Context) error {
-	if p.remote.LocalProto == "tcp" {
-		return p.runTCP(ctx)
-	}
-	panic("should not get here")
-}
-
 func (p *Proxy) runTCP(ctx context.Context) error {
 	done := make(chan struct{})
-	//implements missing netext.ListenContext
-	go func() {
+	go p.handleContextChange(ctx, done)
+	for {
+		p.acceptTCPAndBlock(ctx, done)
+	}
+}
+
+func (p *Proxy) acceptTCPAndBlock(ctx context.Context, done chan struct{}) {
+	src, err := p.tcp.Accept()
+	if err != nil {
 		select {
 		case <-ctx.Done():
-			p.tcp.Close()
-		case <-done:
+			//listener closed
+			err = nil
+		default:
+			p.Infof("Accept error: %s", err)
 		}
-	}()
-	for {
-		src, err := p.tcp.Accept()
-		if err != nil {
-			select {
-			case <-ctx.Done():
-				//listener closed
-				err = nil
-			default:
-				p.Infof("Accept error: %s", err)
-			}
-			close(done)
-			return err
-		}
-		go p.pipeRemote(ctx, src)
+		close(done)
+	}
+	go p.pipeRemote(ctx, src)
+}
+
+func (p *Proxy) handleContextChange(ctx context.Context, done chan struct{}) {
+	select {
+	case <-ctx.Done():
+		p.tcp.Close()
+	case <-done:
 	}
 }
 
 func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	defer src.Close()
+	cid := p.atomicIncreaseConnCounter()
+	l := p.Fork("conn#%d", cid)
 
+	dst, reqs, done := p.connectAndOpenSSHChannel(ctx, l)
+	if done {
+		return
+	}
+	p.closeSSHChannel(reqs, src, dst, l)
+}
+
+func (p *Proxy) atomicIncreaseConnCounter() int {
 	p.mu.Lock()
 	p.count++
 	cid := p.count
 	p.mu.Unlock()
+	return cid
+}
 
-	l := p.Fork("conn#%d", cid)
-	l.Debugf("Open")
-	sshConn := p.sshTun.getSSH(ctx)
-	if sshConn == nil {
-		l.Debugf("No remote connection")
-		return
+func (p *Proxy) connectAndOpenSSHChannel(ctx context.Context, l *logging.Logger) (ssh.Channel, <-chan *ssh.Request, bool) {
+	sshConn, done := p.connectSSH(ctx, l)
+	if done {
+		return nil, nil, true
 	}
 	//ssh request for tcp connection for this proxy's remote
 	dst, reqs, err := sshConn.OpenChannel("valkyrie", []byte(p.remote.Remote()))
 	if err != nil {
 		l.Infof("Stream error: %s", err)
-		return
+		return nil, nil, true
 	}
+	return dst, reqs, false
+}
+
+func (p *Proxy) connectSSH(ctx context.Context, l *logging.Logger) (ssh.Conn, bool) {
+	l.Debugf("Open")
+	sshConn := p.tunnel.getSSH(ctx)
+	if sshConn == nil {
+		l.Debugf("No remote connection")
+		return nil, true
+	}
+	return sshConn, false
+}
+
+func (p *Proxy) closeSSHChannel(reqs <-chan *ssh.Request, src io.ReadWriteCloser, dst ssh.Channel, l *logging.Logger) {
 	go ssh.DiscardRequests(reqs)
-	//then pipe
-	s, r := cio.Pipe(src, dst)
+	s, r := Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
 }

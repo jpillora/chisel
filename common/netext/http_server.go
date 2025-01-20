@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// HTTPServer extends netext/http Server and
+// HTTPServer extends net/http Server and
 // adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server

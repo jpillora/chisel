@@ -16,9 +16,8 @@ import (
 	"time"
 
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cio"
 	"github.com/valkyrie-io/connector-tunnel/common/crypto"
-	"github.com/valkyrie-io/connector-tunnel/common/netext"
+	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
 
@@ -48,17 +47,15 @@ type TLSConfig struct {
 
 // Client represents a client instance
 type Client struct {
-	*cio.Logger
+	*logging.Logger
 	config    *Config
 	computed  settings.Config
 	sshConfig *ssh.ClientConfig
 	tlsConfig *tls.Config
-	proxyURL  *url.URL
 	server    string
-	connCount netext.ConnCount
 	stop      func()
 	eg        *errgroup.Group
-	tunnel    *tunnel.Tunnel
+	tunnel    *tunnel.SSHTunnel
 }
 
 // NewClient creates a new client instance
@@ -86,7 +83,7 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	hasReverse := false
 	client := &Client{
-		Logger: cio.NewLogger("client"),
+		Logger: logging.NewLogger("client"),
 		config: c,
 		computed: settings.Config{
 			Version: chshare.BuildVersion,
@@ -161,7 +158,7 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	if expect == "" {
 		return nil
 	}
-	got := crypto.FingerprintKey(key)
+	got := crypto.FPKey(key)
 	_, err := base64.StdEncoding.DecodeString(expect)
 	if _, ok := err.(base64.CorruptInputError); ok {
 		c.Logger.Infof("Specified deprecated MD5 fingerprint (%s), please update to the new SHA256 fingerprint: %s", expect, got)

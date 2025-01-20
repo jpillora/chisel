@@ -1,9 +1,10 @@
 //go:build !windows
 // +build !windows
 
-package cos
+package signalling
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -46,4 +47,18 @@ func AfterSignal(d time.Duration) <-chan struct{} {
 		close(ch)
 	}()
 	return ch
+}
+
+// InterruptContext returns a context which is
+// cancelled on OS Interrupt
+func InterruptContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt) //windows compatible?
+		<-sig
+		signal.Stop(sig)
+		cancel()
+	}()
+	return ctx
 }

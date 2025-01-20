@@ -86,7 +86,7 @@ func TestVerifyFingerprint(t *testing.T) {
 	rand := NewDetermRand([]byte("test123"))
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand)
 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
-	fp := crypto.FingerprintKey(pub)
+	fp := crypto.FPKey(pub)
 
 	config := Config{
 		Fingerprint: fp,

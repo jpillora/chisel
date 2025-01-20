@@ -12,8 +12,8 @@ import (
 
 	"github.com/valkyrie-io/connector-tunnel/client"
 	"github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cos"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/signalling"
 	"github.com/valkyrie-io/connector-tunnel/server"
 )
 
@@ -177,8 +177,8 @@ func server(args []string) {
 	}
 	s.Debug = *verbose
 
-	go cos.GoStats()
-	ctx := cos.InterruptContext()
+	go signalling.GoStats()
+	ctx := signalling.InterruptContext()
 	if err := s.StartContext(ctx, *host, *port); err != nil {
 		log.Fatal(err)
 	}
@@ -276,38 +276,12 @@ var clientHelp = `
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
-    --proxy, An optional HTTP CONNECT which will be
-    used to reach the valkyrie server. Authentication can be specified
-    inside the URL.
-    For example, http://admin:password@my-server.com:8081
-
     --header, Set a custom header in the form "HeaderName: HeaderContent".
     Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
-
-    --hostname, Optionally set the 'Host' header (defaults to the host
-    found in the server url).
-
-    --sni, Override the ServerName when using TLS (defaults to the 
-    hostname).
 
     --tls-ca, An optional root certificate bundle used to verify the
     valkyrie server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
-
-    --tls-skip-verify, Skip server TLS certificate verification of
-    chain and host name (if TLS is used for transport connections to
-    server). If set, client accepts any TLS certificate presented by
-    the server and any host name in that certificate. This only affects
-    transport https (wss) connection. Valkyrie server's public key
-    may be still verified (see --fingerprint) after inner connection
-    is established.
-
-    --tls-key, a path to a PEM encoded private key used for client 
-    authentication (mutual-TLS).
-
-    --tls-cert, a path to a PEM encoded certificate matching the provided 
-    private key. The certificate must have client authentication 
-    enabled (mutual-TLS).
 ` + commonHelp
 
 func client(args []string) {
@@ -318,7 +292,7 @@ func client(args []string) {
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Should use explicitly to our desired window
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")           // Not used but let's keep
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Optional but not really needed
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Not used but let's keep
 	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
 	verbose := flags.Bool("v", false, "")                                    // Used by Valkyrie
 	flags.Usage = func() {
@@ -344,8 +318,8 @@ func client(args []string) {
 		log.Fatal(err)
 	}
 	c.Debug = *verbose
-	go cos.GoStats()
-	ctx := cos.InterruptContext()
+	go signalling.GoStats()
+	ctx := signalling.InterruptContext()
 	if err := c.Start(ctx); err != nil {
 		log.Fatal(err)
 	}

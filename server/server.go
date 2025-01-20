@@ -12,8 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/requestlog"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cio"
 	"github.com/valkyrie-io/connector-tunnel/common/crypto"
+	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
@@ -30,7 +30,7 @@ type Config struct {
 
 // Server respresent a chisel service
 type Server struct {
-	*cio.Logger
+	*logging.Logger
 	config      *Config
 	fingerprint string
 	httpServer  *netext.HTTPServer
@@ -51,7 +51,7 @@ func NewServer(c *Config) (*Server, error) {
 	server := &Server{
 		config:     c,
 		httpServer: netext.NewHTTPServer(),
-		Logger:     cio.NewLogger("server"),
+		Logger:     logging.NewLogger("server"),
 		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
@@ -83,7 +83,7 @@ func NewServer(c *Config) (*Server, error) {
 		log.Fatal("Failed to parse key")
 	}
 	//fingerprint this key
-	server.fingerprint = crypto.FingerprintKey(private.PublicKey())
+	server.fingerprint = crypto.FPKey(private.PublicKey())
 	//create ssh config
 	server.sshConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",

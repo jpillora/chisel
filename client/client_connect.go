@@ -11,9 +11,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
-	"github.com/valkyrie-io/connector-tunnel/common/cos"
 	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
+	"github.com/valkyrie-io/connector-tunnel/common/signalling"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -53,7 +53,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		d := b.Duration()
 		c.Infof("Retrying in %s...", d)
 		select {
-		case <-cos.AfterSignal(d):
+		case <-signalling.AfterSignal(d):
 			continue //retry now
 		case <-ctx.Done():
 			c.Infof("Cancelled")

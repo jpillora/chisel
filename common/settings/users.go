@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/logging"
 )
 
 type Users struct {
@@ -70,13 +70,13 @@ func (u *Users) Reset(users []*User) {
 
 // UserIndex is a reloadable user source
 type UserIndex struct {
-	*cio.Logger
+	*logging.Logger
 	*Users
 	configFile string
 }
 
 // NewUserIndex creates a source for users
-func NewUserIndex(logger *cio.Logger) *UserIndex {
+func NewUserIndex(logger *logging.Logger) *UserIndex {
 	return &UserIndex{
 		Logger: logger.Fork("users"),
 		Users:  NewUsers(),

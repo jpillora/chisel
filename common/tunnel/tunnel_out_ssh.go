@@ -7,51 +7,74 @@ import (
 	"strings"
 
 	"github.com/jpillora/sizestr"
-	"github.com/valkyrie-io/connector-tunnel/common/cio"
+	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 
-func (t *Tunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
+func (t *SSHTunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
 	for r := range reqs {
 		switch r.Type {
-		case "ping":
-			r.Reply(true, []byte("pong"))
+		case "valkyrie-syn":
+			r.Reply(true, []byte("valkyrie-ack"))
 		default:
 			t.Debugf("Unknown request: %s", r.Type)
 		}
 	}
 }
 
-func (t *Tunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
+func (t *SSHTunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		go t.handleSSHChannel(ch)
 	}
 }
 
-func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
-	if !t.Config.Outbound {
-		t.Debugf("Denied outbound connection")
-		ch.Reject(ssh.Prohibited, "Denied outbound connection")
+func (t *SSHTunnel) handleSSHChannel(ch ssh.NewChannel) {
+	if !t.validateAllowOutbound(ch) {
 		return
 	}
+	hostPort, reqs, stream, err := t.connectRemote(ch)
+	if err != nil {
+		return
+	}
+	defer stream.Close()
+	go ssh.DiscardRequests(reqs)
+	l, err := t.handleOpenConnection(err, stream, hostPort)
+	t.closeConnection(err, l)
+}
+
+func (t *SSHTunnel) connectRemote(ch ssh.NewChannel) (string, <-chan *ssh.Request, io.ReadWriteCloser, error) {
 	remote := string(ch.ExtraData())
 	//extract protocol
 	hostPort := settings.L4Proto(remote)
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)
-		return
+		return "", nil, nil, err
 	}
 	stream := io.ReadWriteCloser(sshChan)
-	//cnet.MeterRWC(t.Logger.Fork("sshchan"), sshChan)
-	defer stream.Close()
-	go ssh.DiscardRequests(reqs)
+	return hostPort, reqs, stream, err
+}
+
+func (t *SSHTunnel) validateAllowOutbound(ch ssh.NewChannel) bool {
+	if !t.Config.Outbound {
+		t.Debugf("Denied outbound connection")
+		ch.Reject(ssh.Prohibited, "Denied outbound connection")
+		return false
+	}
+	return true
+}
+
+func (t *SSHTunnel) handleOpenConnection(err error, stream io.ReadWriteCloser, hostPort string) (*logging.Logger, error) {
 	l := t.Logger.Fork("conn#%d", t.connStats.New())
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
 	err = t.handleTCP(l, stream, hostPort)
+	return l, err
+}
+
+func (t *SSHTunnel) closeConnection(err error, l *logging.Logger) {
 	t.connStats.Close()
 	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
@@ -61,12 +84,12 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
 }
 
-func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
+func (t *SSHTunnel) handleTCP(l *logging.Logger, src io.ReadWriteCloser, hostPort string) error {
 	dst, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		return err
 	}
-	s, r := cio.Pipe(src, dst)
+	s, r := Pipe(src, dst)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil
 }
