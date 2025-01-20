@@ -320,8 +320,6 @@ func client(args []string) {
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Optional but not really needed
 	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
-	hostname := flags.String("hostname", "", "")                             // Can be removed
-	sni := flags.String("sni", "", "")                                       // Can be deleted
 	verbose := flags.Bool("v", false, "")                                    // Used by Valkyrie
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
@@ -338,15 +336,6 @@ func client(args []string) {
 	//default auth
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
-	}
-	//move hostname onto headers
-	if *hostname != "" {
-		config.Headers.Set("Host", *hostname)
-		config.TLS.ServerName = *hostname
-	}
-
-	if *sni != "" {
-		config.TLS.ServerName = *sni
 	}
 
 	//ready

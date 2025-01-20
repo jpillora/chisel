@@ -34,7 +34,6 @@ type Config struct {
 	MaxRetryCount    int
 	MaxRetryInterval time.Duration
 	Server           string
-	Proxy            string
 	Remotes          []string
 	Headers          http.Header
 	TLS              TLSConfig
@@ -44,8 +43,7 @@ type Config struct {
 
 // TLSConfig for a Client
 type TLSConfig struct {
-	CA         string
-	ServerName string
+	CA string
 }
 
 // Client represents a client instance
