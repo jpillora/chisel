@@ -61,10 +61,6 @@ func newTestTLSConfig() (*tlsConfig, error) {
 	if err := os.Mkdir(dirServerCA, 0777); err != nil {
 		return nil, err
 	}
-	pathServerCACrt := path.Join(dirServerCA, "client.crt")
-	if err := os.WriteFile(pathServerCACrt, clientCertPEM, 0666); err != nil {
-		return nil, err
-	}
 
 	dirClientCA := path.Join(tlsConfig.tmpDir, "client-ca")
 	if err := os.Mkdir(dirClientCA, 0777); err != nil {
@@ -103,14 +99,11 @@ func newTestTLSConfig() (*tlsConfig, error) {
 
 	// for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
 	tlsConfig.serverTLS = &chserver.TLSConfig{
-		CA:   pathServerCACrt,
 		Cert: pathServerCrtCrt,
 		Key:  pathServerCrtKey,
 	}
 	tlsConfig.clientTLS = &chclient.TLSConfig{
-		CA:   pathClientCACrt,
-		Cert: pathClientCrtCrt,
-		Key:  pathClientCrtKey,
+		CA: pathClientCACrt,
 	}
 	return tlsConfig, nil
 }

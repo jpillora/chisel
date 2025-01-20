@@ -84,12 +84,6 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		WriteBufferSize:  settings.EnvInt("WS_BUFF_SIZE", 0),
 		NetDialContext:   c.config.DialContext,
 	}
-	//optional proxy
-	if p := c.proxyURL; p != nil {
-		if err := c.setProxy(p, &d); err != nil {
-			return false, err
-		}
-	}
 	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
 	if err != nil {
 		return false, err

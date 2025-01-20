@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
 	"github.com/valkyrie-io/connector-tunnel/common/cio"
 	"github.com/valkyrie-io/connector-tunnel/common/crypto"
@@ -45,10 +44,7 @@ type Config struct {
 
 // TLSConfig for a Client
 type TLSConfig struct {
-	SkipVerify bool
 	CA         string
-	Cert       string
-	Key        string
 	ServerName string
 }
 
@@ -105,14 +101,7 @@ func NewClient(c *Config) (*Client, error) {
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
-		if c.TLS.ServerName != "" {
-			tc.ServerName = c.TLS.ServerName
-		}
-		//certificate verification config
-		if c.TLS.SkipVerify {
-			client.Infof("TLS verification disabled")
-			tc.InsecureSkipVerify = true
-		} else if c.TLS.CA != "" {
+		if c.TLS.CA != "" {
 			rootCAs := x509.NewCertPool()
 			if b, err := os.ReadFile(c.TLS.CA); err != nil {
 				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
@@ -122,16 +111,6 @@ func NewClient(c *Config) (*Client, error) {
 				client.Infof("TLS verification using CA %s", c.TLS.CA)
 				tc.RootCAs = rootCAs
 			}
-		}
-		//provide client cert and key pair for mtls
-		if c.TLS.Cert != "" && c.TLS.Key != "" {
-			c, err := tls.LoadX509KeyPair(c.TLS.Cert, c.TLS.Key)
-			if err != nil {
-				return nil, fmt.Errorf("Error loading client cert and key pair: %v", err)
-			}
-			tc.Certificates = []tls.Certificate{c}
-		} else if c.TLS.Cert != "" || c.TLS.Key != "" {
-			return nil, fmt.Errorf("Please specify client BOTH cert and key")
 		}
 		client.tlsConfig = tc
 	}
@@ -149,13 +128,6 @@ func NewClient(c *Config) (*Client, error) {
 			return nil, fmt.Errorf("Client cannot listen on %s", r.String())
 		}
 		client.computed.Remotes = append(client.computed.Remotes, r)
-	}
-	//outbound proxy
-	if p := c.Proxy; p != "" {
-		client.proxyURL, err = url.Parse(p)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid proxy URL (%s)", err)
-		}
 	}
 	//ssh auth and config
 	user, pass := settings.ParseAuth(c.Auth)
@@ -228,11 +200,6 @@ func (c *Client) Start(ctx context.Context) error {
 	c.stop = cancel
 	eg, ctx := errgroup.WithContext(ctx)
 	c.eg = eg
-	via := ""
-	if c.proxyURL != nil {
-		via = " via " + c.proxyURL.String()
-	}
-	c.Infof("Connecting to %s%s\n", c.server, via)
 	//connect to chisel server
 	eg.Go(func() error {
 		return c.connectionLoop(ctx)
@@ -245,14 +212,6 @@ func (c *Client) Start(ctx context.Context) error {
 		}
 		return c.tunnel.BindRemotes(ctx, clientInbound)
 	})
-	return nil
-}
-
-func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
-	// CONNECT proxy
-	d.Proxy = func(*http.Request) (*url.URL, error) {
-		return u, nil
-	}
 	return nil
 }
 

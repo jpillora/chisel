@@ -141,7 +141,6 @@ func server(args []string) {
 	flags.BoolVar(&config.Reverse, "reverse", false, "")                  // Used by Valkyrie
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                   // Used by Valkyrie
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                 // Used by Valkyrie
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                     // Can be deleted but left for optional use
 
 	host := flags.String("host", "", "")  // Used by Valkyrie
 	p := flags.String("p", "", "")        // Used by Valkyrie
@@ -314,16 +313,12 @@ var clientHelp = `
 func client(args []string) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError) // Used by Valkyrie
 	config := chclient.Config{Headers: http.Header{}}
-	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Validate if not needed by Valkyrie
+	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Should be used by Valkyrie
 	flags.StringVar(&config.Auth, "auth", "", "")                            // Used by Valkyrie
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Not used but let's keep (alive)
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Should use explicitly to our desired window
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")           // Not used but let's keep
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
-	flags.StringVar(&config.Proxy, "proxy", "", "")                          // Not in use
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Optional but not really needed
-	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")      // Delete ASAP
-	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")                    // Will not be used
-	flags.StringVar(&config.TLS.Key, "tls-key", "", "")                      // Will not be used
 	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
 	hostname := flags.String("hostname", "", "")                             // Can be removed
 	sni := flags.String("sni", "", "")                                       // Can be deleted
