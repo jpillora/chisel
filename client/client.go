@@ -197,7 +197,7 @@ func (c *Client) Start(ctx context.Context) error {
 	c.eg = eg
 	//connect to chisel server
 	eg.Go(func() error {
-		return c.connectionLoop(ctx)
+		return c.connLoop(ctx)
 	})
 	//listen sockets
 	eg.Go(func() error {

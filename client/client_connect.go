@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -15,11 +16,11 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func (c *Client) connectionLoop(ctx context.Context) error {
+func (c *Client) connLoop(ctx context.Context) error {
 	//connection loop!
 	b := &Backoff{Max: c.config.MaxRetryInterval}
 	for {
-		connected, err := c.connectionOnce(ctx)
+		connected, err := c.singularConnect(ctx)
 		//reset backoff after successful connections
 		if connected {
 			b.Reset()
@@ -60,8 +61,8 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	return nil
 }
 
-// connectionOnce connects to the chisel server and blocks
-func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error) {
+// singularConnect connects to the chisel server and blocks
+func (c *Client) singularConnect(ctx context.Context) (connected bool, err error) {
 	//already closed?
 	select {
 	case <-ctx.Done():
@@ -86,6 +87,47 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	}
 	conn := netext.NewWebSocketConn(wsConn)
 	// perform SSH handshake on netext.Conn
+	sshConn, chans, reqs, b, err := c.handshake(err, conn)
+	if err != nil {
+		return b, err
+	}
+	defer sshConn.Close()
+	timer, err2 := c.sendConfiguration(sshConn)
+	if err2 != nil {
+		return false, err2
+	}
+	err, connected = c.handleConnected(ctx, timer, err, sshConn, reqs, chans, connected)
+	return connected, err
+}
+
+func (c *Client) handleConnected(ctx context.Context, timer time.Time, err error, sshConn ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel, connected bool) (error, bool) {
+	c.Infof("Connected (Latency %s)", time.Since(timer))
+	//connected, handover ssh connection for sshconnection to use, and block
+	err = c.tunnel.Bind(ctx, sshConn, reqs, chans)
+	c.Infof("Disconnected")
+	connected = time.Since(timer) > 5*time.Second
+	return err, connected
+}
+
+func (c *Client) sendConfiguration(sshConn ssh.Conn) (time.Time, error) {
+	c.Debugf("Sending config")
+	timer := time.Now()
+	_, configerr, err := sshConn.SendRequest(
+		"config",
+		true,
+		settings.EncodeConfig(c.computed),
+	)
+	if err != nil {
+		c.Infof("Config verification failed")
+		return time.Time{}, err
+	}
+	if len(configerr) > 0 {
+		return time.Time{}, errors.New(string(configerr))
+	}
+	return timer, nil
+}
+
+func (c *Client) handshake(err error, conn net.Conn) (ssh.Conn, <-chan ssh.NewChannel, <-chan *ssh.Request, bool, error) {
 	c.Debugf("Handshaking...")
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, "", c.sshConfig)
 	if err != nil {
@@ -96,29 +138,7 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		} else {
 			c.Infof(e)
 		}
-		return false, err
+		return nil, nil, nil, false, err
 	}
-	defer sshConn.Close()
-	// chisel client handshake (reverse of server handshake)
-	// send configuration
-	c.Debugf("Sending config")
-	t0 := time.Now()
-	_, configerr, err := sshConn.SendRequest(
-		"config",
-		true,
-		settings.EncodeConfig(c.computed),
-	)
-	if err != nil {
-		c.Infof("Config verification failed")
-		return false, err
-	}
-	if len(configerr) > 0 {
-		return false, errors.New(string(configerr))
-	}
-	c.Infof("Connected (Latency %s)", time.Since(t0))
-	//connected, handover ssh connection for sshconnection to use, and block
-	err = c.tunnel.Bind(ctx, sshConn, reqs, chans)
-	c.Infof("Disconnected")
-	connected = time.Since(t0) > 5*time.Second
-	return connected, err
+	return sshConn, chans, reqs, false, nil
 }
