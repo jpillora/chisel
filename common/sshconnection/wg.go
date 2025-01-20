@@ -1,4 +1,4 @@
-package tunnel
+package sshconnection
 
 import (
 	"sync"

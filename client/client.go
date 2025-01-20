@@ -1,4 +1,4 @@
-package chclient
+package client
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/valkyrie-io/connector-tunnel/common/crypto"
 	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
-	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
+	"github.com/valkyrie-io/connector-tunnel/common/sshconnection"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
@@ -55,7 +55,7 @@ type Client struct {
 	server    string
 	stop      func()
 	eg        *errgroup.Group
-	tunnel    *tunnel.SSHTunnel
+	tunnel    *sshconnection.SSHConnection
 }
 
 // NewClient creates a new client instance
@@ -118,7 +118,7 @@ func NewClient(c *Config) (*Client, error) {
 		if r.Reverse {
 			hasReverse = true
 		}
-		//confirm non-reverse tunnel is available
+		//confirm non-reverse sshconnection is available
 		if !r.Reverse && !r.CanListen() {
 			return nil, fmt.Errorf("Client cannot listen on %s", r.String())
 		}
@@ -133,8 +133,8 @@ func NewClient(c *Config) (*Client, error) {
 		HostKeyCallback: client.verifyServer,
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
-	//prepare client tunnel
-	client.tunnel = tunnel.New(tunnel.Config{
+	//prepare client sshconnection
+	client.tunnel = sshconnection.New(sshconnection.Config{
 		Logger:    client.Logger,
 		Inbound:   true, //client always accepts inbound
 		Outbound:  hasReverse,
@@ -205,7 +205,7 @@ func (c *Client) Start(ctx context.Context) error {
 		if len(clientInbound) == 0 {
 			return nil
 		}
-		return c.tunnel.BindRemotes(ctx, clientInbound)
+		return c.tunnel.ConnectRemotes(ctx, clientInbound)
 	})
 	return nil
 }

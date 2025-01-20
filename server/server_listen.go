@@ -1,4 +1,4 @@
-package chserver
+package server
 
 import (
 	"crypto/tls"

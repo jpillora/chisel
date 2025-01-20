@@ -1,4 +1,4 @@
-package chclient
+package client
 
 import (
 	"context"
@@ -9,17 +9,15 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/jpillora/backoff"
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
 	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
-	"github.com/valkyrie-io/connector-tunnel/common/signalling"
 	"golang.org/x/crypto/ssh"
 )
 
 func (c *Client) connectionLoop(ctx context.Context) error {
 	//connection loop!
-	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
+	b := &Backoff{Max: c.config.MaxRetryInterval}
 	for {
 		connected, err := c.connectionOnce(ctx)
 		//reset backoff after successful connections
@@ -53,8 +51,6 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		d := b.Duration()
 		c.Infof("Retrying in %s...", d)
 		select {
-		case <-signalling.AfterSignal(d):
-			continue //retry now
 		case <-ctx.Done():
 			c.Infof("Cancelled")
 			return nil
@@ -120,8 +116,8 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		return false, errors.New(string(configerr))
 	}
 	c.Infof("Connected (Latency %s)", time.Since(t0))
-	//connected, handover ssh connection for tunnel to use, and block
-	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
+	//connected, handover ssh connection for sshconnection to use, and block
+	err = c.tunnel.Bind(ctx, sshConn, reqs, chans)
 	c.Infof("Disconnected")
 	connected = time.Since(t0) > 5*time.Second
 	return connected, err

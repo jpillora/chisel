@@ -1,4 +1,4 @@
-package chserver
+package server
 
 import (
 	"net/http"
@@ -9,7 +9,7 @@ import (
 	chshare "github.com/valkyrie-io/connector-tunnel/common"
 	"github.com/valkyrie-io/connector-tunnel/common/netext"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
-	"github.com/valkyrie-io/connector-tunnel/common/tunnel"
+	"github.com/valkyrie-io/connector-tunnel/common/sshconnection"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -121,7 +121,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			failed(s.Errorf("Reverse port forwaring not enabled on server"))
 			return
 		}
-		//confirm reverse tunnel is available
+		//confirm reverse sshconnection is available
 		if r.Reverse && !r.CanListen() {
 			failed(s.Errorf("Server cannot listen on %s", r.String()))
 			return
@@ -129,8 +129,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	//successfuly validated config!
 	r.Reply(true, nil)
-	//tunnel per ssh connection
-	tunnel := tunnel.New(tunnel.Config{
+	//sshconnection per ssh connection
+	tunnel := sshconnection.New(sshconnection.Config{
 		Logger:    l,
 		Inbound:   s.config.Reverse,
 		Outbound:  true, //server always accepts outbound
@@ -139,8 +139,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	//bind
 	eg, ctx := errgroup.WithContext(req.Context())
 	eg.Go(func() error {
-		//connected, handover ssh connection for tunnel to use, and block
-		return tunnel.BindSSH(ctx, sshConn, reqs, chans)
+		//connected, handover ssh connection for sshconnection to use, and block
+		return tunnel.Bind(ctx, sshConn, reqs, chans)
 	})
 	eg.Go(func() error {
 		//connected, setup reversed-remotes?
@@ -149,7 +149,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			return nil
 		}
 		//block
-		return tunnel.BindRemotes(ctx, serverInbound)
+		return tunnel.ConnectRemotes(ctx, serverInbound)
 	})
 	err = eg.Wait()
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {

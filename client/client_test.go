@@ -1,4 +1,4 @@
-package chclient
+package client
 
 import (
 	"crypto/ecdsa"

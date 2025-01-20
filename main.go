@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/valkyrie-io/connector-tunnel/client"
+	"github.com/valkyrie-io/connector-tunnel/server"
 	"log"
 	"net/http"
 	"os"
@@ -10,11 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valkyrie-io/connector-tunnel/client"
 	"github.com/valkyrie-io/connector-tunnel/common"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
-	"github.com/valkyrie-io/connector-tunnel/common/signalling"
-	"github.com/valkyrie-io/connector-tunnel/server"
 )
 
 var help = `
@@ -23,8 +22,8 @@ var help = `
   Version: ` + common.BuildVersion + ` (` + runtime.Version() + `)
 
   Commands:
-    server - runs valkyrie in server mode
-    client - runs valkyrie in client mode
+    runServer - runs valkyrie in runServer mode
+    runClient - runs valkyrie in runClient mode
 
   Read more:
     https://github.com/valkyrie-io/connector-tunnel
@@ -54,10 +53,10 @@ func main() {
 	}
 
 	switch subcmd {
-	case "server":
-		server(args)
-	case "client":
-		client(args)
+	case "runServer":
+		runServer(args)
+	case "runClient":
+		runClient(args)
 	default:
 		fmt.Print(help)
 		os.Exit(0)
@@ -72,14 +71,14 @@ var commonHelp = `
   Signals:
     The valkyrie process is listening for:
       a SIGUSR2 to print process stats, and
-      a SIGHUP to short-circuit the client reconnect timer
+      a SIGHUP to short-circuit the runClient reconnect timer
 
   Version:
     ` + common.BuildVersion + ` (` + runtime.Version() + `)
 `
 
 var serverHelp = `
-  Usage: valkyrie server [options]
+  Usage: valkyrie runServer [options]
 
   Options:
 
@@ -93,7 +92,7 @@ var serverHelp = `
     this flag is set, the --key option is ignored, and the provided private key
     is used to secure all communications. (defaults to the VALKYRIE_KEY_FILE
     environment variable). Since ECDSA keys are short, you may also set keyfile
-    to an inline base64 private key (e.g. valkyrie server --keygen - | base64).
+    to an inline base64 private key (e.g. valkyrie runServer --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -126,15 +125,34 @@ var serverHelp = `
 
     --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
     holding multiple PEM encode CA certificate bundle files, which is used to 
-    validate client connections. The provided CA certificates will be used 
+    validate runClient connections. The provided CA certificates will be used 
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
-func server(args []string) {
+func runServer(args []string) {
 
-	flags := flag.NewFlagSet("server", flag.ContinueOnError)
+	config, host, p, port, verbose := parseServerFlags(args)
 
-	config := &chserver.Config{}
+	assignServerDefaults(host, port, p, config)
+	doRunServer(config, verbose)
+}
+
+func doRunServer(config *server.Config, verbose *bool) {
+	s, err := server.NewServer(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	s.Debug = *verbose
+
+	if err := s.Wait(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseServerFlags(args []string) (*server.Config, *string, *string, *string, *bool) {
+	flags := flag.NewFlagSet("runServer", flag.ContinueOnError)
+
+	config := &server.Config{}
 	flags.StringVar(&config.KeyFile, "keyfile", "", "")                   // Should be used for Secure SSH and FP
 	flags.StringVar(&config.AuthFile, "authfile", "", "")                 // Used by Valkyrie
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "") // Should use explicitly to our desired window
@@ -152,7 +170,10 @@ func server(args []string) {
 		os.Exit(0)
 	}
 	flags.Parse(args)
+	return config, host, p, port, verbose
+}
 
+func assignServerDefaults(host *string, port *string, p *string, config *server.Config) {
 	if *host == "" {
 		*host = os.Getenv("HOST")
 	}
@@ -171,18 +192,128 @@ func server(args []string) {
 	if config.KeyFile == "" {
 		config.KeyFile = settings.Env("KEY_FILE")
 	}
-	s, err := chserver.NewServer(config)
+}
+
+var clientHelp = `
+  Usage: valkyrie runClient [options] <runServer> <remote> [remote] [remote] ...
+
+  <runServer> is the URL to the valkyrie runServer.
+
+  <remote>s are remote connections tunneled through the runServer, each of
+  which come in the form:
+
+    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
+
+    ■ local-host defaults to 0.0.0.0 (all interfaces).
+    ■ local-port defaults to remote-port.
+    ■ remote-port is required*.
+    ■ remote-host defaults to 0.0.0.0 (runServer localhost).
+    ■ protocol defaults to tcp.
+
+  which shares <remote-host>:<remote-port> from the runServer to the runClient
+  as <local-host>:<local-port>, or:
+
+    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
+
+  which does reverse port forwarding, sharing <remote-host>:<remote-port>
+  from the runClient to the runServer's <local-interface>:<local-port>.
+
+    example remotes
+
+      3000
+      example.com:3000
+      3000:google.com:80
+      192.168.0.5:3000:google.com:80
+      R:2222:localhost:22
+
+    When the valkyrie runServer has --reverse enabled, remotes can
+    be prefixed with R to denote that they are reversed. That
+    is, the runServer will listen and accept connections, and they
+    will be proxied through the runClient which specified the remote.
+
+  Options:
+
+    --fingerprint, A *strongly recommended* fingerprint string
+    to perform host-key validation against the runServer's public key.
+	Fingerprint mismatches will close the connection.
+	Fingerprints are generated by hashing the ECDSA public key using
+	SHA256 and encoding the result in base64.
+	Fingerprints must be 44 characters containing a trailing equals (=).
+
+    --auth, An optional username and password (runClient authentication)
+    in the form: "<user>:<pass>". These credentials are compared to
+    the credentials inside the runServer's --authfile. defaults to the
+    AUTH environment variable.
+
+    --keepalive, An optional keepalive interval. Since the underlying
+    transport is HTTP, in many instances we'll be traversing through
+    proxies, often these proxies will close idle connections. You must
+    specify a time with a unit, for example '5s' or '2m'. Defaults
+    to '25s' (set to 0s to disable).
+
+    --max-retry-count, Maximum number of times to retry before exiting.
+    Defaults to unlimited.
+
+    --max-retry-interval, Maximum wait time before retrying after a
+    disconnection. Defaults to 5 minutes.
+
+    --header, Set a custom header in the form "HeaderName: HeaderContent".
+    Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
+
+    --tls-ca, An optional root certificate bundle used to verify the
+    valkyrie runServer. Only valid when connecting to the runServer with
+    "https" or "wss". By default, the operating system CAs will be used.
+` + commonHelp
+
+func runClient(args []string) {
+	config, verbose, args := parseClientFlags(args)
+	if len(args) < 2 {
+		log.Fatalf("A runServer and least one remote is required")
+	}
+	assignClientDefaults(args, config)
+
+	//ready
+	doRunClient(config, verbose)
+}
+
+func parseClientFlags(args []string) (client.Config, *bool, []string) {
+	flags := flag.NewFlagSet("runClient", flag.ContinueOnError) // Used by Valkyrie
+	config := client.Config{Headers: http.Header{}}
+	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Should be used by Valkyrie
+	flags.StringVar(&config.Auth, "auth", "", "")                            // Used by Valkyrie
+	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Should use explicitly to our desired window
+	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")           // Not used but let's keep
+	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
+	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Not used but let's keep
+	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
+	verbose := flags.Bool("v", false, "")                                    // Used by Valkyrie
+	flags.Usage = func() {
+		fmt.Print(clientHelp)
+		os.Exit(0)
+	}
+	flags.Parse(args)
+	//pull out options, put back remaining args
+	args = flags.Args()
+	return config, verbose, args
+}
+
+func assignClientDefaults(args []string, config client.Config) {
+	config.Server = args[0]
+	config.Remotes = args[1:]
+	//default auth
+	if config.Auth == "" {
+		config.Auth = os.Getenv("AUTH")
+	}
+}
+
+func doRunClient(config client.Config, verbose *bool) {
+	c, err := client.NewClient(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	s.Debug = *verbose
+	c.Debug = *verbose
 
-	go signalling.GoStats()
-	ctx := signalling.InterruptContext()
-	if err := s.StartContext(ctx, *host, *port); err != nil {
-		log.Fatal(err)
-	}
-	if err := s.Wait(); err != nil {
+	if err := c.Wait(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -211,119 +342,4 @@ func (flag *headerFlags) Set(arg string) error {
 	value := arg[index+1:]
 	flag.Header.Set(key, strings.TrimSpace(value))
 	return nil
-}
-
-var clientHelp = `
-  Usage: valkyrie client [options] <server> <remote> [remote] [remote] ...
-
-  <server> is the URL to the valkyrie server.
-
-  <remote>s are remote connections tunneled through the server, each of
-  which come in the form:
-
-    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
-
-    ■ local-host defaults to 0.0.0.0 (all interfaces).
-    ■ local-port defaults to remote-port.
-    ■ remote-port is required*.
-    ■ remote-host defaults to 0.0.0.0 (server localhost).
-    ■ protocol defaults to tcp.
-
-  which shares <remote-host>:<remote-port> from the server to the client
-  as <local-host>:<local-port>, or:
-
-    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
-
-  which does reverse port forwarding, sharing <remote-host>:<remote-port>
-  from the client to the server's <local-interface>:<local-port>.
-
-    example remotes
-
-      3000
-      example.com:3000
-      3000:google.com:80
-      192.168.0.5:3000:google.com:80
-      R:2222:localhost:22
-
-    When the valkyrie server has --reverse enabled, remotes can
-    be prefixed with R to denote that they are reversed. That
-    is, the server will listen and accept connections, and they
-    will be proxied through the client which specified the remote.
-
-  Options:
-
-    --fingerprint, A *strongly recommended* fingerprint string
-    to perform host-key validation against the server's public key.
-	Fingerprint mismatches will close the connection.
-	Fingerprints are generated by hashing the ECDSA public key using
-	SHA256 and encoding the result in base64.
-	Fingerprints must be 44 characters containing a trailing equals (=).
-
-    --auth, An optional username and password (client authentication)
-    in the form: "<user>:<pass>". These credentials are compared to
-    the credentials inside the server's --authfile. defaults to the
-    AUTH environment variable.
-
-    --keepalive, An optional keepalive interval. Since the underlying
-    transport is HTTP, in many instances we'll be traversing through
-    proxies, often these proxies will close idle connections. You must
-    specify a time with a unit, for example '5s' or '2m'. Defaults
-    to '25s' (set to 0s to disable).
-
-    --max-retry-count, Maximum number of times to retry before exiting.
-    Defaults to unlimited.
-
-    --max-retry-interval, Maximum wait time before retrying after a
-    disconnection. Defaults to 5 minutes.
-
-    --header, Set a custom header in the form "HeaderName: HeaderContent".
-    Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
-
-    --tls-ca, An optional root certificate bundle used to verify the
-    valkyrie server. Only valid when connecting to the server with
-    "https" or "wss". By default, the operating system CAs will be used.
-` + commonHelp
-
-func client(args []string) {
-	flags := flag.NewFlagSet("client", flag.ContinueOnError) // Used by Valkyrie
-	config := chclient.Config{Headers: http.Header{}}
-	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Should be used by Valkyrie
-	flags.StringVar(&config.Auth, "auth", "", "")                            // Used by Valkyrie
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")    // Should use explicitly to our desired window
-	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")           // Not used but let's keep
-	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "") // Not used but let's keep
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")                        // Not used but let's keep
-	flags.Var(&headerFlags{config.Headers}, "header", "")                    // Let's keep
-	verbose := flags.Bool("v", false, "")                                    // Used by Valkyrie
-	flags.Usage = func() {
-		fmt.Print(clientHelp)
-		os.Exit(0)
-	}
-	flags.Parse(args)
-	//pull out options, put back remaining args
-	args = flags.Args()
-	if len(args) < 2 {
-		log.Fatalf("A server and least one remote is required")
-	}
-	config.Server = args[0]
-	config.Remotes = args[1:]
-	//default auth
-	if config.Auth == "" {
-		config.Auth = os.Getenv("AUTH")
-	}
-
-	//ready
-	c, err := chclient.NewClient(&config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.Debug = *verbose
-	go signalling.GoStats()
-	ctx := signalling.InterruptContext()
-	if err := c.Start(ctx); err != nil {
-		log.Fatal(err)
-	}
-	if err := c.Wait(); err != nil {
-		log.Fatal(err)
-	}
 }

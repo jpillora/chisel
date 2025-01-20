@@ -1,4 +1,4 @@
-package tunnel
+package sshconnection
 
 import (
 	"context"
@@ -6,16 +6,15 @@ import (
 	"net"
 	"sync"
 
-	"github.com/jpillora/sizestr"
 	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 
-// Proxy is the inbound portion of a SSHTunnel
-type Proxy struct {
+// SSHInbound is the inbound portion of a SSHConnection
+type SSHInbound struct {
 	*logging.Logger
-	tunnel *SSHTunnel
+	tunnel *SSHConnection
 	id     int
 	count  int
 	remote *settings.Remote
@@ -24,10 +23,10 @@ type Proxy struct {
 	mu     sync.Mutex
 }
 
-// newProxy creates a Proxy
-func newProxy(logger *logging.Logger, tunnel *SSHTunnel, index int, remote *settings.Remote) (*Proxy, error) {
+// newProxy creates a SSHInbound
+func newProxy(logger *logging.Logger, tunnel *SSHConnection, index int, remote *settings.Remote) (*SSHInbound, error) {
 	id := index + 1
-	p := &Proxy{
+	p := &SSHInbound{
 		Logger: logger.Fork("proxy#%s", remote.String()),
 		tunnel: tunnel,
 		id:     id,
@@ -36,7 +35,7 @@ func newProxy(logger *logging.Logger, tunnel *SSHTunnel, index int, remote *sett
 	return p, p.listen()
 }
 
-func (p *Proxy) listen() error {
+func (p *SSHInbound) listen() error {
 	if p.remote.LocalProto == "tcp" {
 		addr, err := net.ResolveTCPAddr("tcp", p.remote.LocalHost+":"+p.remote.LocalPort)
 		if err != nil {
@@ -54,7 +53,7 @@ func (p *Proxy) listen() error {
 	return nil
 }
 
-func (p *Proxy) runTCP(ctx context.Context) error {
+func (p *SSHInbound) runTCP(ctx context.Context) error {
 	done := make(chan struct{})
 	go p.handleContextChange(ctx, done)
 	for {
@@ -74,7 +73,7 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 	}
 }
 
-func (p *Proxy) handleContextChange(ctx context.Context, done chan struct{}) {
+func (p *SSHInbound) handleContextChange(ctx context.Context, done chan struct{}) {
 	select {
 	case <-ctx.Done():
 		p.tcp.Close()
@@ -82,7 +81,7 @@ func (p *Proxy) handleContextChange(ctx context.Context, done chan struct{}) {
 	}
 }
 
-func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
+func (p *SSHInbound) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	defer src.Close()
 	cid := p.atomicIncreaseConnCounter()
 	l := p.Fork("conn#%d", cid)
@@ -94,7 +93,7 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	p.closeSSHChannel(reqs, src, dst, l)
 }
 
-func (p *Proxy) atomicIncreaseConnCounter() int {
+func (p *SSHInbound) atomicIncreaseConnCounter() int {
 	p.mu.Lock()
 	p.count++
 	cid := p.count
@@ -102,7 +101,7 @@ func (p *Proxy) atomicIncreaseConnCounter() int {
 	return cid
 }
 
-func (p *Proxy) connectAndOpenSSHChannel(ctx context.Context, l *logging.Logger) (ssh.Channel, <-chan *ssh.Request, bool) {
+func (p *SSHInbound) connectAndOpenSSHChannel(ctx context.Context, l *logging.Logger) (ssh.Channel, <-chan *ssh.Request, bool) {
 	sshConn, done := p.connectSSH(ctx, l)
 	if done {
 		return nil, nil, true
@@ -116,7 +115,7 @@ func (p *Proxy) connectAndOpenSSHChannel(ctx context.Context, l *logging.Logger)
 	return dst, reqs, false
 }
 
-func (p *Proxy) connectSSH(ctx context.Context, l *logging.Logger) (ssh.Conn, bool) {
+func (p *SSHInbound) connectSSH(ctx context.Context, l *logging.Logger) (ssh.Conn, bool) {
 	l.Debugf("Open")
 	sshConn := p.tunnel.getSSH(ctx)
 	if sshConn == nil {
@@ -126,8 +125,8 @@ func (p *Proxy) connectSSH(ctx context.Context, l *logging.Logger) (ssh.Conn, bo
 	return sshConn, false
 }
 
-func (p *Proxy) closeSSHChannel(reqs <-chan *ssh.Request, src io.ReadWriteCloser, dst ssh.Channel, l *logging.Logger) {
+func (p *SSHInbound) closeSSHChannel(reqs <-chan *ssh.Request, src io.ReadWriteCloser, dst ssh.Channel, l *logging.Logger) {
 	go ssh.DiscardRequests(reqs)
 	s, r := Pipe(src, dst)
-	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
+	l.Debugf("Close (sent %s received %s)", formatBytes(s), formatBytes(r))
 }

@@ -44,7 +44,7 @@ See [the latest release](https://github.com/valkyrie-io/connector-tunnel/release
 [![Docker Pulls](https://img.shields.io/docker/pulls/valkyrie-io/connector-tunnel.svg)](https://hub.docker.com/r/valkyrie-io/connector-tunnel/) [![Image Size](https://img.shields.io/docker/image-size/valkyrie-io/connector-tunnel/latest)](https://microbadger.com/images/valkyrie-io/connector-tunnel)
 
 ```sh
-docker run --rm -it valkyrie-io/connector-tunnel --help
+docker run --rm -it valkyrie-io/connector-sshconnection --help
 ```
 
 ### Fedora
@@ -58,7 +58,7 @@ sudo dnf -y install valkyrie
 ### Source
 
 ```sh
-$ go install github.com/valkyrie-io/connector-tunnel@latest
+$ go install github.com/valkyrie-io/connector-sshconnection@latest
 ```
 
 ## Demo
@@ -375,7 +375,7 @@ Internally, this is done using the _Password_ authentication method provided by 
 1. Start your valkyrie server
 
     ```sh
-    valkyrie-io/connector-tunnel server --keyfile '<ck-base64 string or file path>' -p 9312 --socks5
+    valkyrie-io/connector-sshconnection server --keyfile '<ck-base64 string or file path>' -p 9312 --socks5
     ```
 
 1. Connect your valkyrie client (using server's fingerprint)

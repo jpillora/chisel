@@ -1,4 +1,4 @@
-package tunnel
+package sshconnection
 
 import (
 	"fmt"
@@ -6,13 +6,12 @@ import (
 	"net"
 	"strings"
 
-	"github.com/jpillora/sizestr"
 	"github.com/valkyrie-io/connector-tunnel/common/logging"
 	"github.com/valkyrie-io/connector-tunnel/common/settings"
 	"golang.org/x/crypto/ssh"
 )
 
-func (t *SSHTunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
+func (t *SSHConnection) handleSSHRequests(reqs <-chan *ssh.Request) {
 	for r := range reqs {
 		switch r.Type {
 		case "valkyrie-syn":
@@ -23,13 +22,13 @@ func (t *SSHTunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
 	}
 }
 
-func (t *SSHTunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
+func (t *SSHConnection) handleSSHChannels(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		go t.handleSSHChannel(ch)
 	}
 }
 
-func (t *SSHTunnel) handleSSHChannel(ch ssh.NewChannel) {
+func (t *SSHConnection) handleSSHChannel(ch ssh.NewChannel) {
 	if !t.validateAllowOutbound(ch) {
 		return
 	}
@@ -43,7 +42,7 @@ func (t *SSHTunnel) handleSSHChannel(ch ssh.NewChannel) {
 	t.closeConnection(err, l)
 }
 
-func (t *SSHTunnel) connectRemote(ch ssh.NewChannel) (string, <-chan *ssh.Request, io.ReadWriteCloser, error) {
+func (t *SSHConnection) connectRemote(ch ssh.NewChannel) (string, <-chan *ssh.Request, io.ReadWriteCloser, error) {
 	remote := string(ch.ExtraData())
 	//extract protocol
 	hostPort := settings.L4Proto(remote)
@@ -56,7 +55,7 @@ func (t *SSHTunnel) connectRemote(ch ssh.NewChannel) (string, <-chan *ssh.Reques
 	return hostPort, reqs, stream, err
 }
 
-func (t *SSHTunnel) validateAllowOutbound(ch ssh.NewChannel) bool {
+func (t *SSHConnection) validateAllowOutbound(ch ssh.NewChannel) bool {
 	if !t.Config.Outbound {
 		t.Debugf("Denied outbound connection")
 		ch.Reject(ssh.Prohibited, "Denied outbound connection")
@@ -65,7 +64,7 @@ func (t *SSHTunnel) validateAllowOutbound(ch ssh.NewChannel) bool {
 	return true
 }
 
-func (t *SSHTunnel) handleOpenConnection(err error, stream io.ReadWriteCloser, hostPort string) (*logging.Logger, error) {
+func (t *SSHConnection) handleOpenConnection(err error, stream io.ReadWriteCloser, hostPort string) (*logging.Logger, error) {
 	l := t.Logger.Fork("conn#%d", t.connStats.New())
 	//ready to handle
 	t.connStats.Open()
@@ -74,7 +73,7 @@ func (t *SSHTunnel) handleOpenConnection(err error, stream io.ReadWriteCloser, h
 	return l, err
 }
 
-func (t *SSHTunnel) closeConnection(err error, l *logging.Logger) {
+func (t *SSHConnection) closeConnection(err error, l *logging.Logger) {
 	t.connStats.Close()
 	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
@@ -84,12 +83,12 @@ func (t *SSHTunnel) closeConnection(err error, l *logging.Logger) {
 	l.Debugf("Close %s%s", t.connStats.String(), errmsg)
 }
 
-func (t *SSHTunnel) handleTCP(l *logging.Logger, src io.ReadWriteCloser, hostPort string) error {
+func (t *SSHConnection) handleTCP(l *logging.Logger, src io.ReadWriteCloser, hostPort string) error {
 	dst, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		return err
 	}
 	s, r := Pipe(src, dst)
-	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
+	l.Debugf("sent %s received %s", formatBytes(s), formatBytes(r))
 	return nil
 }

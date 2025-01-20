@@ -1,4 +1,4 @@
-package tunnel
+package sshconnection
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Config a SSHTunnel
+// Config a SSHConnection
 type Config struct {
 	*logging.Logger
 	Inbound   bool
@@ -28,7 +28,7 @@ type Config struct {
 // Each remote has a 1:1 mapping to a proxy.
 // Proxies listen, send data over ssh, and the other end of the ssh connection
 // communicates with the endpoint and returns the response.
-type SSHTunnel struct {
+type SSHConnection struct {
 	Config
 	activeConnMut  sync.RWMutex
 	activatingConn waitGroup
@@ -37,17 +37,17 @@ type SSHTunnel struct {
 	connStats      netext.ConnCount
 }
 
-func New(c Config) *SSHTunnel {
-	c.Logger = c.Logger.Fork("SSHTunnel")
-	t := &SSHTunnel{
+func New(c Config) *SSHConnection {
+	c.Logger = c.Logger.Fork("SSHConnection")
+	t := &SSHConnection{
 		Config: c,
 	}
 	t.activatingConn.Add(1)
 	return t
 }
 
-// BindSSH provides an active SSH for use for tunnelling
-func (t *SSHTunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel) error {
+// Bind provides an active SSH for use for tunnelling
+func (t *SSHConnection) Bind(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel) error {
 	//link ctx to ssh-conn
 	go t.linkCtxToSSHConnection(ctx, c)
 	t.markActiveAndUnblock(c)
@@ -57,7 +57,7 @@ func (t *SSHTunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Re
 	return err
 }
 
-func (t *SSHTunnel) linkCtxToSSHConnection(ctx context.Context, c ssh.Conn) {
+func (t *SSHConnection) linkCtxToSSHConnection(ctx context.Context, c ssh.Conn) {
 	<-ctx.Done()
 	if c.Close() == nil {
 		t.Debugf("SSH cancelled")
@@ -65,7 +65,7 @@ func (t *SSHTunnel) linkCtxToSSHConnection(ctx context.Context, c ssh.Conn) {
 	t.activatingConn.DoneAll()
 }
 
-func (t *SSHTunnel) markActiveAndUnblock(c ssh.Conn) {
+func (t *SSHConnection) markActiveAndUnblock(c ssh.Conn) {
 	t.activeConnMut.Lock()
 	if t.activeConn != nil {
 		panic("double bind ssh")
@@ -75,13 +75,13 @@ func (t *SSHTunnel) markActiveAndUnblock(c ssh.Conn) {
 	t.activatingConn.Done()
 }
 
-func (t *SSHTunnel) keepAliveIfNeeded(c ssh.Conn) {
+func (t *SSHConnection) keepAliveIfNeeded(c ssh.Conn) {
 	if t.Config.KeepAlive > 0 {
 		go t.keepAliveLoop(c)
 	}
 }
 
-func (t *SSHTunnel) blockSSHUntilClosed(reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel, c ssh.Conn) error {
+func (t *SSHConnection) blockSSHUntilClosed(reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel, c ssh.Conn) error {
 	go t.handleSSHRequests(reqs)
 	go t.handleSSHChannels(chans)
 	t.Debugf("SSH connected")
@@ -90,7 +90,7 @@ func (t *SSHTunnel) blockSSHUntilClosed(reqs <-chan *ssh.Request, chans <-chan s
 	return err
 }
 
-func (t *SSHTunnel) markSSHInactiveAndBlock() {
+func (t *SSHConnection) markSSHInactiveAndBlock() {
 	t.activatingConn.Add(1)
 	t.activeConnMut.Lock()
 	t.activeConn = nil
@@ -98,7 +98,7 @@ func (t *SSHTunnel) markSSHInactiveAndBlock() {
 }
 
 // getSSH blocks while connecting
-func (t *SSHTunnel) getSSH(ctx context.Context) ssh.Conn {
+func (t *SSHConnection) getSSH(ctx context.Context) ssh.Conn {
 	conn, done := t.validateConn(ctx)
 	if done {
 		return conn
@@ -106,7 +106,7 @@ func (t *SSHTunnel) getSSH(ctx context.Context) ssh.Conn {
 	return t.connectSSH(ctx)
 }
 
-func (t *SSHTunnel) validateConn(ctx context.Context) (ssh.Conn, bool) {
+func (t *SSHConnection) validateConn(ctx context.Context) (ssh.Conn, bool) {
 	//cancelled already?
 	if isDone(ctx) {
 		return nil, true
@@ -121,7 +121,7 @@ func (t *SSHTunnel) validateConn(ctx context.Context) (ssh.Conn, bool) {
 	return nil, false
 }
 
-func (t *SSHTunnel) connectSSH(ctx context.Context) ssh.Conn {
+func (t *SSHConnection) connectSSH(ctx context.Context) ssh.Conn {
 	select {
 	case <-ctx.Done(): //cancelled
 		return nil
@@ -135,7 +135,7 @@ func (t *SSHTunnel) connectSSH(ctx context.Context) ssh.Conn {
 	}
 }
 
-func (t *SSHTunnel) activatingConnWait() <-chan struct{} {
+func (t *SSHConnection) activatingConnWait() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
 		t.activatingConn.Wait()
@@ -144,26 +144,26 @@ func (t *SSHTunnel) activatingConnWait() <-chan struct{} {
 	return ch
 }
 
-// BindRemotes converts the given remotes into proxies, and blocks
+// ConnectRemotes converts the given remotes into proxies, and blocks
 // until the caller cancels the context or there is a proxy error.
-func (t *SSHTunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) error {
+func (t *SSHConnection) ConnectRemotes(ctx context.Context, remotes []*settings.Remote) error {
 	if len(remotes) == 0 {
 		return errors.New("no remotes")
 	}
 	if !t.Inbound {
 		return errors.New("inbound connections blocked")
 	}
-	proxies := make([]*Proxy, len(remotes))
+	proxies := make([]*SSHInbound, len(remotes))
 	err2 := t.createRemoteProxies(remotes, proxies)
 	if err2 != nil {
 		return err2
 	}
-	//TODO: handle tunnel close
+	//TODO: handle sshconnection close
 	eg, ctx := errgroup.WithContext(ctx)
 	return t.runTCPRemotes(ctx, proxies, eg)
 }
 
-func (t *SSHTunnel) runTCPRemotes(ctx context.Context, proxies []*Proxy, eg *errgroup.Group) error {
+func (t *SSHConnection) runTCPRemotes(ctx context.Context, proxies []*SSHInbound, eg *errgroup.Group) error {
 	for _, proxy := range proxies {
 		p := proxy
 		eg.Go(func() error {
@@ -176,7 +176,7 @@ func (t *SSHTunnel) runTCPRemotes(ctx context.Context, proxies []*Proxy, eg *err
 	return err
 }
 
-func (t *SSHTunnel) createRemoteProxies(remotes []*settings.Remote, proxies []*Proxy) error {
+func (t *SSHConnection) createRemoteProxies(remotes []*settings.Remote, proxies []*SSHInbound) error {
 	for i, remote := range remotes {
 		err2 := t.createRemoteProxy(remote, proxies, i)
 		if err2 != nil {
@@ -186,7 +186,7 @@ func (t *SSHTunnel) createRemoteProxies(remotes []*settings.Remote, proxies []*P
 	return nil
 }
 
-func (t *SSHTunnel) createRemoteProxy(remote *settings.Remote, proxies []*Proxy, i int) error {
+func (t *SSHConnection) createRemoteProxy(remote *settings.Remote, proxies []*SSHInbound, i int) error {
 	p, err := newProxy(t.Logger, t, t.proxyCount, remote)
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func (t *SSHTunnel) createRemoteProxy(remote *settings.Remote, proxies []*Proxy,
 	return nil
 }
 
-func (t *SSHTunnel) keepAliveLoop(sshConn ssh.Conn) {
+func (t *SSHConnection) keepAliveLoop(sshConn ssh.Conn) {
 	//ping forever
 	for {
 		time.Sleep(t.Config.KeepAlive)
