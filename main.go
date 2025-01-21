@@ -68,11 +68,6 @@ var commonHelp = `
 
     --help, This help text
 
-  Signals:
-    The valkyrie process is listening for:
-      a SIGUSR2 to print process stats, and
-      a SIGHUP to short-circuit the client reconnect timer
-
   Version:
     ` + common.BuildVersion + ` (` + runtime.Version() + `)
 `
