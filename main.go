@@ -22,7 +22,7 @@ var help = `
   Version: ` + common.BuildVersion + ` (` + runtime.Version() + `)
 
   Commands:
-    runServer - runs valkyrie in runServer mode
+    server - runs valkyrie in server mode
     client - runs valkyrie in client mode
 
   Read more:
@@ -53,9 +53,9 @@ func main() {
 	}
 
 	switch subcmd {
-	case "runServer":
+	case "server":
 		runServer(args)
-	case "runClient":
+	case "client":
 		runClient(args)
 	default:
 		fmt.Print(help)
@@ -78,7 +78,7 @@ var commonHelp = `
 `
 
 var serverHelp = `
-  Usage: valkyrie runServer [options]
+  Usage: valkyrie server [options]
 
   Options:
 
@@ -92,7 +92,7 @@ var serverHelp = `
     this flag is set, the --key option is ignored, and the provided private key
     is used to secure all communications. (defaults to the VALKYRIE_KEY_FILE
     environment variable). Since ECDSA keys are short, you may also set keyfile
-    to an inline base64 private key (e.g. valkyrie runServer --keygen - | base64).
+    to an inline base64 private key (e.g. valkyrie server --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -268,7 +268,7 @@ var clientHelp = `
 func runClient(args []string) {
 	config, verbose, args := parseClientFlags(args)
 	if len(args) < 2 {
-		log.Fatalf("A runServer and least one remote is required")
+		log.Fatalf("A server and least one remote is required")
 	}
 	assignClientDefaults(args, config)
 
@@ -277,7 +277,7 @@ func runClient(args []string) {
 }
 
 func parseClientFlags(args []string) (client.Config, *bool, []string) {
-	flags := flag.NewFlagSet("runClient", flag.ContinueOnError) // Used by Valkyrie
+	flags := flag.NewFlagSet("client", flag.ContinueOnError) // Used by Valkyrie
 	config := client.Config{Headers: http.Header{}}
 	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")              // Should be used by Valkyrie
 	flags.StringVar(&config.Auth, "auth", "", "")                            // Used by Valkyrie
