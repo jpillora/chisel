@@ -216,12 +216,14 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 			//generate private key (optionally using seed)
 			key, err := ccrypto.GenerateKey(os.Getenv("CHISEL_KEY"))
 			if err != nil {
-				c.logger.Fatal("Failed to generate key from CHISEL_KEY")
+				c.Logger.Infof("Failed to generate key from CHISEL_KEY")
+				return err
 			}
 			//convert into ssh.PrivateKey
 			private, err := ssh.ParsePrivateKey(key)
 			if err != nil {
-				c.logger.Fatal("Failed to parse key")
+				c.Logger.Infof("Failed to parse key")
+				return err
 			}
 			//fingerprint this key
 			expect = ccrypto.FingerprintKey(private.PublicKey())
