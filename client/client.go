@@ -8,8 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -44,6 +42,7 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Verbose          bool
 }
 
 // TLSConfig for a Client
@@ -52,6 +51,7 @@ type TLSConfig struct {
 	CA         string
 	Cert       string
 	Key        string
+	ServerName string
 }
 
 // Client represents a client instance
@@ -112,13 +112,16 @@ func NewClient(c *Config) (*Client, error) {
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
+		if c.TLS.ServerName != "" {
+			tc.ServerName = c.TLS.ServerName
+		}
 		//certificate verification config
 		if c.TLS.SkipVerify {
 			client.Infof("TLS verification disabled")
 			tc.InsecureSkipVerify = true
 		} else if c.TLS.CA != "" {
 			rootCAs := x509.NewCertPool()
-			if b, err := ioutil.ReadFile(c.TLS.CA); err != nil {
+			if b, err := os.ReadFile(c.TLS.CA); err != nil {
 				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
 			} else if ok := rootCAs.AppendCertsFromPEM(b); !ok {
 				return nil, fmt.Errorf("Failed to decode PEM: %s", c.TLS.CA)
@@ -213,12 +216,12 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 			//generate private key (optionally using seed)
 			key, err := ccrypto.GenerateKey(os.Getenv("CHISEL_KEY"))
 			if err != nil {
-				log.Fatal("Failed to generate key from CHISEL_KEY")
+				c.logger.Fatal("Failed to generate key from CHISEL_KEY")
 			}
 			//convert into ssh.PrivateKey
 			private, err := ssh.ParsePrivateKey(key)
 			if err != nil {
-				log.Fatal("Failed to parse key")
+				c.logger.Fatal("Failed to parse key")
 			}
 			//fingerprint this key
 			expect = ccrypto.FingerprintKey(private.PublicKey())

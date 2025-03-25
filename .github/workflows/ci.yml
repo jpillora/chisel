@@ -1,16 +1,17 @@
-on: [push, pull_request]
 name: CI
+on:
+  pull_request: {}
+  push: {}
+permissions: write-all
 jobs:
   # ================
-  # TEST JOB
-  #   runs on every push and PR
-  #   runs 2x3 times (see matrix)
+  # BUILD AND TEST JOB
   # ================
   test:
-    name: Test
+    name: Build & Test
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: ["stable"]
         platform: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -59,6 +60,7 @@ jobs:
           version: latest
           args: release --debug --rm-dist --config .github/goreleaser.yml
         env:
+          GITHUB_USER: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Your GoReleaser Pro key, if you are using the 'goreleaser-pro' distribution
           # GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

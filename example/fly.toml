@@ -1,0 +1,13 @@
+app = "jp-chisel"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[build]
+  dockerfile = "Flyfile"
+
+[[services]]
+  internal_port = 443
+  protocol = "tcp"
+  [[services.ports]]
+    port = "443"

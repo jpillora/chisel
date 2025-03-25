@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"path"
 	"testing"
 
 	chclient "github.com/jpillora/chisel/client"
@@ -8,25 +9,22 @@ import (
 )
 
 func TestTLS(t *testing.T) {
+	tlsConfig, err := newTestTLSConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tlsConfig.Close()
+
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: chserver.TLSConfig{
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
-				CA:   "tls/server-ca/client.crt",
-			},
+			TLS: *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
-			TLS: chclient.TLSConfig{
-				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
-				CA:   "tls/client-ca/server.crt",
-				Cert: "tls/client-crt/client.crt",
-				Key:  "tls/client-crt/client.key",
-			},
-			Server: "https://localhost:" + tmpPort,
+			TLS:     *tlsConfig.clientTLS,
+			Server:  "https://localhost:" + tmpPort,
 		})
 	defer teardown()
 	//test remote
@@ -40,25 +38,24 @@ func TestTLS(t *testing.T) {
 }
 
 func TestMTLS(t *testing.T) {
+	tlsConfig, err := newTestTLSConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tlsConfig.Close()
+	//provide no client cert, server should reject the client request
+	tlsConfig.serverTLS.CA = path.Dir(tlsConfig.serverTLS.CA)
+
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: chserver.TLSConfig{
-				CA:   "tls/server-ca",
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
-			},
+			TLS: *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
-			TLS: chclient.TLSConfig{
-				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
-				CA:   "tls/client-ca/server.crt",
-				Cert: "tls/client-crt/client.crt",
-				Key:  "tls/client-crt/client.key",
-			},
-			Server: "https://localhost:" + tmpPort,
+			TLS:     *tlsConfig.clientTLS,
+			Server:  "https://localhost:" + tmpPort,
 		})
 	defer teardown()
 	//test remote
@@ -72,60 +69,59 @@ func TestMTLS(t *testing.T) {
 }
 
 func TestTLSMissingClientCert(t *testing.T) {
+	tlsConfig, err := newTestTLSConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tlsConfig.Close()
+	//provide no client cert, server should reject the client request
+	tlsConfig.clientTLS.Cert = ""
+	tlsConfig.clientTLS.Key = ""
+
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: chserver.TLSConfig{
-				CA:   "tls/server-ca/client.crt",
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
-			},
+			TLS: *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
-			TLS: chclient.TLSConfig{
-				CA: "tls/client-ca/server.crt",
-				//provide no client cert, server should reject the client request
-				//Cert: "tls/client-crt/client.crt",
-				//Key:  "tls/client-crt/client.key",
-			},
-			Server: "https://localhost:" + tmpPort,
+			TLS:     *tlsConfig.clientTLS,
+			Server:  "https://localhost:" + tmpPort,
 		})
 	defer teardown()
 	//test remote
-	_, err := post("http://localhost:"+tmpPort, "foo")
+	_, err = post("http://localhost:"+tmpPort, "foo")
 	if err == nil {
 		t.Fatal(err)
 	}
 }
 
 func TestTLSMissingClientCA(t *testing.T) {
+	tlsConfig, err := newTestTLSConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tlsConfig.Close()
+	//specify a CA which does not match the client cert
+	//server should reject the client request
+	//provide no client cert, server should reject the client request
+	tlsConfig.serverTLS.CA = tlsConfig.clientTLS.CA
+
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
 		&chserver.Config{
-			TLS: chserver.TLSConfig{
-				//specify a CA which does not match the client cert
-				//server should reject the client request
-				CA:   "tls/server-crt/server.crt",
-				Cert: "tls/server-crt/server.crt",
-				Key:  "tls/server-crt/server.key",
-			},
+			TLS: *tlsConfig.serverTLS,
 		},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
-			TLS: chclient.TLSConfig{
-				//for self signed cert, it needs the server cert, for real cert, this need to be the trusted CA cert
-				CA:   "tls/client-ca/server.crt",
-				Cert: "tls/client-crt/client.crt",
-				Key:  "tls/client-crt/client.key",
-			},
-			Server: "https://localhost:" + tmpPort,
+			TLS:     *tlsConfig.clientTLS,
+			Server:  "https://localhost:" + tmpPort,
 		})
 	defer teardown()
 	//test remote
-	_, err := post("http://localhost:"+tmpPort, "foo")
+	_, err = post("http://localhost:"+tmpPort, "foo")
 	if err == nil {
 		t.Fatal(err)
 	}

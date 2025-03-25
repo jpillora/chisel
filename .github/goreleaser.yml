@@ -1,6 +1,6 @@
-# test this goreleaser config with:
-# - cd chisel
-# - goreleaser --skip-publish --rm-dist --config .github/goreleaser.yml
+# test this file with
+#   goreleaser release --config goreleaser.yml --clean --snapshot
+version: 2
 builds:
   - id: chisel
     binary: chisel
@@ -13,6 +13,7 @@ builds:
     goos:
       - linux
       - windows
+      - openbsd
     goarch:
       - amd64
   - id: chisel-garble
@@ -38,6 +39,7 @@ archives:
     files:
       - none*
 release:
+  draft: true
   prerelease: auto
 changelog:
   sort: asc

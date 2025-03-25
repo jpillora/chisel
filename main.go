@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +14,9 @@ import (
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cos"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 var help = `
@@ -87,7 +88,7 @@ var commonHelp = `
 
 func generatePidFile() {
 	pid := []byte(strconv.Itoa(os.Getpid()))
-	if err := ioutil.WriteFile("chisel.pid", pid, 0644); err != nil {
+	if err := os.WriteFile("chisel.pid", pid, 0644); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -103,11 +104,22 @@ var serverHelp = `
     --port, -p, Defines the HTTP listening port (defaults to the environment
     variable PORT and fallsback to port 8080).
 
-    --key, An optional string to seed the generation of a ECDSA public
+    --key, (deprecated use --keygen and --keyfile instead)
+    An optional string to seed the generation of a ECDSA public
     and private key pair. All communications will be secured using this
     key pair. Share the subsequent fingerprint with clients to enable detection
     of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
     variable, otherwise a new key is generate each run).
+
+    --keygen, A path to write a newly generated PEM-encoded SSH private key file.
+    If users depend on your --key fingerprint, you may also include your --key to
+    output your existing key. Use - (dash) to output the generated key to stdout.
+
+    --keyfile, An optional path to a PEM-encoded SSH private key. When
+    this flag is set, the --key option is ignored, and the provided private key
+    is used to secure all communications. (defaults to the CHISEL_KEY_FILE
+    environment variable). Since ECDSA keys are short, you may also set keyfile
+    to an inline base64 private key (e.g. chisel server --keygen - | base64).
 
     --authfile, An optional path to a users.json file. This file should
     be an object with users defined like:
@@ -151,7 +163,7 @@ var serverHelp = `
     and you cannot set --tls-domain.
 
     --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncypt. Setting --tls-domain requires port 443.
+    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
     You may specify multiple --tls-domain flags to serve multiple domains.
     The resulting files are cached in the "$HOME/.cache/chisel" directory.
     You can modify this path by setting the CHISEL_LE_CACHE variable,
@@ -170,6 +182,7 @@ func server(args []string) {
 
 	config := &chserver.Config{}
 	flags.StringVar(&config.KeySeed, "key", "", "")
+	flags.StringVar(&config.KeyFile, "keyfile", "", "")
 	flags.StringVar(&config.AuthFile, "authfile", "", "")
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
@@ -187,12 +200,25 @@ func server(args []string) {
 	port := flags.String("port", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	keyGen := flags.String("keygen", "", "")
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
 		os.Exit(0)
 	}
 	flags.Parse(args)
+
+	if *keyGen != "" {
+		if err := ccrypto.GenerateKeyFile(*keyGen, config.KeySeed); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	if config.KeySeed != "" {
+		log.Print("Option `--key` is deprecated and will be removed in a future version of chisel.")
+		log.Print("Please use `chisel server --keygen /file/path`, followed by `chisel server --keyfile /file/path` to specify the SSH private key")
+	}
 
 	if *host == "" {
 		*host = os.Getenv("HOST")
@@ -209,8 +235,13 @@ func server(args []string) {
 	if *port == "" {
 		*port = "8080"
 	}
-	if config.KeySeed == "" {
-		config.KeySeed = os.Getenv("CHISEL_KEY")
+	if config.KeyFile == "" {
+		config.KeyFile = settings.Env("KEY_FILE")
+	} else if config.KeySeed == "" {
+		config.KeySeed = settings.Env("KEY")
+	}
+	if config.Auth == "" {
+		config.Auth = os.Getenv("AUTH")
 	}
 	s, err := chserver.NewServer(config)
 	if err != nil {
@@ -366,6 +397,9 @@ var clientHelp = `
     --hostname, Optionally set the 'Host' header (defaults to the host
     found in the server url).
 
+    --sni, Override the ServerName when using TLS (defaults to the 
+    hostname).
+
     --tls-ca, An optional root certificate bundle used to verify the
     chisel server. Only valid when connecting to the server with
     "https" or "wss". By default, the operating system CAs will be used.
@@ -401,6 +435,7 @@ func client(args []string) {
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
+	sni := flags.String("sni", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
 	flags.Usage = func() {
@@ -422,7 +457,13 @@ func client(args []string) {
 	//move hostname onto headers
 	if *hostname != "" {
 		config.Headers.Set("Host", *hostname)
+		config.TLS.ServerName = *hostname
 	}
+
+	if *sni != "" {
+		config.TLS.ServerName = *sni
+	}
+
 	//ready
 	c, err := chclient.NewClient(&config)
 	if err != nil {
