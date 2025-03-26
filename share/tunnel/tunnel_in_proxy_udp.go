@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"github.com/pires/go-proxyproto"
 	"io"
 	"net"
 	"strings"
@@ -18,18 +19,19 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//listenUDP is a special listener which forwards packets via
-//the bound ssh connection. tricky part is multiplexing lots of
-//udp clients through the entry node. each will listen on its
-//own source-port for a response:
-//                                                (random)
-//    src-1 1111->...                         dst-1 6345->7777
-//    src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
-//    src-3 3333->...    listener    handler  dst-1 1444->7777
+// listenUDP is a special listener which forwards packets via
+// the bound ssh connection. tricky part is multiplexing lots of
+// udp clients through the entry node. each will listen on its
+// own source-port for a response:
 //
-//we must store these mappings (1111-6345, etc) in memory for a length
-//of time, so that when the exit node receives a response on 6345, it
-//knows to return it to 1111.
+//	                                            (random)
+//	src-1 1111->...                         dst-1 6345->7777
+//	src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
+//	src-3 3333->...    listener    handler  dst-1 1444->7777
+//
+// we must store these mappings (1111-6345, etc) in memory for a length
+// of time, so that when the exit node receives a response on 6345, it
+// knows to return it to 1111.
 func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -102,8 +104,20 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 			}
 			return u.Errorf("inbound-udpchan: %w", err)
 		}
-		//send over channel, including source address
 		b := buff[:n]
+		//if proxy protocol is requested, prepend the header
+		if u.remote.ProxyProto {
+			//NOTE: LocalAddr for UDP doesn't actually get the destination IP in the packet
+			//getting that information is non-trivial and non-portable from what I can see
+			//therefore, this will suffice for now
+			header := proxyproto.HeaderProxyFromAddrs(2, addr, u.inbound.LocalAddr())
+			formatted, err := header.Format()
+			if err != nil {
+				return u.Errorf("header format: %w", err)
+			}
+			b = append(formatted, b...)
+		}
+		//send over channel, including source address
 		if err := uc.encode(addr.String(), b); err != nil {
 			if strings.HasSuffix(err.Error(), "EOF") {
 				continue //dropped packet...

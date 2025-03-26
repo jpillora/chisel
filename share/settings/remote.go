@@ -35,7 +35,7 @@ import (
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Socks, Reverse, Stdio               bool
+	Socks, Reverse, Stdio, ProxyProto   bool
 }
 
 const revPrefix = "R:"
@@ -129,6 +129,9 @@ func DecodeRemote(s string) (*Remote, error) {
 	if r.Stdio && r.Reverse {
 		return nil, errors.New("stdio cannot be reversed")
 	}
+	if r.ProxyProto && !r.Reverse {
+		return nil, errors.New("cannot use proxy protocol for a non-reversed remote")
+	}
 	return r, nil
 }
 
@@ -153,7 +156,7 @@ func isHost(s string) bool {
 
 var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 
-//L4Proto extacts the layer-4 protocol from the given string
+// L4Proto extacts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
@@ -162,7 +165,7 @@ func L4Proto(s string) (head, proto string) {
 	return s, ""
 }
 
-//implement Stringer
+// implement Stringer
 func (r Remote) String() string {
 	sb := strings.Builder{}
 	if r.Reverse {
@@ -177,7 +180,7 @@ func (r Remote) String() string {
 	return sb.String()
 }
 
-//Encode remote to a string
+// Encode remote to a string
 func (r Remote) Encode() string {
 	if r.LocalPort == "" {
 		r.LocalPort = r.RemotePort
@@ -193,7 +196,7 @@ func (r Remote) Encode() string {
 	return local + ":" + remote
 }
 
-//Local is the decodable local portion
+// Local is the decodable local portion
 func (r Remote) Local() string {
 	if r.Stdio {
 		return "stdio"
@@ -204,7 +207,7 @@ func (r Remote) Local() string {
 	return r.LocalHost + ":" + r.LocalPort
 }
 
-//Remote is the decodable remote portion
+// Remote is the decodable remote portion
 func (r Remote) Remote() string {
 	if r.Socks {
 		return "socks"
@@ -215,8 +218,8 @@ func (r Remote) Remote() string {
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-//UserAddr is checked when checking if a
-//user has access to a given remote
+// UserAddr is checked when checking if a
+// user has access to a given remote
 func (r Remote) UserAddr() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
@@ -224,7 +227,7 @@ func (r Remote) UserAddr() string {
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-//CanListen checks if the port can be listened on
+// CanListen checks if the port can be listened on
 func (r Remote) CanListen() bool {
 	//valid protocols
 	switch r.LocalProto {
@@ -253,7 +256,7 @@ func (r Remote) CanListen() bool {
 
 type Remotes []*Remote
 
-//Filter out forward reversed/non-reversed remotes
+// Filter out forward reversed/non-reversed remotes
 func (rs Remotes) Reversed(reverse bool) Remotes {
 	subset := Remotes{}
 	for _, r := range rs {
@@ -265,7 +268,7 @@ func (rs Remotes) Reversed(reverse bool) Remotes {
 	return subset
 }
 
-//Encode back into strings
+// Encode back into strings
 func (rs Remotes) Encode() []string {
 	s := make([]string, len(rs))
 	for i, r := range rs {
