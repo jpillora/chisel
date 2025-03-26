@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"github.com/pires/go-proxyproto"
 	"io"
 	"log"
 	"net"
@@ -44,14 +45,18 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		if err != nil {
 			t.Fatal(err)
 		}
+		pl := &proxyproto.Listener{
+			Listener: fl,
+		}
 		log.Printf("fileserver: listening on %s", fileAddr)
 		go func() {
-			f.Serve(fl)
+			f.Serve(pl)
 			cancel()
 		}()
 		go func() {
 			<-ctx.Done()
 			f.Close()
+			pl.Close()
 		}()
 	}
 	//server

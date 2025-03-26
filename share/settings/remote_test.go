@@ -41,6 +41,17 @@ func TestRemoteDecode(t *testing.T) {
 			"R:0.0.0.0:80:google.com:80",
 		},
 		{
+			"RP:google.com:80",
+			Remote{
+				LocalPort:  "80",
+				RemoteHost: "google.com",
+				RemotePort: "80",
+				Reverse:    true,
+				ProxyProto: true,
+			},
+			"RP:0.0.0.0:80:google.com:80",
+		},
+		{
 			"示例網站.com:80",
 			Remote{
 				LocalPort:  "80",
@@ -110,6 +121,18 @@ func TestRemoteDecode(t *testing.T) {
 				Reverse:    true,
 			},
 			"R:[::]:3000:[::1]:3000",
+		},
+		{
+			"RP:[::]:3000:[::1]:3000",
+			Remote{
+				LocalHost:  "[::]",
+				LocalPort:  "3000",
+				RemoteHost: "[::1]",
+				RemotePort: "3000",
+				Reverse:    true,
+				ProxyProto: true,
+			},
+			"RP:[::]:3000:[::1]:3000",
 		},
 	} {
 		//expected defaults

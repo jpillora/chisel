@@ -39,10 +39,16 @@ type Remote struct {
 }
 
 const revPrefix = "R:"
+const revProxyPrefix = "RP:"
 
 func DecodeRemote(s string) (*Remote, error) {
+	proxy := false
 	reverse := false
-	if strings.HasPrefix(s, revPrefix) {
+	if strings.HasPrefix(s, revProxyPrefix) {
+		s = strings.TrimPrefix(s, revProxyPrefix)
+		reverse = true
+		proxy = true
+	} else if strings.HasPrefix(s, revPrefix) {
 		s = strings.TrimPrefix(s, revPrefix)
 		reverse = true
 	}
@@ -50,7 +56,7 @@ func DecodeRemote(s string) (*Remote, error) {
 	if len(parts) <= 0 || len(parts) >= 5 {
 		return nil, errors.New("Invalid remote")
 	}
-	r := &Remote{Reverse: reverse}
+	r := &Remote{Reverse: reverse, ProxyProto: proxy}
 	//parse from back to front, to set 'remote' fields first,
 	//then to set 'local' fields second (allows the 'remote' side
 	//to provide the defaults)
@@ -168,7 +174,9 @@ func L4Proto(s string) (head, proto string) {
 // implement Stringer
 func (r Remote) String() string {
 	sb := strings.Builder{}
-	if r.Reverse {
+	if r.Reverse && r.ProxyProto {
+		sb.WriteString(revProxyPrefix)
+	} else if r.Reverse {
 		sb.WriteString(revPrefix)
 	}
 	sb.WriteString(strings.TrimPrefix(r.Local(), "0.0.0.0:"))
@@ -190,7 +198,9 @@ func (r Remote) Encode() string {
 	if r.RemoteProto == "udp" {
 		remote += "/udp"
 	}
-	if r.Reverse {
+	if r.Reverse && r.ProxyProto {
+		return "RP:" + local + ":" + remote
+	} else if r.Reverse {
 		return "R:" + local + ":" + remote
 	}
 	return local + ":" + remote
