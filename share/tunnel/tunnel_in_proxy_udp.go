@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"github.com/pires/go-proxyproto"
 	"io"
 	"net"
 	"strings"
@@ -102,8 +103,20 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 			}
 			return u.Errorf("inbound-udpchan: %w", err)
 		}
-		//send over channel, including source address
 		b := buff[:n]
+		//if proxy protocol is requested, prepend the header
+		if u.remote.ProxyProto {
+			//NOTE: LocalAddr for UDP doesn't actually get the destination IP in the packet
+			//getting that information is non-trivial and non-portable from what I can see
+			//therefore, this will suffice for now
+			header := proxyproto.HeaderProxyFromAddrs(2, addr, u.inbound.LocalAddr())
+			formatted, err := header.Format()
+			if err != nil {
+				return u.Errorf("header format: %w", err)
+			}
+			b = append(formatted, b...)
+		}
+		//send over channel, including source address
 		if err := uc.encode(addr.String(), b); err != nil {
 			if strings.HasSuffix(err.Error(), "EOF") {
 				continue //dropped packet...

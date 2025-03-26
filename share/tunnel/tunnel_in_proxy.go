@@ -9,6 +9,7 @@ import (
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
+	"github.com/pires/go-proxyproto"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -144,6 +145,22 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 		return
 	}
 	go ssh.DiscardRequests(reqs)
+	//if proxy protocol is requested, send the header
+	if p.remote.ProxyProto {
+		conn, ok := src.(net.Conn)
+		if !ok {
+			//this should never happen, and if it does, something has gone horribly wrong (file an issue)
+			panic("attempted to use proxy protocol for a source which is not a network connection")
+		}
+
+		header := proxyproto.HeaderProxyFromAddrs(2, conn.RemoteAddr(), conn.LocalAddr())
+		s, err := header.WriteTo(dst)
+		if err != nil {
+			l.Infof("Stream error: %s", err)
+			return
+		}
+		l.Debugf("PROXY v2 header (sent %s)", sizestr.ToString(s))
+	}
 	//then pipe
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
