@@ -36,8 +36,8 @@ import (
 //     remote 1.1.1.1:53/udp
 
 type Remote struct {
-	LocalHost, LocalPort, LocalProto    string
-	RemoteHost, RemotePort, RemoteProto string
+	LocalHost, LocalPort, LocalProto            string
+	RemoteHost, RemotePort, RemoteProto         string
 	Socks, UDPSocks, Reverse, Stdio, ProxyProto bool
 }
 
