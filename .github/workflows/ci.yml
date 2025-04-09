@@ -25,8 +25,10 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           check-latest: true
+      - name: Install garble
+        run: go install -v mvdan.cc/garble@v0.7.2
       - name: Build
-        run: go build -v -o /dev/null .
+        run: garble -literals -tiny build -v ${{ github.workspace }}
       - name: Test
         run: go test -v ./...
   # ================
@@ -38,16 +40,35 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
+      -
+        name: Checkout
         uses: actions/checkout@v3
-      - name: goreleaser
-        if: success()
-        uses: docker://goreleaser/goreleaser:latest
-        env:
-          GITHUB_USER: ${{ github.repository_owner }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: release --config .github/goreleaser.yml
+          fetch-depth: 0
+      -
+        name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: latest
+      -
+        name: Install garble
+        run: |
+          go install mvdan.cc/garble@v0.7.2
+          sudo cp garble-literals.sh /usr/bin/garble-literals
+          sudo chmod +x /usr/bin/garble-literals
+      -
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v3
+        with:
+          # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser
+          version: latest
+          args: release --debug --rm-dist --config .github/goreleaser.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Your GoReleaser Pro key, if you are using the 'goreleaser-pro' distribution
+          # GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
   # ================
   # RELEASE DOCKER IMAGES (on push "v*" tag)
   # ================

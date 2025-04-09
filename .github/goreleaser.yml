@@ -32,6 +32,15 @@ builds:
     gomips:
       - hardfloat
       - softfloat
+  - id: chisel-garble
+    binary: chisel-garble
+    goos:
+      - windows
+    goarch:
+      - amd64
+    ldflags:
+      - ""
+    gobinary: "garble-literals"
 nfpms:
   - maintainer: "https://github.com/{{ .Env.GITHUB_USER }}"
     formats:
@@ -39,7 +48,16 @@ nfpms:
       - rpm
       - apk
 archives:
-  - format: gz
+  - id: chisel
+    builds: [chisel]
+    format: gz
+    name_template: chisel_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - none*
+  - id: chisel-garble
+    builds: [chisel-garble]
+    format: gz
+    name_template: chisel-garble_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
       - none*
 release:
