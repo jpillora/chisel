@@ -49,7 +49,8 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: latest
+          go-version: 1.24.2
+          check-latest: true
       -
         name: Install garble
         run: |
