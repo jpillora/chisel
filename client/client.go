@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -44,6 +43,7 @@ type Config struct {
 	Headers          http.Header
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
+	Verbose          bool
 }
 
 // TLSConfig for a Client
@@ -52,6 +52,7 @@ type TLSConfig struct {
 	CA         string
 	Cert       string
 	Key        string
+	ServerName string
 }
 
 // Client represents a client instance
@@ -112,13 +113,16 @@ func NewClient(c *Config) (*Client, error) {
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
+		if c.TLS.ServerName != "" {
+			tc.ServerName = c.TLS.ServerName
+		}
 		//certificate verification config
 		if c.TLS.SkipVerify {
 			client.Infof("TLS verification disabled")
 			tc.InsecureSkipVerify = true
 		} else if c.TLS.CA != "" {
 			rootCAs := x509.NewCertPool()
-			if b, err := ioutil.ReadFile(c.TLS.CA); err != nil {
+			if b, err := os.ReadFile(c.TLS.CA); err != nil {
 				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
 			} else if ok := rootCAs.AppendCertsFromPEM(b); !ok {
 				return nil, fmt.Errorf("Failed to decode PEM: %s", c.TLS.CA)

@@ -18,18 +18,19 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//listenUDP is a special listener which forwards packets via
-//the bound ssh connection. tricky part is multiplexing lots of
-//udp clients through the entry node. each will listen on its
-//own source-port for a response:
-//                                                (random)
-//    src-1 1111->...                         dst-1 6345->7777
-//    src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
-//    src-3 3333->...    listener    handler  dst-1 1444->7777
+// listenUDP is a special listener which forwards packets via
+// the bound ssh connection. tricky part is multiplexing lots of
+// udp clients through the entry node. each will listen on its
+// own source-port for a response:
 //
-//we must store these mappings (1111-6345, etc) in memory for a length
-//of time, so that when the exit node receives a response on 6345, it
-//knows to return it to 1111.
+//	                                            (random)
+//	src-1 1111->...                         dst-1 6345->7777
+//	src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
+//	src-3 3333->...    listener    handler  dst-1 1444->7777
+//
+// we must store these mappings (1111-6345, etc) in memory for a length
+// of time, so that when the exit node receives a response on 6345, it
+// knows to return it to 1111.
 func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -45,7 +46,9 @@ func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpLi
 		sshTun:  sshTun,
 		remote:  remote,
 		inbound: conn,
+		maxMTU:  settings.EnvInt("UDP_MAX_SIZE", 9012),
 	}
+	u.Debugf("UDP max size: %d bytes", u.maxMTU)
 	return u, nil
 }
 
@@ -57,6 +60,7 @@ type udpListener struct {
 	outboundMut sync.Mutex
 	outbound    *udpChannel
 	sent, recv  int64
+	maxMTU      int
 }
 
 func (u *udpListener) run(ctx context.Context) error {
@@ -80,8 +84,7 @@ func (u *udpListener) run(ctx context.Context) error {
 }
 
 func (u *udpListener) runInbound(ctx context.Context) error {
-	maxMTU := settings.EnvInt("UDP_MAX_SIZE", 12000)
-	buff := make([]byte, maxMTU)
+	buff := make([]byte, u.maxMTU)
 	for !isDone(ctx) {
 		//read from inbound udp
 		u.inbound.SetReadDeadline(time.Now().Add(time.Second))
