@@ -13,25 +13,9 @@ builds:
     goos:
       - linux
       - windows
-      - openbsd
     goarch:
       - amd64
-      - arm
-      - arm64
-      - ppc64
-      - ppc64le
-      - mips
-      - mipsle
-      - mips64
-      - mips64le
-      - s390x
-    goarm:
-      - 5
-      - 6
-      - 7
-    gomips:
-      - hardfloat
-      - softfloat
+
   - id: chisel-garble
     binary: chisel-garble
     goos:
