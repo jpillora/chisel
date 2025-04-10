@@ -112,3 +112,54 @@ func TestVerifyFingerprint(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPermittedDomain(t *testing.T) {
+	permittedDomains := []string{
+		"http://something.slb.com",
+		"http://cluster.local",
+		"http://something-service",
+		"http://localhost",
+		"http://127.0.0.1",
+		"https://slb-ds.com",
+		"https://something.slb.com",
+		"https://cluster.local",
+		"https://something-service",
+		"https://localhost",
+		"https://thing.slb.com:3456",
+		"https://thing.slb.com:80",
+		"https://thing.slb.com:443",
+		"https://thing.slb.com:8080",
+	}
+
+	for _, domain := range permittedDomains {
+		t.Run(domain, func(t *testing.T) {
+			config := Config{
+				Server: domain,
+			}
+			_, err := NewClient(&config)
+			if err != nil {
+				t.Fatalf("Failed for allowed domain %s: %v", domain, err)
+			}
+		})
+	}
+}
+func TestBannedDomain(t *testing.T) {
+	bannedDomains := []string{
+		"http://banned.com",
+		"http://something.banned.com",
+		"https://localheist",
+		"https://nop.nope.com:6788",
+	}
+
+	for _, domain := range bannedDomains {
+		t.Run(domain, func(t *testing.T) {
+			config := Config{
+				Server: domain,
+			}
+			_, err := NewClient(&config)
+			if err == nil {
+				t.Fatalf("Failed for banned domain %s: %v", domain, err)
+			}
+		})
+	}
+}
