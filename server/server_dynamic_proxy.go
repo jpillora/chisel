@@ -1,9 +1,10 @@
 package chserver
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"errors"
+	"hash/crc64"
+	"os"
 
 	//"errors"
 	"fmt"
@@ -122,6 +123,13 @@ func (s *Server) checkResourceAccessDcMaster(drProxy *DynamicReverseProxy) (err 
 func (s *Server) authRequest(r *http.Request, useCache bool, drProxy *DynamicReverseProxy,
 	checkResourceAccess func(drProxy *DynamicReverseProxy) error) (err error) {
 	var userId int64
+	subdomain := os.Getenv("SUBDOMAIN")
+	domain := os.Getenv("DOMAIN")
+	if len(subdomain) == 0 || len(domain) == 0 {
+		s.Infof("could not get SUBDOMAIN")
+		err = errors.New("Could not create service fqdn.")
+		return
+	}
 
 	authKey, err := s.getAuthorizationCookie(r)
 	if err != nil {
@@ -139,7 +147,8 @@ func (s *Server) authRequest(r *http.Request, useCache bool, drProxy *DynamicRev
 
 	// user id is not set through because cache did not match or useCache is false
 	// go ahead and access db to get user id and jobid
-	userId, err = craveauth.ValidateSignedInUser(authKey, r.Header.Get("User-Agent"), r.Host, s.Logger)
+	userId, err = craveauth.ValidateSignedInUser(authKey, r.Header.Get("User-Agent"),
+		fmt.Sprintf("%s.%s", subdomain, domain), s.Logger)
 	if err != nil {
 		s.Infof("User access denied. Error: %v", err)
 		return
@@ -176,8 +185,9 @@ func (s *Server) handleDynamicProxy(w http.ResponseWriter, r *http.Request) (han
 }
 
 type ProxyData struct {
-	Target   string `json:"target"`
-	KeepBase bool   `json:"keepbase"`
+	Target        string `json:"target"`
+	ServicePrefix string `json:"serviceprefix"`
+	ProxyType     string `json:"proxytype"`
 }
 
 type ProxyRegisterResponse struct {
@@ -189,9 +199,38 @@ func (s *Server) getProxyData(w http.ResponseWriter, r *http.Request, pd *ProxyD
 	return
 }
 
-func (s *Server) getProxyHashFromTarget(target string) (hash string) {
-	hash = fmt.Sprintf("%x", md5.Sum([]byte(target)))
+// Pros:
+// ✅ Very fast (~5x faster than MD5).
+// ✅ Fixed 16-character output.
+
+// Cons:
+// ❌ Higher collision risk than cryptographic hashes.
+
+func (s *Server) getProxyHashFromTarget(input string) string {
+	var crc64Table = crc64.MakeTable(crc64.ECMA)
+	hash := crc64.Checksum([]byte(input), crc64Table)
+	return fmt.Sprintf("%016x", hash) // 16-character hex
+}
+
+func (s *Server) getServiceFQDN(drProxy *DynamicReverseProxy, hash string) (fqdn string, err error) {
+	fqdn = fmt.Sprintf("%v.%v.%v", hash, drProxy.JobId, "svc")
+	s.Infof("Generating fqdn prefix: v", fqdn)
 	return
+}
+
+func (s *Server) getProxyIDFromFQDN(fqdn string) (string, error) {
+	parts := strings.Split(fqdn, ".")
+
+	// Check if we have at least 3 parts (e.g., "svc.test.ik.crave.io")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("%v: invalid FQDN format: not enough parts, expected '*.svc.<domain>", fqdn)
+	}
+
+	// If 3rd part is "svc", return the first part
+	if parts[2] == "svc" {
+		return parts[0], nil
+	}
+	return "", fmt.Errorf("%v: invalid FQDN format: not enough parts, expected '*.svc.<domain>", fqdn)
 }
 
 // createDynamicProxy is the main http websocket handler for the chisel server
@@ -199,6 +238,8 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	var pd ProxyData
 	var drProxy DynamicReverseProxy
 
+	pd.ServicePrefix = "svc"
+	pd.ProxyType = "legacy"
 	err := s.getProxyData(w, r, &pd)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -215,8 +256,9 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	drProxy.Target = pd.Target
-	drProxy.KeepBase = pd.KeepBase
-	s.Infof("Creating reverse proxy for target: %v", pd.Target)
+	drProxy.ServicePrefix = pd.ServicePrefix
+	drProxy.ProxyType = pd.ProxyType
+	s.Infof("Creating reverse proxy for target: %v:%v:%v", pd.ServicePrefix, pd.ProxyType, pd.Target)
 	err = s.authRequest(r, false, &drProxy, s.checkResourceAccessDcMaster)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -237,13 +279,18 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
 		r.Header.Set("Origin", u.Scheme+"://"+u.Host)
 
-		path := r.URL.Path
-		path = strings.TrimPrefix(path, "/")
-		pathParts := strings.SplitN(path, "/", 2)
-		pId := pathParts[0]
-		if s.dynamicReverseProxies[pId].KeepBase {
-			r.URL.Path = "/sshd" + r.URL.Path
+		if r.Header.Get("X-Subservice-Type") == "true" {
+			pId, err = s.getProxyIDFromFQDN(r.Host)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			}
+			return
 		} else {
+			// legacy
+			path := r.URL.Path
+			path = strings.TrimPrefix(path, "/")
+			pathParts := strings.SplitN(path, "/", 2)
+			pId = pathParts[0]
 			// s.Infof("Setting path : %v %v", path, pathParts)
 			if len(pathParts) >= 2 && pathParts[1] != "" {
 				path = "/" + pathParts[1]
@@ -258,8 +305,16 @@ func (s *Server) createDynamicProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	drProxy.Handler = reverseProxy
 	s.dynamicReverseProxies[pId] = &drProxy
+	s.Infof("Registering for pid: %v", pId)
 
 	w.Header().Set("Content-Type", "application/json")
+	if drProxy.ProxyType == "build" {
+		pId, err = s.getServiceFQDN(&drProxy, pId)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error getting fqdn, %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
 	prr := ProxyRegisterResponse{Id: pId}
 	err = json.NewEncoder(w).Encode(prr)
 	if err != nil {
@@ -288,6 +343,13 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 		}
 		s.disconnectResourceDcMaster(proxy)
 		delete(s.dynamicReverseProxies, pId)
+		if proxy.ProxyType == "build" {
+			pId, err = s.getServiceFQDN(proxy, pId)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("error getting fqdn, %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
 	} else { // do we need this error?
 		http.Error(w, s.Errorf("Invalid id (%s)", pId).Error(), http.StatusBadRequest)
 	}
@@ -296,11 +358,30 @@ func (s *Server) deleteDynamicProxy(w http.ResponseWriter, r *http.Request) {
 
 // executeDynamicProxy is the main http websocket handler for the chisel server
 func (s *Server) executeDynamicProxy(w http.ResponseWriter, r *http.Request) bool {
-	path := r.URL.Path
-	path = strings.TrimPrefix(path, "/")
-	pathParts := strings.SplitN(path, "/", 2)
-	pId := pathParts[0]
+	var err error
+	pId := ""
+	// Parse the full request URL
+	// s.Infof("%s: %s", r.Host, r.Header.Get("X-Subservice-Type"))
+	if r.Header.Get("X-Subservice-Type") == "true" {
+		pId, err = s.getProxyIDFromFQDN(r.Host)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return false
+		}
+	} else {
+		// legacy
+		path := r.URL.Path
+		path = strings.TrimPrefix(path, "/")
+		pathParts := strings.SplitN(path, "/", 2)
+		pId = pathParts[0]
+	}
 
+	// for name, values := range r.Header {
+	// 	for _, value := range values {
+	// 		s.Infof("%s: %s\n", name, value)
+	// 	}
+	// }
+	// s.Infof("Got pid: %v", pId)
 	//just serve the reverse proxy request.
 	if proxy, ok := s.dynamicReverseProxies[pId]; ok {
 		err := s.authRequest(r, true, proxy, s.checkResourceAccessDcMaster)

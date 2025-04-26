@@ -45,7 +45,8 @@ type DynamicReverseProxy struct {
 	Target         string
 	User           int64
 	JobId          int64
-	KeepBase       bool
+	ServicePrefix  string
+	ProxyType      string
 	DcMasterClient dcrpc.DcMasterRPCClient
 	GrpcConn       *grpc.ClientConn // TODO: Put this into an interface
 }
