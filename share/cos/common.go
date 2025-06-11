@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/signal"
 	"time"
+	"syscall"
+	"log"
 )
 
 //InterruptContext returns a context which is
@@ -13,9 +15,11 @@ func InterruptContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt) //windows compatible?
-		<-sig
+		signal.Notify(sig, os.Interrupt, syscall.SIGTERM) //windows compatible?
+		s := <-sig
+		log.Printf("Graceful shutdown signal received: %s", s)
 		signal.Stop(sig)
+		log.Println("Graceful shutdown complete.")
 		cancel()
 	}()
 	return ctx
