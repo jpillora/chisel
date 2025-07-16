@@ -17,7 +17,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -86,7 +85,7 @@ func testTunnel(port string, size int) {
 		fatal(err)
 	}
 
-	n, err := io.Copy(ioutil.Discard, resp.Body)
+	n, err := io.Copy(io.Discard, resp.Body)
 	if err != nil {
 		fatal(err)
 	}

@@ -11,7 +11,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -53,7 +52,7 @@ func newTestTLSConfig() (*tlsConfig, error) {
 		return nil, err
 	}
 
-	tlsConfig.tmpDir, err = ioutil.TempDir("", "")
+	tlsConfig.tmpDir, err = os.MkdirTemp("", "")
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func newTestTLSConfig() (*tlsConfig, error) {
 		return nil, err
 	}
 	pathServerCACrt := path.Join(dirServerCA, "client.crt")
-	if err := ioutil.WriteFile(pathServerCACrt, clientCertPEM, 0666); err != nil {
+	if err := os.WriteFile(pathServerCACrt, clientCertPEM, 0666); err != nil {
 		return nil, err
 	}
 
@@ -72,7 +71,7 @@ func newTestTLSConfig() (*tlsConfig, error) {
 		return nil, err
 	}
 	pathClientCACrt := path.Join(dirClientCA, "server.crt")
-	if err := ioutil.WriteFile(pathClientCACrt, serverCertPEM, 0666); err != nil {
+	if err := os.WriteFile(pathClientCACrt, serverCertPEM, 0666); err != nil {
 		return nil, err
 	}
 
@@ -81,11 +80,11 @@ func newTestTLSConfig() (*tlsConfig, error) {
 		return nil, err
 	}
 	pathServerCrtCrt := path.Join(dirServerCrt, "server.crt")
-	if err := ioutil.WriteFile(pathServerCrtCrt, serverCertPEM, 0666); err != nil {
+	if err := os.WriteFile(pathServerCrtCrt, serverCertPEM, 0666); err != nil {
 		return nil, err
 	}
 	pathServerCrtKey := path.Join(dirServerCrt, "server.key")
-	if err := ioutil.WriteFile(pathServerCrtKey, serverKeyPEM, 0666); err != nil {
+	if err := os.WriteFile(pathServerCrtKey, serverKeyPEM, 0666); err != nil {
 		return nil, err
 	}
 
@@ -94,11 +93,11 @@ func newTestTLSConfig() (*tlsConfig, error) {
 		return nil, err
 	}
 	pathClientCrtCrt := path.Join(dirClientCrt, "client.crt")
-	if err := ioutil.WriteFile(pathClientCrtCrt, clientCertPEM, 0666); err != nil {
+	if err := os.WriteFile(pathClientCrtCrt, clientCertPEM, 0666); err != nil {
 		return nil, err
 	}
 	pathClientCrtKey := path.Join(dirClientCrt, "client.key")
-	if err := ioutil.WriteFile(pathClientCrtKey, clientKeyPEM, 0666); err != nil {
+	if err := os.WriteFile(pathClientCrtKey, clientKeyPEM, 0666); err != nil {
 		return nil, err
 	}
 

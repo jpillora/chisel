@@ -8,10 +8,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -29,7 +29,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//Config represents a client configuration
+// Config represents a client configuration
 type Config struct {
 	Fingerprint      string
 	Auth             string
@@ -45,7 +45,7 @@ type Config struct {
 	Verbose          bool
 }
 
-//TLSConfig for a Client
+// TLSConfig for a Client
 type TLSConfig struct {
 	SkipVerify bool
 	CA         string
@@ -54,7 +54,7 @@ type TLSConfig struct {
 	ServerName string
 }
 
-//Client represents a client instance
+// Client represents a client instance
 type Client struct {
 	*cio.Logger
 	config    *Config
@@ -69,7 +69,7 @@ type Client struct {
 	tunnel    *tunnel.Tunnel
 }
 
-//NewClient creates a new client instance
+// NewClient creates a new client instance
 func NewClient(c *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(c.Server, "http") {
@@ -105,7 +105,7 @@ func NewClient(c *Config) (*Client, error) {
 		tlsConfig: nil,
 	}
 	//set default log level
-	client.Logger.Info = c.Verbose
+	client.Logger.Info = true
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}
@@ -118,7 +118,7 @@ func NewClient(c *Config) (*Client, error) {
 			tc.InsecureSkipVerify = true
 		} else if c.TLS.CA != "" {
 			rootCAs := x509.NewCertPool()
-			if b, err := ioutil.ReadFile(c.TLS.CA); err != nil {
+			if b, err := os.ReadFile(c.TLS.CA); err != nil {
 				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.CA)
 			} else if ok := rootCAs.AppendCertsFromPEM(b); !ok {
 				return nil, fmt.Errorf("Failed to decode PEM: %s", c.TLS.CA)
@@ -190,7 +190,7 @@ func NewClient(c *Config) (*Client, error) {
 	return client, nil
 }
 
-//Run starts client and blocks while connected
+// Run starts client and blocks while connected
 func (c *Client) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -221,7 +221,7 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	return nil
 }
 
-//verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints
+// verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints
 func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
 	bytes := md5.Sum(key.Marshal())
 	strbytes := make([]string, len(bytes))
@@ -236,7 +236,7 @@ func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
 	return nil
 }
 
-//Start client and does not block
+// Start client and does not block
 func (c *Client) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	c.stop = cancel
@@ -293,12 +293,12 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	return nil
 }
 
-//Wait blocks while the client is running.
+// Wait blocks while the client is running.
 func (c *Client) Wait() error {
 	return c.eg.Wait()
 }
 
-//Close manually stops the client
+// Close manually stops the client
 func (c *Client) Close() error {
 	if c.stop != nil {
 		c.stop()

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -57,7 +57,7 @@ func New(c Config) *Tunnel {
 	//setup socks server (not listening on any port!)
 	extra := ""
 	if c.Socks {
-		sl := log.New(ioutil.Discard, "", 0)
+		sl := log.New(io.Discard, "", 0)
 		if t.Logger.Debug {
 			sl = log.New(os.Stdout, "[socks]", log.Ldate|log.Ltime)
 		}

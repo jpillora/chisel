@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 // Config is the configuration for the chisel service
 type Config struct {
 	KeySeed   string
+	KeyFile   string
 	AuthFile  string
 	Auth      string
 	Proxy     string
@@ -73,13 +75,38 @@ func NewServer(c *Config) (*Server, error) {
 			server.users.AddUser(u)
 		}
 	}
-	//generate private key (optionally using seed)
-	key, err := ccrypto.GenerateKey(c.KeySeed)
-	if err != nil {
-		log.Fatal("Failed to generate key")
+
+	var pemBytes []byte
+	var err error
+	if c.KeyFile != "" {
+		var key []byte
+
+		if ccrypto.IsChiselKey([]byte(c.KeyFile)) {
+			key = []byte(c.KeyFile)
+		} else {
+			key, err = os.ReadFile(c.KeyFile)
+			if err != nil {
+				log.Fatalf("Failed to read key file %s", c.KeyFile)
+			}
+		}
+
+		pemBytes = key
+		if ccrypto.IsChiselKey(key) {
+			pemBytes, err = ccrypto.ChiselKey2PEM(key)
+			if err != nil {
+				log.Fatalf("Invalid key %s", string(key))
+			}
+		}
+	} else {
+		//generate private key (optionally using seed)
+		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
+		if err != nil {
+			log.Fatal("Failed to generate key")
+		}
 	}
+
 	//convert into ssh.PrivateKey
-	private, err := ssh.ParsePrivateKey(key)
+	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
 		log.Fatal("Failed to parse key")
 	}
