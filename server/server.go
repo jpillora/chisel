@@ -169,6 +169,7 @@ func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	}
 	l, err := s.listener(host, port)
 	if err != nil {
+		s.Infof("%s", err)
 		return err
 	}
 	h := http.Handler(http.HandlerFunc(s.handleClientHandler))
