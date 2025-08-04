@@ -49,8 +49,6 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 		if port != "443" && hasDomains {
 			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
 		}
-	} else {
-		return nil, errors.New("failed to set up TLS")
 	}
 	//tcp listen
 	l, err := net.Listen("tcp", host+":"+port)
