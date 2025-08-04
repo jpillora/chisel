@@ -154,12 +154,15 @@ var serverHelp = `
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
-    --tls-key, Enables TLS and provides optional path to a PEM-encoded
+    --tls-key, Enables TLS and provides optional path to a PEM-encoded 
     TLS private key. When this flag is set, you must also set --tls-cert,
     and you cannot set --tls-domain.
 
+    --tls-keypass, Specifies a password to decrypt a PEM-encoded encrypted
+    private key in PKCS#8 format.
+
     --tls-cert, Enables TLS and provides optional path to a PEM-encoded
-    TLS certificate. When this flag is set, you must also set --tls-key,
+    TLS certificate. When this flag is set, you must also set --tls-key, 
     and you cannot set --tls-domain.
 
     --tls-domain, Enables TLS and automatically acquires a TLS key and
@@ -191,6 +194,7 @@ func server(args []string) {
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
+	flags.StringVar(&config.TLS.KeyPass, "tls-keypass", "", "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
@@ -412,9 +416,12 @@ var clientHelp = `
     may be still verified (see --fingerprint) after inner connection
     is established.
 
-    --tls-key, a path to a PEM encoded private key used for client 
+    --tls-key, a path to a PEM-encoded private key used for client 
     authentication (mutual-TLS).
 
+    --tls-keypass, Specifies a password to decrypt a PEM-encoded encrypted
+    private key in PKCS#8 format (mutual-TLS).
+	
     --tls-cert, a path to a PEM encoded certificate matching the provided 
     private key. The certificate must have client authentication 
     enabled (mutual-TLS).
@@ -433,6 +440,7 @@ func client(args []string) {
 	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
+	flags.StringVar(&config.TLS.KeyPass, "tls-keypass", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
 	hostname := flags.String("hostname", "", "")
 	sni := flags.String("sni", "", "")

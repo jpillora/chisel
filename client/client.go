@@ -2,10 +2,15 @@ package chclient
 
 import (
 	"context"
+	"crypto/ecdh"
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/md5"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -23,6 +28,7 @@ import (
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
+	"github.com/youmark/pkcs8"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
@@ -51,6 +57,7 @@ type TLSConfig struct {
 	CA         string
 	Cert       string
 	Key        string
+	KeyPass    string
 	ServerName string
 }
 
@@ -129,7 +136,43 @@ func NewClient(c *Config) (*Client, error) {
 		}
 		//provide client cert and key pair for mtls
 		if c.TLS.Cert != "" && c.TLS.Key != "" {
-			c, err := tls.LoadX509KeyPair(c.TLS.Cert, c.TLS.Key)
+			k, err := os.ReadFile(c.TLS.Key)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.Key)
+			}
+			pemBlock, _ := pem.Decode(k)
+			var privateKey any
+			if strings.HasPrefix(pemBlock.Type, "ENCRYPTED") {
+				privateKey, err = pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, []byte(c.TLS.KeyPass))
+			} else {
+				privateKey, err = pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, nil)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("%s", err)
+			}
+			switch pk := privateKey.(type) {
+			case *rsa.PrivateKey:
+				privateKey = pk
+			case ed25519.PrivateKey:
+				privateKey = pk
+			case *ecdh.PrivateKey:
+				privateKey = pk
+			case *ecdsa.PrivateKey:
+				privateKey = pk
+			default:
+				return nil, fmt.Errorf("Unknown private key type")
+			}
+			privateKeyDER, _ := x509.MarshalPKCS8PrivateKey(privateKey)
+			pemBlock = &pem.Block{
+				Type:  "PRIVATE KEY",
+				Bytes: privateKeyDER,
+			}
+			privateKeyPEMBlock := pem.EncodeToMemory(pemBlock)
+			certPEMBlock, err := os.ReadFile(c.TLS.Cert)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to load file: %s", c.TLS.Cert)
+			}
+			c, err := tls.X509KeyPair(certPEMBlock, privateKeyPEMBlock)
 			if err != nil {
 				return nil, fmt.Errorf("Error loading client cert and key pair: %v", err)
 			}

@@ -1,21 +1,29 @@
 package chserver
 
 import (
+	"crypto/ecdh"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/youmark/pkcs8"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-//TLSConfig enables configures TLS
+// TLSConfig enables configures TLS
 type TLSConfig struct {
 	Key     string
+	KeyPass string
 	Cert    string
 	Domains []string
 	CA      string
@@ -33,7 +41,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 	}
 	extra := ""
 	if hasKeyCert {
-		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert, s.config.TLS.CA)
+		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.KeyPass, s.config.TLS.Cert, s.config.TLS.CA)
 		if err != nil {
 			return nil, err
 		}
@@ -88,8 +96,44 @@ func (s *Server) tlsLetsEncrypt(domains []string) *tls.Config {
 	return m.TLSConfig()
 }
 
-func (s *Server) tlsKeyCert(key, cert string, ca string) (*tls.Config, error) {
-	keypair, err := tls.LoadX509KeyPair(cert, key)
+func (s *Server) tlsKeyCert(key, keypass string, cert string, ca string) (*tls.Config, error) {
+	k, err := os.ReadFile(key)
+	if err != nil {
+		return nil, err
+	}
+	pemBlock, _ := pem.Decode(k)
+	var privateKey any
+	if strings.HasPrefix(pemBlock.Type, "ENCRYPTED") {
+		privateKey, err = pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, []byte(keypass))
+	} else {
+		privateKey, err = pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	switch pk := privateKey.(type) {
+	case *rsa.PrivateKey:
+		privateKey = pk
+	case ed25519.PrivateKey:
+		privateKey = pk
+	case *ecdh.PrivateKey:
+		privateKey = pk
+	case *ecdsa.PrivateKey:
+		privateKey = pk
+	default:
+		return nil, errors.New("Unknown private key type")
+	}
+	privateKeyDER, _ := x509.MarshalPKCS8PrivateKey(privateKey)
+	pemBlock = &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyDER,
+	}
+	privateKeyPEMBlock := pem.EncodeToMemory(pemBlock)
+	certPEMBlock, err := os.ReadFile(cert)
+	if err != nil {
+		return nil, err
+	}
+	keypair, err := tls.X509KeyPair(certPEMBlock, privateKeyPEMBlock)
 	if err != nil {
 		return nil, err
 	}
