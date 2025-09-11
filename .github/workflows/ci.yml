@@ -53,6 +53,7 @@ jobs:
         env:
           GITHUB_USER: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOTOOLCHAIN: auto
         with:
           args: release --config .github/goreleaser.yml
   # ================
