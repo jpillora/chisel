@@ -39,8 +39,7 @@ nfpms:
       - rpm
       - apk
 archives:
-  - format: gz
-    files:
+  - files:
       - none*
 release:
   draft: true
