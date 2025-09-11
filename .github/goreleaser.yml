@@ -32,17 +32,6 @@ builds:
     gomips:
       - hardfloat
       - softfloat
-    # Exclude broken Windows ARM builds
-    ignore:
-      - goos: windows
-        goarch: arm
-        goarm: 5
-      - goos: windows
-        goarch: arm
-        goarm: 6
-      - goos: windows
-        goarch: arm
-        goarm: 7
 nfpms:
   - maintainer: "https://github.com/{{ .Env.GITHUB_USER }}"
     formats:
