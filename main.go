@@ -237,7 +237,8 @@ func server(args []string) {
 	}
 	if config.KeyFile == "" {
 		config.KeyFile = settings.Env("KEY_FILE")
-	} else if config.KeySeed == "" {
+	}
+	if config.KeySeed == "" {
 		config.KeySeed = settings.Env("KEY")
 	}
 	if config.Auth == "" {
