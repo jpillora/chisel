@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -35,6 +37,7 @@ var help = `
 
 func main() {
 
+	envPrefix := flag.String("env-prefix", "CHISEL_", "")
 	version := flag.Bool("version", false, "")
 	v := flag.Bool("v", false, "")
 	flag.Bool("help", false, "")
@@ -57,9 +60,9 @@ func main() {
 
 	switch subcmd {
 	case "server":
-		server(args)
+		server(args, *envPrefix)
 	case "client":
-		client(args)
+		client(args, *envPrefix)
 	default:
 		fmt.Print(help)
 		os.Exit(0)
@@ -176,7 +179,7 @@ var serverHelp = `
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
-func server(args []string) {
+func server(args []string, envPrefix string) {
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
@@ -206,6 +209,7 @@ func server(args []string) {
 		fmt.Print(serverHelp)
 		os.Exit(0)
 	}
+	flagsFromEnv(flags, envPrefix)
 	flags.Parse(args)
 
 	if *keyGen != "" {
@@ -419,9 +423,11 @@ var clientHelp = `
     --tls-cert, a path to a PEM encoded certificate matching the provided 
     private key. The certificate must have client authentication 
     enabled (mutual-TLS).
+
+    --remotes, a file to read remotes from (one per line).
 ` + commonHelp
 
-func client(args []string) {
+func client(args []string, envPrefix string) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 	config := chclient.Config{Headers: http.Header{}}
 	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
@@ -439,18 +445,29 @@ func client(args []string) {
 	sni := flags.String("sni", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	flagRemotes := flags.String("remotes", "", "")
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(0)
 	}
+	flagsFromEnv(flags, envPrefix)
 	flags.Parse(args)
 	//pull out options, put back remaining args
 	args = flags.Args()
-	if len(args) < 2 {
-		log.Fatalf("A server and least one remote is required")
+	switch len(args) {
+	case 0:
+		log.Fatalf("A server is required")
+	case 1:
+		if *flagRemotes == "" {
+			log.Fatalf("A server and least one remote is required")
+		}
 	}
 	config.Server = args[0]
-	config.Remotes = args[1:]
+	//read remotes
+	var err error
+	if config.Remotes, err = readRemotes(args[1:], *flagRemotes); err != nil {
+		log.Fatal(err)
+	}
 	//default auth
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
@@ -482,4 +499,53 @@ func client(args []string) {
 	if err := c.Wait(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+var envRepl = strings.NewReplacer(" ", "_", "-", "_")
+
+func flagsFromEnv(fs *flag.FlagSet, prefix string) {
+	notSet := make(map[string]*flag.Flag)
+	fs.VisitAll(func(f *flag.Flag) {
+		notSet[f.Name] = f
+	})
+	fs.Visit(func(f *flag.Flag) {
+		delete(notSet, f.Name)
+	})
+
+	for k, f := range notSet {
+		f.Value.Set(os.Getenv(prefix + strings.ToUpper(envRepl.Replace(k))))
+	}
+}
+
+func readRemotes(remotes []string, fl string) ([]string, error) {
+	var remotesFn string
+	if fl != "" {
+		remotesFn = fl
+	} else if len(remotes) == 1 && (remotes[0] == "-" || remotes[0] == "") {
+		remotes = remotes[:0]
+		remotesFn = "-"
+	}
+	if remotesFn == "" {
+		return remotes, nil
+	}
+	fh := os.Stdin
+	if remotesFn != "-" {
+		var err error
+		if fh, err = os.Open(remotesFn); err != nil {
+			return remotes, nil
+		}
+	}
+	scanner := bufio.NewScanner(fh)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if i := bytes.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		line = bytes.TrimSpace(line)
+		if len(line) != 0 {
+			remotes = append(remotes, string(line))
+		}
+	}
+	fh.Close()
+	return remotes, nil
 }
