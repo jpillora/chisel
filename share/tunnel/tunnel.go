@@ -68,6 +68,10 @@ func New(c Config) *Tunnel {
 	return t
 }
 
+func (t *Tunnel) Close() {
+	t.activatingConn.DoneAll()
+}
+
 //BindSSH provides an active SSH for use for tunnelling
 func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Request, chans <-chan ssh.NewChannel) error {
 	//link ctx to ssh-conn
@@ -76,7 +80,6 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 		if c.Close() == nil {
 			t.Debugf("SSH cancelled")
 		}
-		t.activatingConn.DoneAll()
 	}()
 	//mark active and unblock
 	t.activeConnMut.Lock()
