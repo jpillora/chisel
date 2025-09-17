@@ -42,6 +42,11 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(chshare.BuildVersion))
 		return
 	}
+
+	if s.httpHook != nil {
+		s.httpHook.ServeHTTP(w, r)
+		return
+	}
 	//missing :O
 	w.WriteHeader(404)
 	w.Write([]byte("Not found"))
