@@ -83,6 +83,8 @@ func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort strin
 	if err != nil {
 		return err
 	}
+	// No need to do it in Pipe() when CloseWrite() is used
+	defer dst.Close()
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil
