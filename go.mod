@@ -1,6 +1,8 @@
 module github.com/jpillora/chisel
 
-go 1.25.7
+go 1.25
+
+toolchain go1.25.7
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
