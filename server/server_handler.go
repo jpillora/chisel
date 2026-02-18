@@ -142,6 +142,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	})
+	defer tunnel.Close()
 	//bind
 	eg, ctx := errgroup.WithContext(req.Context())
 	eg.Go(func() error {
