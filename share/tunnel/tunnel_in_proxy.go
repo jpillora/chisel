@@ -10,6 +10,7 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/sizestr"
 	"golang.org/x/crypto/ssh"
+	"errors"
 )
 
 //sshTunnel exposes a subset of Tunnel to subtypes
@@ -118,13 +119,39 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 			close(done)
 			return err
 		}
-		go p.pipeRemote(ctx, src)
+
+		dst, l, err := p.openSshChannel(ctx)
+		if err != nil {
+			// SSH channel failed - likely because remote end not connectable
+			l.Infof("Reset")
+			resetTCP(src.(*net.TCPConn), err.Error())
+		    continue
+		}
+
+		go p.pipeRemoteSshAlreadyOpened(src, dst, l)
 	}
 }
 
 func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 	defer src.Close()
 
+	dst, l, err := p.openSshChannel(ctx)
+	if err != nil {
+		return
+	}
+
+	//then pipe
+	s, r := cio.Pipe(src, dst)
+	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
+}
+
+func (p *Proxy) pipeRemoteSshAlreadyOpened(src, dst io.ReadWriteCloser, l *cio.Logger) {
+	defer src.Close()
+	s, r := cio.Pipe(src, dst)
+	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
+}
+
+func (p *Proxy) openSshChannel(ctx context.Context) (io.ReadWriteCloser, *cio.Logger, error) {
 	p.mu.Lock()
 	p.count++
 	cid := p.count
@@ -132,19 +159,32 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 
 	l := p.Fork("conn#%d", cid)
 	l.Debugf("Open")
+
 	sshConn := p.sshTun.getSSH(ctx)
 	if sshConn == nil {
 		l.Debugf("No remote connection")
-		return
+		return nil, l, errors.New("No remote SSH connection")
 	}
 	//ssh request for tcp connection for this proxy's remote
 	dst, reqs, err := sshConn.OpenChannel("chisel", []byte(p.remote.Remote()))
 	if err != nil {
 		l.Infof("Stream error: %s", err)
-		return
+		return nil, l, err
 	}
 	go ssh.DiscardRequests(reqs)
-	//then pipe
-	s, r := cio.Pipe(src, dst)
-	l.Debugf("Close (sent %s received %s)", sizestr.ToString(s), sizestr.ToString(r))
+	return dst, l, nil
+}
+
+func resetTCP(c *net.TCPConn, msg string) {
+	data := append([]byte(msg),0x0a)
+
+	c.SetLinger(0)      // TCP reset if close and all data not yet sent/acked
+	c.SetNoDelay(false) // Make TCP slower to send...
+	// maximise changes to have Write() and Close() executed without gorouting switch
+	func() {
+		c.Write(data) // ignore errors
+		c.Close()
+	}()
+
+	return
 }
