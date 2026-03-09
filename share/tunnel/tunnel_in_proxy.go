@@ -143,6 +143,8 @@ func (p *Proxy) pipeRemote(ctx context.Context, src io.ReadWriteCloser) {
 		l.Infof("Stream error: %s", err)
 		return
 	}
+	// No need to do it in Pipe() when CloseWrite() is used
+	defer dst.Close()
 	go ssh.DiscardRequests(reqs)
 	//then pipe
 	s, r := cio.Pipe(src, dst)
