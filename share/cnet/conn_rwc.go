@@ -11,7 +11,11 @@ type rwcConn struct {
 	buff []byte
 }
 
-//NewRWCConn converts a RWC into a net.Conn
+type closeWriter interface {
+	CloseWrite() error
+}
+
+// NewRWCConn converts a RWC into a net.Conn
 func NewRWCConn(rwc io.ReadWriteCloser) net.Conn {
 	c := rwcConn{
 		ReadWriteCloser: rwc,
@@ -45,4 +49,11 @@ func (c *rwcConn) SetReadDeadline(t time.Time) error {
 
 func (c *rwcConn) SetWriteDeadline(t time.Time) error {
 	return nil //no-op
+}
+
+func (c *rwcConn) CloseWrite() error {
+	if cw, ok := c.ReadWriteCloser.(closeWriter); ok {
+		return cw.CloseWrite()
+	}
+	return nil
 }
