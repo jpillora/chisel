@@ -35,7 +35,9 @@ type Config struct {
 	Auth             string
 	KeepAlive        time.Duration
 	MaxRetryCount    int
+	MinRetryInterval time.Duration
 	MaxRetryInterval time.Duration
+	RetryJitter      bool
 	Server           string
 	Proxy            string
 	Remotes          []string
@@ -74,6 +76,9 @@ func NewClient(c *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(c.Server, "http") {
 		c.Server = "http://" + c.Server
+	}
+	if c.MinRetryInterval < time.Second {
+		c.MinRetryInterval = 100 * time.Millisecond
 	}
 	if c.MaxRetryInterval < time.Second {
 		c.MaxRetryInterval = 5 * time.Minute
