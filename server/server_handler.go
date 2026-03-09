@@ -135,13 +135,18 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	//successfuly validated config!
 	r.Reply(true, nil)
 	//tunnel per ssh connection
-	tunnel := tunnel.New(tunnel.Config{
+	tunnelConfig := tunnel.Config{
 		Logger:    l,
 		Inbound:   s.config.Reverse,
 		Outbound:  true, //server always accepts outbound
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
-	})
+	}
+	//enforce ACL on every channel, not just the initial config
+	if user != nil {
+		tunnelConfig.ACL = user.HasAccess
+	}
+	tunnel := tunnel.New(tunnelConfig)
 	//bind
 	eg, ctx := errgroup.WithContext(req.Context())
 	eg.Go(func() error {

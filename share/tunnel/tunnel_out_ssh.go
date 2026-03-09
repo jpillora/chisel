@@ -46,6 +46,12 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
 		return
 	}
+	//check ACL against the actual requested destination
+	if t.Config.ACL != nil && !socks && !t.Config.ACL(hostPort) {
+		t.Debugf("Denied connection to %s (ACL)", hostPort)
+		ch.Reject(ssh.Prohibited, "access denied")
+		return
+	}
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)

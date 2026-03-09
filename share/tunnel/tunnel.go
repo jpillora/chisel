@@ -25,6 +25,9 @@ type Config struct {
 	Outbound  bool
 	Socks     bool
 	KeepAlive time.Duration
+	//ACL optionally checks if a given address (host:port) is allowed.
+	//When set, outbound connections are denied if this returns false.
+	ACL func(addr string) bool
 }
 
 //Tunnel represents an SSH tunnel with proxy capabilities.
