@@ -66,7 +66,7 @@ $ go install github.com/jpillora/chisel@latest
 A [demo app](https://chisel-demo.herokuapp.com) on Heroku is running this `chisel server`:
 
 ```sh
-$ chisel server --port $PORT --proxy http://example.com
+$ chisel server --port $PORT --backend http://example.com
 # listens on $PORT, proxy web requests to http://example.com
 ```
 
