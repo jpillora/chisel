@@ -1,0 +1,45 @@
+name: Release Binaries
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  build:
+    name: ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('/arm{0}', matrix.goarm) || '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {goos: linux,   goarch: amd64}
+          - {goos: linux,   goarch: arm64}
+          - {goos: linux,   goarch: arm,   goarm: "7"}
+          - {goos: linux,   goarch: arm,   goarm: "6"}
+          - {goos: linux,   goarch: "386"}
+          - {goos: darwin,  goarch: amd64}
+          - {goos: darwin,  goarch: arm64}
+          - {goos: windows, goarch: amd64}
+          - {goos: windows, goarch: arm64}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+        run: |
+          SUFFIX="${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}"
+          EXT="${{ matrix.goos == 'windows' && '.exe' || '' }}"
+          NAME="chisel_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}${SUFFIX}${EXT}"
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/jpillora/chisel/share.BuildVersion=${{ github.ref_name }}" \
+            -o "$NAME" .
+          echo "ASSET=$NAME" >> $GITHUB_ENV
+      - name: Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
