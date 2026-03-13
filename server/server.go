@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -32,6 +33,8 @@ type Config struct {
 	Reverse   bool
 	KeepAlive time.Duration
 	TLS       TLSConfig
+
+	Listener net.Listener
 }
 
 // Server respresent a chisel service
