@@ -27,6 +27,7 @@ type Config struct {
 	KeyFile   string
 	AuthFile  string
 	Auth      string
+	AuthURL   string
 	Proxy     string
 	Socks5    bool
 	Reverse   bool
@@ -45,6 +46,7 @@ type Server struct {
 	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
+	urlUsers     *settings.URLUserIndex
 }
 
 var upgrader = websocket.Upgrader{
@@ -62,6 +64,9 @@ func NewServer(c *Config) (*Server, error) {
 		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
+	if c.AuthURL != "" && (c.AuthFile != "" || c.Auth != "") {
+		return nil, errors.New("--authurl cannot be combined with --authfile or --auth")
+	}
 	server.users = settings.NewUserIndex(server.Logger)
 	if c.AuthFile != "" {
 		if err := server.users.LoadUsers(c.AuthFile); err != nil {
@@ -74,6 +79,9 @@ func NewServer(c *Config) (*Server, error) {
 		if u.Name != "" {
 			server.users.AddUser(u)
 		}
+	}
+	if c.AuthURL != "" {
+		server.urlUsers = settings.NewURLUserIndex(c.AuthURL, server.Logger)
 	}
 
 	var pemBytes []byte
@@ -161,7 +169,7 @@ func (s *Server) Start(host, port string) error {
 // and can be closed by cancelling the provided context
 func (s *Server) StartContext(ctx context.Context, host, port string) error {
 	s.Infof("Fingerprint %s", s.fingerprint)
-	if s.users.Len() > 0 {
+	if s.users.Len() > 0 || s.urlUsers != nil {
 		s.Infof("User authentication enabled")
 	}
 	if s.reverseProxy != nil {
@@ -198,15 +206,25 @@ func (s *Server) GetFingerprint() string {
 // authUser is responsible for validating the ssh user / password combination
 func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 	// check if user authentication is enabled and if not, allow all
-	if s.users.Len() == 0 {
+	if s.users.Len() == 0 && s.urlUsers == nil {
 		return nil, nil
 	}
-	// check the user exists and has matching password
 	n := c.User()
+	// URL-based auth: delegate credential check to external service
+	if s.urlUsers != nil {
+		user, err := s.urlUsers.GetUser(n, string(password))
+		if err != nil {
+			s.Debugf("Login failed for user: %s", n)
+			return nil, errors.New("Invalid authentication for username: " + n)
+		}
+		s.sessions.Set(string(c.SessionID()), user)
+		return nil, nil
+	}
+	// file/inline user auth
 	user, found := s.users.Get(n)
 	if !found || user.Pass != string(password) {
 		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+		return nil, errors.New("Invalid authentication for username: " + n)
 	}
 	// insert the user session map
 	// TODO this should probably have a lock on it given the map isn't thread-safe
