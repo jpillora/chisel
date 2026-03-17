@@ -153,6 +153,14 @@ $ chisel server --help
     authfile with {"<user:pass>": [""]}. If unset, it will use the
     environment variable AUTH.
 
+    --authurl, An optional URL to an external authentication service.
+    On each connection attempt chisel POSTs {"username": "...", "password": "..."}
+    as JSON to this URL. A 200 response must return a JSON array of address
+    regexes (in the same format as the values in --authfile) to grant access;
+    any non-200 response denies access. Use [""] or ["*"] to allow all addresses.
+    Supports all address-matching functionality of --authfile. Cannot be
+    combined with --authfile or --auth.
+    
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
