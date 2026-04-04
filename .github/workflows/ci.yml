@@ -2,7 +2,6 @@ name: CI
 on:
   pull_request: {}
   push: {}
-permissions: write-all
 jobs:
   # ================
   # BUILD AND TEST JOB
@@ -29,64 +28,47 @@ jobs:
       - name: Test
         run: go test -v ./...
   # ================
-  # RELEASE BINARIES (on push "v*" tag)
+  # RELEASE (on push "v*" tag)
+  # Builds binaries, packages, and multi-arch Docker images via GoReleaser
   # ================
-  release_binaries:
-    name: Release Binaries
+  release:
+    name: Release
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Check out code
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: goreleaser
-        if: success()
-        uses: docker://goreleaser/goreleaser:latest
-        env:
-          GITHUB_USER: ${{ github.repository_owner }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GOTOOLCHAIN: auto
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          args: release --config .github/goreleaser.yml
-  # ================
-  # RELEASE DOCKER IMAGES (on push "v*" tag)
-  # ================
-  release_docker:
-    name: Release Docker Images
-    needs: test
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v5
+          go-version: stable
+          cache: true
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to DockerHub
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          images: jpillora/chisel
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: .github/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/386,linux/arm/v7,linux/arm/v6
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          distribution: goreleaser
+          version: latest
+          args: release --clean --config .github/goreleaser.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
