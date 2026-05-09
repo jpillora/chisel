@@ -18,18 +18,29 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 ## Features
 
-- Easy to use
-- [Performant](./test/bench/perf.md)\*
-- [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
-- [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
-- Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
-- Clients can create multiple tunnel endpoints over one TCP connection
-- Clients can optionally pass through SOCKS or HTTP CONNECT proxies
-- Reverse port forwarding (Connections go through the server and out the client)
-- Server optionally doubles as a [reverse proxy](http://golang.org/pkg/net/http/httputil/#NewSingleHostReverseProxy)
-- Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
-- Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
-- Client connections over stdio which supports `ssh -o ProxyCommand` providing SSH over HTTP
+**Simplicity**
+
+Chisel is a lightweight, easy-to-use application packaged as a single binary. [Examples](example/) for common use cases are provided for convenience.
+
+**Performance**
+
+Chisel uses WebSockets under the hood to provide a performant connection with low latency. Read more in our [performance](test/bench/perf.md) doc.
+
+**Security**
+
+Chisel encrypts connections with ECDSA and supports multiple methods of authentication. See [security](#security) for details.
+
+**Resiliency**
+
+In client mode, Chisel supports automatic reconnection with [exponential backoff](https://github.com/jpillora/backoff).
+
+**Flexibility**
+
+In addition to "raw" TCP forwarding, Chisel supports tunneling over SOCKS5 and HTTP CONNECT. A single TCP connection can support multiple tunnel endpoints.
+
+Reverse port forwarding is also supported, allowing the user to bounce down incoming traffic from a server on the public internet to clients behind a firewall.
+
+See our full [features list](doc/features.md) for more.
 
 ## Install
 
