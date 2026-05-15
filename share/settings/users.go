@@ -5,8 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/jpillora/chisel/share/cio"
@@ -102,19 +106,37 @@ func (u *UserIndex) addWatchEvents() error {
 	if err != nil {
 		return err
 	}
-	if err := watcher.Add(u.configFile); err != nil {
+	var configPath, _ = filepath.Abs(u.configFile)
+	if err := watcher.Add(filepath.Dir(configPath)); err != nil {
 		return err
 	}
 	go func() {
+		var debounceTimer *time.Timer
+		var debounceMutex sync.Mutex
 		for e := range watcher.Events {
-			if e.Op&fsnotify.Write != fsnotify.Write {
+			eventPath, _ := filepath.Abs(e.Name)
+			if runtime.GOOS == "windows" {
+				if !strings.EqualFold(eventPath, configPath) {
+					continue
+				}
+			} else if eventPath != configPath {
 				continue
 			}
-			if err := u.loadUserIndex(); err != nil {
-				u.Infof("Failed to reload the users configuration: %s", err)
-			} else {
-				u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+			if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
+				continue
 			}
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(200*time.Millisecond, func() {
+				debounceMutex.Lock()
+				defer debounceMutex.Unlock()
+				if err := u.loadUserIndex(); err != nil {
+					u.Infof("Failed to reload the users configuration: %s", err)
+				} else {
+					u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+				}
+			})
 		}
 	}()
 	return nil
