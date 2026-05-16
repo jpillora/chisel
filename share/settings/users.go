@@ -106,38 +106,60 @@ func (u *UserIndex) addWatchEvents() error {
 	if err != nil {
 		return err
 	}
-	var configPath, _ = filepath.Abs(u.configFile)
+	configPath, err := filepath.Abs(u.configFile)
+	if err != nil {
+		return err
+	}
 	if err := watcher.Add(filepath.Dir(configPath)); err != nil {
 		return err
 	}
 	go func() {
 		var debounceTimer *time.Timer
 		var debounceMutex sync.Mutex
-		for e := range watcher.Events {
-			eventPath, _ := filepath.Abs(e.Name)
-			if runtime.GOOS == "windows" {
-				if !strings.EqualFold(eventPath, configPath) {
-					continue
+		for {
+			select {
+				case e, ok := <-watcher.Events: {
+					if !ok {
+						u.Infof("Stop watching the users configuration: fsnotify Events channel closed.")
+						return
+					}
+					eventPath, err := filepath.Abs(e.Name)
+					if err != nil {
+						continue
+					}
+					if runtime.GOOS == "windows" {
+						if !strings.EqualFold(eventPath, configPath) {
+							continue
+						}
+					} else if eventPath != configPath {
+						continue
+					}
+					if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
+						continue
+					}
+					if debounceTimer != nil {
+						debounceTimer.Stop()
+					}
+					debounceTimer = time.AfterFunc(200*time.Millisecond, func() {
+						debounceMutex.Lock()
+						defer debounceMutex.Unlock()
+						if err := u.loadUserIndex(); err != nil {
+							u.Infof("Failed to reload the users configuration: %s", err)
+						} else {
+							u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+						}
+					})
 				}
-			} else if eventPath != configPath {
-				continue
-			}
-			if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
-				continue
-			}
-			if debounceTimer != nil {
-				debounceTimer.Stop()
-			}
-			debounceTimer = time.AfterFunc(200*time.Millisecond, func() {
-				debounceMutex.Lock()
-				defer debounceMutex.Unlock()
-				if err := u.loadUserIndex(); err != nil {
-					u.Infof("Failed to reload the users configuration: %s", err)
-				} else {
-					u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+				case err, ok := <-watcher.Errors: {
+					if !ok {
+						u.Infof("Stop watching the users configuration: fsnotify Errors channel closed.")
+						return
+					}
+					// just log and continue running with current config
+					u.Infof("Error while watching the users configuration: %s", err)
 				}
-			})
-		}
+			}
+    }
 	}()
 	return nil
 }
