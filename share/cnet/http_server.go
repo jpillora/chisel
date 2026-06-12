@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -16,7 +18,6 @@ type HTTPServer struct {
 	*http.Server
 	waiterMux sync.Mutex
 	waiter    *errgroup.Group
-	listenErr error
 }
 
 //NewHTTPServer creates a new HTTPServer
@@ -55,6 +56,13 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 	})
 	go func() {
 		<-ctx.Done()
+		//graceful shutdown: stop accepting, drain in-flight requests
+		//for a grace period, then force-close the remainder. hijacked
+		//connections (websocket tunnels) are closed by their owners.
+		grace := settings.EnvDuration("SHUTDOWN_GRACE", 5*time.Second)
+		c, cancel := context.WithTimeout(context.Background(), grace)
+		defer cancel()
+		h.Server.Shutdown(c)
 		h.Close()
 	}()
 	return nil
