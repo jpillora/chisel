@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 const debug = true
@@ -114,6 +116,25 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	//their own assertions decide the outcome
 	if !client.Ready(ctx) {
 		t.Log("setup: client did not become ready")
+		return server, client, teardown
+	}
+	//wait for tunnel listeners to accept: forward remotes bind on
+	//the client at Start, but reverse remotes are bound on the
+	//server after the handshake completes
+	for _, s := range tl.client.Remotes {
+		r, err := settings.DecodeRemote(s)
+		if err != nil || r.Stdio || r.LocalProto != "tcp" {
+			continue
+		}
+		addr := "127.0.0.1:" + r.LocalPort
+		for i := 0; i < 100; i++ {
+			conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 	return server, client, teardown
 }
