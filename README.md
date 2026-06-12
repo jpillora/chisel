@@ -302,6 +302,9 @@ $ chisel client --help
     --max-retry-count, Maximum number of times to retry before exiting.
     Defaults to unlimited.
 
+    --min-retry-interval, Minimum wait time before retrying after a
+    disconnection. Defaults to 1 second.
+
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 

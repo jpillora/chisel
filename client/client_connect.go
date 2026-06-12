@@ -19,7 +19,10 @@ import (
 
 func (c *Client) connectionLoop(ctx context.Context) error {
 	//connection loop!
-	b := &backoff.Backoff{Max: c.config.MaxRetryInterval}
+	b := &backoff.Backoff{
+		Min: c.config.MinRetryInterval,
+		Max: c.config.MaxRetryInterval,
+	}
 	for {
 		connected, err := c.connectionOnce(ctx)
 		//reset backoff after successful connections
@@ -30,7 +33,7 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 		attempt := int(b.Attempt())
 		maxAttempt := c.config.MaxRetryCount
 		//dont print closed-connection errors
-		if strings.HasSuffix(err.Error(), "use of closed network connection") {
+		if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
 			err = io.EOF
 		}
 		//show error message and attempt counts (excluding disconnects)
@@ -43,12 +46,15 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 				}
 				msg += fmt.Sprintf(" (Attempt: %d/%s)", attempt, maxAttemptVal)
 			}
-			c.Infof(msg)
+			c.Infof("%s", msg)
 		}
 		//give up?
 		if maxAttempt >= 0 && attempt >= maxAttempt {
 			c.Infof("Give up")
-			break
+			c.Close()
+			//unlike a ctx-cancelled shutdown, exhausting the
+			//connection attempts is an error (non-zero exit)
+			return errors.New("connection attempts exhausted")
 		}
 		d := b.Duration()
 		c.Infof("Retrying in %s...", d)
@@ -60,8 +66,6 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 			return nil
 		}
 	}
-	c.Close()
-	return nil
 }
 
 // connectionOnce connects to the chisel server and blocks
@@ -102,9 +106,9 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		e := err.Error()
 		if strings.Contains(e, "unable to authenticate") {
 			c.Infof("Authentication failed")
-			c.Debugf(e)
+			c.Debugf("%s", e)
 		} else {
-			c.Infof(e)
+			c.Infof("%s", e)
 		}
 		return false, err
 	}

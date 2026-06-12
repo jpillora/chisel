@@ -35,6 +35,7 @@ type Config struct {
 	Auth             string
 	KeepAlive        time.Duration
 	MaxRetryCount    int
+	MinRetryInterval time.Duration
 	MaxRetryInterval time.Duration
 	Server           string
 	Proxy            string
@@ -75,9 +76,6 @@ func NewClient(c *Config) (*Client, error) {
 	if !strings.HasPrefix(c.Server, "http") {
 		c.Server = "http://" + c.Server
 	}
-	if c.MaxRetryInterval < time.Second {
-		c.MaxRetryInterval = 5 * time.Minute
-	}
 	u, err := url.Parse(c.Server)
 	if err != nil {
 		return nil, err
@@ -106,6 +104,18 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//set default log level
 	client.Logger.Info = true
+	//retry interval defaults; explicit values are honored
+	if c.MinRetryInterval <= 0 {
+		c.MinRetryInterval = time.Second
+	}
+	if c.MaxRetryInterval <= 0 {
+		c.MaxRetryInterval = 5 * time.Minute
+	}
+	if c.MaxRetryInterval < c.MinRetryInterval {
+		client.Infof("max-retry-interval (%s) raised to min-retry-interval (%s)",
+			c.MaxRetryInterval, c.MinRetryInterval)
+		c.MaxRetryInterval = c.MinRetryInterval
+	}
 	//configure tls
 	if u.Scheme == "wss" {
 		tc := &tls.Config{}

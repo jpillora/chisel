@@ -389,6 +389,9 @@ var clientHelp = `
     --max-retry-count, Maximum number of times to retry before exiting.
     Defaults to unlimited.
 
+    --min-retry-interval, Minimum wait time before retrying after a
+    disconnection. Defaults to 1 second.
+
     --max-retry-interval, Maximum wait time before retrying after a
     disconnection. Defaults to 5 minutes.
 
@@ -434,6 +437,7 @@ func client(args []string) {
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
 	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
+	flags.DurationVar(&config.MinRetryInterval, "min-retry-interval", 0, "")
 	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
 	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
