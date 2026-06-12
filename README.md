@@ -144,9 +144,13 @@ $ chisel server --help
     when <user> connects, their <pass> will be verified and then
     each of the remote addresses will be compared against the list
     of address regular expressions for a match. Addresses will
-    always come in the form "<remote-host>:<remote-port>" for normal remotes
-    and "R:<local-interface>:<local-port>" for reverse port forwarding
-    remotes. This file will be automatically reloaded on change.
+    always come in the form "<remote-host>:<remote-port>" for normal remotes,
+    "R:<local-interface>:<local-port>" for reverse port forwarding
+    remotes, and "socks" for SOCKS5 proxy access. Note that SOCKS5
+    access previously bypassed this list; existing authfiles which
+    should allow SOCKS5 must add an entry matching "socks" (the
+    empty wildcard "" matches everything, including "socks"). This
+    file will be automatically reloaded on change.
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. It is equivalent to creating an
@@ -256,7 +260,9 @@ $ chisel client --help
     specify "socks" in place of remote-host and remote-port.
     The default local host and port for a "socks" remote is
     127.0.0.1:1080. Connections to this remote will terminate
-    at the server's internal SOCKS5 proxy.
+    at the server's internal SOCKS5 proxy. When the server also
+    has --authfile set, SOCKS5 access requires an entry matching
+    the token "socks" in the user's address list.
 
     When the chisel server has --reverse enabled, remotes can
     be prefixed with R to denote that they are reversed. That

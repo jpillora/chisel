@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T10:26:30Z
+* updated: 2026-06-12T10:31:28Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -88,11 +88,11 @@ Review/merge PR #515 (fixes removal, makes the cap configurable). Longer term, i
 
 ## 4. Security: SOCKS channels bypass per-user ACL
 
-* status: open
+* status: closed
 * priority: P1
 * type: bug
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-10T13:08:55Z
+* updated: 2026-06-12T10:31:28Z
 
 ### Problem
 
