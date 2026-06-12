@@ -1,6 +1,7 @@
 package chserver
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -138,6 +139,15 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	//successfuly validated config!
 	r.Reply(true, nil)
+	//log session opens at info level so operators can see connected
+	//clients, their IPs and declared remotes without debug mode
+	username := "-"
+	if user != nil {
+		username = user.Name
+	}
+	opened := time.Now()
+	l.Infof("Open (user=%s addr=%s remotes=%s)",
+		username, req.RemoteAddr, strings.Join(c.Remotes.Encode(), ","))
 	//tunnel per ssh connection
 	tunnelConfig := tunnel.Config{
 		Logger:    l,
@@ -173,9 +183,10 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return tunnel.BindRemotes(ctx, serverInbound)
 	})
 	err = eg.Wait()
+	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("Closed connection (%s)", err)
-	} else {
-		l.Debugf("Closed connection")
+		errmsg = fmt.Sprintf(" (error %s)", err)
 	}
+	l.Infof("Close (user=%s addr=%s duration=%s)%s",
+		username, req.RemoteAddr, time.Since(opened), errmsg)
 }

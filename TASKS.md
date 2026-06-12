@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:17:02Z
+* updated: 2026-06-12T11:21:11Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -554,11 +554,11 @@ Review the PR rather than reimplementing.
 
 ## 29. Observability: connection logs, /metrics, session introspection
 
-* status: open
+* status: closed
 * priority: P3
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:21:11Z
 
 ### Recurring asks
 
@@ -578,11 +578,11 @@ Optional next: a /metrics endpoint (sessions, tunnels, bytes — ConnCount and M
 
 ## 30. HTTP fallback transport (SSE/long-poll) for websocket-hostile proxies
 
-* status: open
+* status: inprogress
 * priority: P3
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:17:32Z
 
 ### Idea
 
