@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -87,7 +86,7 @@ func NewServer(c *Config) (*Server, error) {
 		} else {
 			key, err = os.ReadFile(c.KeyFile)
 			if err != nil {
-				log.Fatalf("Failed to read key file %s", c.KeyFile)
+				return nil, server.Errorf("Failed to read key file %s: %s", c.KeyFile, err)
 			}
 		}
 
@@ -95,21 +94,21 @@ func NewServer(c *Config) (*Server, error) {
 		if ccrypto.IsChiselKey(key) {
 			pemBytes, err = ccrypto.ChiselKey2PEM(key)
 			if err != nil {
-				log.Fatalf("Invalid key %s", string(key))
+				return nil, server.Errorf("Invalid chisel key: %s", err)
 			}
 		}
 	} else {
 		//generate private key (optionally using seed)
 		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
 		if err != nil {
-			log.Fatal("Failed to generate key")
+			return nil, server.Errorf("Failed to generate key: %s", err)
 		}
 	}
 
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
-		log.Fatal("Failed to parse key")
+		return nil, server.Errorf("Failed to parse key: %s", err)
 	}
 	//fingerprint this key
 	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
