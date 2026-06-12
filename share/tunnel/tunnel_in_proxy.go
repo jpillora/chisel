@@ -69,6 +69,18 @@ func (p *Proxy) listen() error {
 	return nil
 }
 
+//Close unbinds the proxy's listeners. proxies which have
+//been Run are instead closed by cancelling their context.
+func (p *Proxy) Close() error {
+	if p.tcp != nil {
+		return p.tcp.Close()
+	}
+	if p.udp != nil {
+		return p.udp.inbound.Close()
+	}
+	return nil
+}
+
 //Run enables the proxy and blocks while its active,
 //close the proxy by cancelling the context.
 func (p *Proxy) Run(ctx context.Context) error {

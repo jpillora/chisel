@@ -156,6 +156,10 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 	for i, remote := range remotes {
 		p, err := NewProxy(t.Logger, t, t.proxyCount, remote)
 		if err != nil {
+			//unbind the proxies which already bound
+			for _, p := range proxies[:i] {
+				p.Close()
+			}
 			return err
 		}
 		proxies[i] = p

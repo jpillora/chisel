@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:02:07Z
+* updated: 2026-06-12T11:04:40Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -121,11 +121,11 @@ Channel ACLs were added in commit 44310b6 but left this hole.
 
 ## 5. BindRemotes leaks bound listeners on partial failure
 
-* status: open
+* status: closed
 * priority: P2
 * type: bug
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-10T13:08:55Z
+* updated: 2026-06-12T11:04:40Z
 
 ### Problem
 
