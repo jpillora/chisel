@@ -8,6 +8,17 @@ permissions:
   contents: read
 jobs:
   # ================
+  # SPELLING CHECK
+  # ================
+  codespell:
+    name: Spelling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: codespell
+        uses: codespell-project/actions-codespell@v2
+  # ================
   # BUILD AND TEST JOB
   # ================
   test:

@@ -128,7 +128,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		//confirm reverse tunnels are allowed
 		if r.Reverse && !s.config.Reverse {
 			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
-			failed(s.Errorf("Reverse port forwaring not enabled on server"))
+			failed(s.Errorf("Reverse port forwarding not enabled on server"))
 			return
 		}
 		//confirm reverse tunnel is available
@@ -137,7 +137,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	//successfuly validated config!
+	//successfully validated config!
 	r.Reply(true, nil)
 	//log session opens at info level so operators can see connected
 	//clients, their IPs and declared remotes without debug mode

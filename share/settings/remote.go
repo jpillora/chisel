@@ -119,7 +119,7 @@ func DecodeRemote(s string) (*Remote, error) {
 	}
 	if r.LocalProto != r.RemoteProto {
 		//TODO support cross protocol
-		//tcp <-> udp, is faily straight forward
+		//tcp <-> udp, is fairly straightforward
 		//udp <-> tcp, is trickier since udp is stateless and tcp is not
 		return nil, errors.New("cross-protocol remotes are not supported yet")
 	}
@@ -153,7 +153,7 @@ func isHost(s string) bool {
 
 var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 
-//L4Proto extacts the layer-4 protocol from the given string
+//L4Proto extracts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)

@@ -1,0 +1,3 @@
+[codespell]
+skip = go.sum,go.mod,.git,dist,TASKS.md
+ignore-words-list = unparseable

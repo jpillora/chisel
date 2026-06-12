@@ -24,7 +24,7 @@ func GoStats() {
 	for range c {
 		memStats := runtime.MemStats{}
 		runtime.ReadMemStats(&memStats)
-		log.Printf("recieved SIGUSR2, go-routines: %d, go-memory-usage: %s",
+		log.Printf("received SIGUSR2, go-routines: %d, go-memory-usage: %s",
 			runtime.NumGoroutine(),
 			sizestr.ToString(int64(memStats.Alloc)))
 	}
