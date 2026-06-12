@@ -64,16 +64,19 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		s.Debugf("Failed to handshake (%s)", err)
 		return
 	}
-	// pull the users from the session map
+	// resolve the user from the authenticated username set by
+	// authUser (nil permissions means auth is disabled: allow-all)
 	var user *settings.User
-	if s.users.Len() > 0 {
-		sid := string(sshConn.SessionID())
-		u, ok := s.sessions.Get(sid)
-		if !ok {
-			panic("bug in ssh auth handler")
+	if sshConn.Permissions != nil {
+		n := sshConn.Permissions.Extensions["user"]
+		u, found := s.users.Get(n)
+		if !found {
+			//user was removed by an authfile reload mid-handshake
+			l.Infof("User %s no longer exists", n)
+			sshConn.Close()
+			return
 		}
 		user = u
-		s.sessions.Del(sid)
 	}
 	// chisel server handshake (reverse of client handshake)
 	// verify configuration

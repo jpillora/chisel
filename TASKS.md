@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:04:40Z
+* updated: 2026-06-12T11:07:30Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -143,11 +143,11 @@ Add `Proxy.Close()` and close `proxies[0..i-1]` on error before returning.
 
 ## 6. Server auth: session map leak, panic race, literal %s error, timing-unsafe compare
 
-* status: open
+* status: closed
 * priority: P2
 * type: bug
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-10T13:25:12Z
+* updated: 2026-06-12T11:07:30Z
 
 ### Problem
 

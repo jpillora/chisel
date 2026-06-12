@@ -2,7 +2,8 @@ package chserver
 
 import (
 	"context"
-	"errors"
+	"crypto/subtle"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -42,7 +43,6 @@ type Server struct {
 	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
 }
@@ -59,7 +59,6 @@ func NewServer(c *Config) (*Server, error) {
 		config:     c,
 		httpServer: cnet.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
-		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
 	server.users = settings.NewUserIndex(server.Logger)
@@ -204,14 +203,15 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
+	if !found || subtle.ConstantTimeCompare([]byte(user.Pass), password) != 1 {
 		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+		return nil, fmt.Errorf("invalid authentication for username: %s", n)
 	}
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
+	// pass the username through to the handshake handler, which
+	// re-resolves the user (no session state to leak or race)
+	return &ssh.Permissions{
+		Extensions: map[string]string{"user": n},
+	}, nil
 }
 
 // AddUser adds a new user into the server user index
