@@ -75,6 +75,8 @@ var commonHelp = `
 
   Signals:
     The chisel process is listening for:
+      a SIGINT or SIGTERM to begin a graceful shutdown
+        (a second signal forces an immediate exit),
       a SIGUSR2 to print process stats, and
       a SIGHUP to short-circuit the client reconnect timer
 

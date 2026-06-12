@@ -22,7 +22,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 - [Performant](./test/bench/perf.md)\*
 - [Encrypted connections](#security) using the SSH protocol (via `crypto/ssh`)
 - [Authenticated connections](#authentication); authenticated client connections with a users config file, authenticated server connections with fingerprint matching.
-- Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff)
+- Client auto-reconnects with [exponential backoff](https://github.com/jpillora/backoff) (tunable via `--min/max-retry-interval`); keepalive pings time out, so silently dead connections (sleep/wake, NAT timeouts, server restarts) are detected and re-established
 - Clients can create multiple tunnel endpoints over one TCP connection
 - Clients can optionally pass through SOCKS or HTTP CONNECT proxies
 - Reverse port forwarding (Connections go through the server and out the client)
@@ -48,6 +48,8 @@ Binaries are built with the latest Go release, which sets the minimum OS version
 ```sh
 docker run --rm -it jpillora/chisel --help
 ```
+
+Images are multi-arch and published to both Docker Hub (`jpillora/chisel`) and GitHub Container Registry (`ghcr.io/jpillora/chisel`).
 
 ### Fedora
 
@@ -211,6 +213,8 @@ $ chisel server --help
 
   Signals:
     The chisel process is listening for:
+      a SIGINT or SIGTERM to begin a graceful shutdown
+        (a second signal forces an immediate exit),
       a SIGUSR2 to print process stats, and
       a SIGHUP to short-circuit the client reconnect timer
 
@@ -362,6 +366,8 @@ $ chisel client --help
 
   Signals:
     The chisel process is listening for:
+      a SIGINT or SIGTERM to begin a graceful shutdown
+        (a second signal forces an immediate exit),
       a SIGUSR2 to print process stats, and
       a SIGHUP to short-circuit the client reconnect timer
 
@@ -376,13 +382,23 @@ $ chisel client --help
 
 ### Security
 
-Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key file, using the `--keyfile` option. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. See the `--help` above for more information.
+Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key file, using the `--keyfile` option. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. Legacy MD5 fingerprints are still accepted but must be the full 16-octet colon form — truncated prefixes are rejected. See the `--help` above for more information.
+
+The server also caps inbound websocket message sizes before authentication (`CHISEL_WS_READ_LIMIT`, default 64KB), so unauthenticated peers cannot exhaust memory with oversized frames.
 
 ### Authentication
 
 Using the `--authfile` option, the server may optionally provide a `user.json` configuration file to create a list of accepted users. The client then authenticates using the `--auth` option. See [users.json](example/users.json) for an example authentication configuration file. See the `--help` above for more information.
 
-Internally, this is done using the _Password_ authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/.
+Notes on authfile behavior:
+
+- The file is watched and **reloaded live** — including editor saves via rename (vim) and kubernetes configmap updates. Reloads apply to new connections and to new tunnels of already-connected clients; removed users lose access to new tunnels immediately, though established tunnels are not interrupted.
+- Address patterns are regular expressions and are **not anchored** — anchor them with `^` and `$` (the server warns about unanchored patterns at load). The empty string `""` matches everything.
+- SOCKS5 access is controlled by an entry matching the token `socks`. **Breaking**: SOCKS5 previously bypassed the authfile entirely; servers running `--socks5` with `--authfile` must grant `socks` to users who should keep proxy access (wildcard `""` entries keep working).
+- Auth strings without a colon (`user:pass`) are now a **fatal startup error** on both server and client — previously they silently disabled authentication.
+- The `--auth` user survives authfile reloads and wins name clashes with file users.
+
+Internally, this is done using the _Password_ authentication method provided by SSH. Learn more about `crypto/ssh` here http://blog.gopheracademy.com/go-and-ssh/. Session opens/closes (with user, source address and remotes) and failed login attempts are logged at info level.
 
 ### TLS Guide
 
@@ -430,6 +446,8 @@ For mutual TLS, also pass `--tls-ca` to the server and `--tls-cert`/`--tls-key` 
     ```
 
 1. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
+
+Note: if the server also uses `--authfile`, users need an entry matching the token `socks` to use the proxy (see [Authentication](#authentication)).
 
 ### Reverse SOCKS with an Authfile
 
