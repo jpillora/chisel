@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T10:59:53Z
+* updated: 2026-06-12T11:02:07Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -392,11 +392,11 @@ Keepalive fixes [PR #581](https://github.com/jpillora/chisel/pull/581) / [PR #48
 
 ## 22. Version: fall back to debug.ReadBuildInfo when ldflags absent
 
-* status: open
+* status: closed
 * priority: P2
 * type: task
 * created: 2026-06-10T10:23:53Z
-* updated: 2026-06-10T13:10:28Z
+* updated: 2026-06-12T11:02:07Z
 
 ### Problem
 

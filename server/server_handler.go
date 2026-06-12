@@ -100,13 +100,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		failed(s.Errorf("invalid config"))
 		return
 	}
-	//print if client and server  versions dont match
+	//print if client and server versions dont match,
+	//skipping dev/unknown builds where the mismatch is meaningless
 	cv := strings.TrimPrefix(c.Version, "v")
-	if cv == "" {
-		cv = "<unknown>"
-	}
 	sv := strings.TrimPrefix(chshare.BuildVersion, "v")
-	if cv != sv {
+	devVersion := func(v string) bool {
+		return v == "" || strings.HasPrefix(v, "0.0.0")
+	}
+	if cv != sv && !devVersion(cv) && !devVersion(sv) {
 		l.Infof("Client version (%s) differs from server version (%s)", cv, sv)
 	}
 	//validate remotes
