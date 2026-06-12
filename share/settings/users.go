@@ -77,6 +77,14 @@ type UserIndex struct {
 	*cio.Logger
 	*Users
 	configFile string
+	pinned     []*User
+}
+
+// PinUser adds a user which survives configuration file
+// reloads (e.g. the --auth user). Pin before LoadUsers.
+func (u *UserIndex) PinUser(user *User) {
+	u.pinned = append(u.pinned, user)
+	u.AddUser(user)
 }
 
 // NewUserIndex creates a source for users
@@ -209,7 +217,7 @@ func (u *UserIndex) loadUserIndex() error {
 		}
 		users = append(users, user)
 	}
-	//swap
-	u.Reset(users)
+	//swap, keeping pinned users (pinned last: they win name clashes)
+	u.Reset(append(users, u.pinned...))
 	return nil
 }

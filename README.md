@@ -150,7 +150,9 @@ $ chisel server --help
     access previously bypassed this list; existing authfiles which
     should allow SOCKS5 must add an entry matching "socks" (the
     empty wildcard "" matches everything, including "socks"). This
-    file will be automatically reloaded on change.
+    file will be automatically reloaded on change. Reloads apply
+    to new connections and to new tunnels of connected clients;
+    established tunnels are not interrupted.
 
     --auth, An optional string representing a single user with full
     access, in the form of <user:pass>. It is equivalent to creating an

@@ -146,9 +146,15 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	}
-	//enforce ACL on every channel, not just the initial config
+	//enforce ACL on every channel, not just the initial config.
+	//the user is re-resolved from the live index per channel, so
+	//authfile reloads apply to connected clients' new tunnels
 	if user != nil {
-		tunnelConfig.ACL = user.HasAccess
+		name := user.Name
+		tunnelConfig.ACL = func(addr string) bool {
+			u, found := s.users.Get(name)
+			return found && u.HasAccess(addr)
+		}
 	}
 	tunnel := tunnel.New(tunnelConfig)
 	//bind

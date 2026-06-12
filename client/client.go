@@ -182,6 +182,9 @@ func NewClient(c *Config) (*Client, error) {
 	}
 	//ssh auth and config
 	user, pass := settings.ParseAuth(c.Auth)
+	if c.Auth != "" && user == "" {
+		return nil, fmt.Errorf("invalid auth string, expected <user>:<pass>")
+	}
 	client.sshConfig = &ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(pass)},

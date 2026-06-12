@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:11:58Z
+* updated: 2026-06-12T11:17:02Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -175,11 +175,11 @@ Unbounded (if slow) growth on a public server.
 
 ## 8. Auth user store: --auth validation foot-guns + reload semantics (#549)
 
-* status: open
+* status: closed
 * priority: P2
 * type: bug
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-10T13:25:12Z
+* updated: 2026-06-12T11:17:02Z
 
 ### Problem
 

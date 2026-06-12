@@ -3,6 +3,7 @@ package settings
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 	"time"
@@ -125,5 +126,38 @@ func TestWatchSymlinkSwap(t *testing.T) {
 	}
 	if !waitUser(index, "bob") {
 		t.Fatal("symlink swap update not detected")
+	}
+}
+
+// TestWatchPinnedUserSurvivesReload verifies that pinned users (--auth)
+// are not dropped when the authfile reloads; previously the first
+// reload Reset() deleted them.
+func TestWatchPinnedUserSurvivesReload(t *testing.T) {
+	cfg := filepath.Join(t.TempDir(), "users.json")
+	writeUser(t, cfg, "alice")
+	index := NewUserIndex(cio.NewLogger("test"))
+	index.PinUser(&User{
+		Name:  "pinned",
+		Pass:  "pw",
+		Addrs: []*regexp.Regexp{UserAllowAll},
+	})
+	if err := index.LoadUsers(cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"alice", "pinned"} {
+		if _, found := index.Get(n); !found {
+			t.Fatalf("expected user %q after load", n)
+		}
+	}
+	//reload: replace alice with bob
+	writeUser(t, cfg, "bob")
+	if !waitUser(index, "bob") {
+		t.Fatal("reload not detected")
+	}
+	if _, found := index.Get("pinned"); !found {
+		t.Fatal("pinned user dropped by authfile reload")
+	}
+	if _, found := index.Get("alice"); found {
+		t.Fatal("alice should have been replaced by the reload")
 	}
 }

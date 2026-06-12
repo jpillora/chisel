@@ -62,16 +62,18 @@ func NewServer(c *Config) (*Server, error) {
 	}
 	server.Info = true
 	server.users = settings.NewUserIndex(server.Logger)
-	if c.AuthFile != "" {
-		if err := server.users.LoadUsers(c.AuthFile); err != nil {
-			return nil, err
-		}
-	}
+	//pin the --auth user first so authfile reloads cannot drop it
 	if c.Auth != "" {
 		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
 		u.Name, u.Pass = settings.ParseAuth(c.Auth)
-		if u.Name != "" {
-			server.users.AddUser(u)
+		if u.Name == "" {
+			return nil, server.Errorf("invalid auth string, expected <user>:<pass>")
+		}
+		server.users.PinUser(u)
+	}
+	if c.AuthFile != "" {
+		if err := server.users.LoadUsers(c.AuthFile); err != nil {
+			return nil, err
 		}
 	}
 

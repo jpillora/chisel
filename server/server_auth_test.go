@@ -57,3 +57,10 @@ func TestAuthUserAllowAll(t *testing.T) {
 		t.Fatalf("expected nil permissions for allow-all, got %+v", perms)
 	}
 }
+
+func TestInvalidAuthString(t *testing.T) {
+	//auth strings without a colon used to silently disable auth
+	if _, err := NewServer(&Config{KeySeed: "x", Auth: "nocolon"}); err == nil {
+		t.Fatal("server accepted --auth without a colon")
+	}
+}
