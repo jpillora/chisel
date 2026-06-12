@@ -157,7 +157,9 @@ var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
-		return strings.ToLower(s[:l-4]), s[l-3:]
+		//lowercase the proto to match the case-insensitive regex,
+		//all later comparisons expect "tcp"/"udp"
+		return strings.ToLower(s[:l-4]), strings.ToLower(s[l-3:])
 	}
 	return s, ""
 }

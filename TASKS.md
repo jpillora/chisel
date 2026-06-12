@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:21:11Z
+* updated: 2026-06-12T11:23:56Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -237,11 +237,11 @@ All in `client/client_connect.go` connectionLoop:
 
 ## 12. Uppercase /UDP remote suffix parses but later fails as unknown proto
 
-* status: open
+* status: closed
 * priority: P3
 * type: bug
 * created: 2026-06-10T10:23:15Z
-* updated: 2026-06-10T13:09:36Z
+* updated: 2026-06-12T11:23:56Z
 
 ### Problem
 
@@ -527,11 +527,11 @@ Add `socks5` to the allowed schemes (same SOCKS5 dialer). Note in help/docs: all
 
 ## 28. External auth provider: --authurl webhook
 
-* status: open
+* status: inprogress
 * priority: P3
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:21:39Z
 
 ### Idea
 
