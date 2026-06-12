@@ -5,8 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/jpillora/chisel/share/cio"
@@ -96,28 +100,80 @@ func (u *UserIndex) LoadUsers(configFile string) error {
 	return nil
 }
 
-// watchEvents is responsible for watching for updates to the file and reloading
+// addWatchEvents is responsible for watching for updates to the file and reloading
 func (u *UserIndex) addWatchEvents() error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
-	if err := watcher.Add(u.configFile); err != nil {
+	configPath, err := filepath.Abs(u.configFile)
+	if err != nil {
 		return err
 	}
+	//watch the parent directory instead of the file itself, so the watch
+	//survives editors and orchestrators which replace the file rather
+	//than write to it (vim tmp+rename, truncate+write, kubernetes
+	//configmap symlink swaps)
+	if err := watcher.Add(filepath.Dir(configPath)); err != nil {
+		return err
+	}
+	//track the resolved path to catch symlink retargets
+	realPath, _ := filepath.EvalSymlinks(configPath)
 	go func() {
-		for e := range watcher.Events {
-			if e.Op&fsnotify.Write != fsnotify.Write {
-				continue
-			}
-			if err := u.loadUserIndex(); err != nil {
-				u.Infof("Failed to reload the users configuration: %s", err)
-			} else {
-				u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+		//collapse event bursts (truncate+write, remove+create) into a
+		//single reload once events settle, so half-written files are
+		//not loaded
+		const debounce = 100 * time.Millisecond
+		timer := time.NewTimer(debounce)
+		timer.Stop()
+		for {
+			select {
+			case e, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if u.watchHit(e, configPath, &realPath) {
+					timer.Reset(debounce)
+				}
+			case <-timer.C:
+				if err := u.loadUserIndex(); err != nil {
+					u.Infof("Failed to reload the users configuration: %s", err)
+				} else {
+					u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				u.Infof("Error watching the users configuration: %s", err)
 			}
 		}
 	}()
 	return nil
+}
+
+// watchHit reports whether the event affects the configured file, either
+// directly or via a symlink retarget (kubernetes configmaps swap a
+// symlinked directory rather than writing to the watched file).
+func (u *UserIndex) watchHit(e fsnotify.Event, configPath string, realPath *string) bool {
+	if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove) == 0 {
+		return false //ignore chmod
+	}
+	if eventPath, err := filepath.Abs(e.Name); err == nil && samePath(eventPath, configPath) {
+		return true
+	}
+	if current, err := filepath.EvalSymlinks(configPath); err == nil && current != *realPath {
+		*realPath = current
+		return true
+	}
+	return false
+}
+
+func samePath(a, b string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 // loadUserIndex is responsible for loading the users configuration

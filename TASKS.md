@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T10:22:12Z
+* updated: 2026-06-12T10:26:30Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -35,11 +35,11 @@ This is the most-reported problem in the tracker.
 
 ## 2. Authfile fsnotify watcher misses rename/truncate updates; no debounce
 
-* status: open
+* status: closed
 * priority: P1
 * type: bug
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-10T13:08:55Z
+* updated: 2026-06-12T10:26:30Z
 
 ### Problem
 
