@@ -212,6 +212,10 @@ func (u *UserIndex) loadUserIndex() error {
 				if err != nil {
 					return errors.New("Invalid address regex")
 				}
+				if !strings.HasPrefix(r, "^") || !strings.HasSuffix(r, "$") {
+					u.Infof("authfile: pattern %q (user %s) is unanchored and "+
+						"may match unintended addresses; anchor it with ^ and $", r, user.Name)
+				}
 				user.Addrs = append(user.Addrs, re)
 			}
 		}

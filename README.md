@@ -144,7 +144,11 @@ $ chisel server --help
       }
     when <user> connects, their <pass> will be verified and then
     each of the remote addresses will be compared against the list
-    of address regular expressions for a match. Addresses will
+    of address regular expressions for a match. Patterns are NOT
+    anchored by default: "10.0.0.1:80" also matches
+    "210.0.0.1:8080", and "." matches any character. Anchor your
+    patterns, e.g. "^10\.0\.0\.1:80$". The empty string ""
+    matches every address. Addresses will
     always come in the form "<remote-host>:<remote-port>" for normal remotes,
     "R:<local-interface>:<local-port>" for reverse port forwarding
     remotes, and "socks" for SOCKS5 proxy access. Note that SOCKS5

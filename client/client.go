@@ -234,7 +234,9 @@ func (c *Client) verifyServer(hostname string, remote net.Addr, key ssh.PublicKe
 	return nil
 }
 
-// verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints
+// verifyLegacyFingerprint calculates and compares legacy MD5 fingerprints,
+// requiring the full 16-octet colon form (a prefix match would let a
+// truncated fingerprint "verify" against ~1 in 65k keys)
 func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
 	bytes := md5.Sum(key.Marshal())
 	strbytes := make([]string, len(bytes))
@@ -243,7 +245,7 @@ func (c *Client) verifyLegacyFingerprint(key ssh.PublicKey) error {
 	}
 	got := strings.Join(strbytes, ":")
 	expect := c.config.Fingerprint
-	if !strings.HasPrefix(got, expect) {
+	if got != expect {
 		return fmt.Errorf("Invalid fingerprint (%s)", got)
 	}
 	return nil
