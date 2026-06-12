@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T10:37:22Z
+* updated: 2026-06-12T10:40:41Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -364,11 +364,11 @@ Scope to least privilege (`contents: read` for test, `contents: write` only on r
 
 ## 21. Tracker triage: close stale dependabot PRs and resolved issues
 
-* status: open
+* status: closed
 * priority: P2
 * type: task
 * created: 2026-06-10T10:23:53Z
-* updated: 2026-06-10T13:25:46Z
+* updated: 2026-06-12T10:40:41Z
 
 ### Stale dependabot PRs
 
@@ -672,3 +672,12 @@ Keep `test/e2e/env_key_test.go` green throughout — regression test for [#570](
 - IPv4/IPv6 dial preference flag — localhost resolving to ::1 surprises users when the service binds 127.0.0.1 only — [#544](https://github.com/jpillora/chisel/issues/544), [#479](https://github.com/jpillora/chisel/issues/479), [#520](https://github.com/jpillora/chisel/issues/520)
 - Custom websocket endpoint path (--uri) — [#566](https://github.com/jpillora/chisel/issues/566); pairs with the SSE transport idea (task 30)
 - Win7 support — [#576](https://github.com/jpillora/chisel/issues/576); infeasible on modern Go, document minimum OS in README instead
+
+## 35. Dependabot rot: switch to grouped monthly updates or renovate
+
+* status: open
+* priority: P4
+* type: task
+* created: 2026-06-12T10:40:33Z
+
+The dependabot config produced 11 stale PRs that sat unmerged for years (closed 2026-06-12 in task 21). Decide between dependabot grouped monthly updates or renovate, then implement. Refs: [#559](https://github.com/jpillora/chisel/issues/559) (renovate suggestion), [#452](https://github.com/jpillora/chisel/issues/452) (confusing \"fake pushes\" from dependabot).
