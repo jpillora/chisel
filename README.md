@@ -507,6 +507,17 @@ Since WebSockets support is required:
 - `1.9` - Bump to Go 1.21. Switch from `--key` seed to P256 key strings with `--key{gen,file}` (by @cmenginnz)
 - `1.10` - Bump to Go 1.22. Add `.rpm` `.deb` and `.apk` to releases. Fix bad version comparison.
 - `1.11` - Bump to Go 1.25.1. Update all dependencies.
+- `1.12` - (unreleased) Reliability and security pass:
+  - keepalive pings now time out (`CHISEL_PING_TIMEOUT`), so dead connections reconnect promptly after sleep/wake, NAT timeouts and server restarts
+  - authfile reloads survive editor renames and kubernetes configmap swaps, and apply live to connected clients (new tunnels; established tunnels are not interrupted)
+  - **breaking**: with `--socks5` + `--authfile`, SOCKS5 access now requires an authfile entry matching `socks` (wildcard `""` entries keep working)
+  - TCP half-close is propagated through tunnels, and unreachable targets reject the tunnel instead of presenting a dead connection (`CHISEL_DIAL_TIMEOUT`, default 30s)
+  - graceful shutdown on SIGTERM with HTTP request draining (`CHISEL_SHUTDOWN_GRACE`); a second signal force-exits
+  - UDP exit nodes no longer break or leak past 100 concurrent flows (`CHISEL_UDP_MAX_CONNS`)
+  - inbound websocket messages are size-capped pre-auth (`CHISEL_WS_READ_LIMIT`)
+  - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
+  - `go install` builds report their real version; sessions and failed logins are logged at info level
+  - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions
 
 ## License
 
