@@ -78,7 +78,6 @@ func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 		return
 	}
 	stream := io.ReadWriteCloser(sshChan)
-	//cnet.MeterRWC(t.Logger.Fork("sshchan"), sshChan)
 	defer stream.Close()
 	go ssh.DiscardRequests(reqs)
 	l := t.Logger.Fork("conn#%d", t.connStats.New())

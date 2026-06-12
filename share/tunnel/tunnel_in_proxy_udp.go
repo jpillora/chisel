@@ -88,7 +88,7 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		//read from inbound udp
 		u.inbound.SetReadDeadline(time.Now().Add(time.Second))
 		n, addr, err := u.inbound.ReadFromUDP(buff)
-		if e, ok := err.(net.Error); ok && (e.Timeout() || e.Temporary()) {
+		if e, ok := err.(net.Error); ok && e.Timeout() {
 			continue
 		}
 		if err != nil {

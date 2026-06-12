@@ -309,6 +309,13 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 	return nil
 }
 
+// Ready blocks until the client has an active connection to the
+// server, returning false if the context is cancelled or the
+// connection wait times out first
+func (c *Client) Ready(ctx context.Context) bool {
+	return c.tunnel.Ready(ctx)
+}
+
 // Wait blocks while the client is running.
 func (c *Client) Wait() error {
 	return c.eg.Wait()

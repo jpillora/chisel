@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:39:13Z
+* updated: 2026-06-12T11:44:17Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -509,11 +509,11 @@ Add `socks5` to the allowed schemes (same SOCKS5 dialer). Note in help/docs: all
 
 ## 27. Build hygiene: Makefile flags, build tags, deprecated APIs, test nits
 
-* status: open
+* status: closed
 * priority: P4
 * type: task
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:28Z
+* updated: 2026-06-12T11:44:17Z
 
 ### Items
 

@@ -134,6 +134,13 @@ func (t *Tunnel) getSSH(ctx context.Context) ssh.Conn {
 	}
 }
 
+//Ready waits for an active ssh connection, returning false
+//if none arrives before the context is cancelled or the
+//connection wait times out
+func (t *Tunnel) Ready(ctx context.Context) bool {
+	return t.getSSH(ctx) != nil
+}
+
 func (t *Tunnel) activatingConnWait() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {

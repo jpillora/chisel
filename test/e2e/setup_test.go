@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
@@ -110,11 +109,12 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		// 	t.Fatalf("goroutines left %d", d)
 		// }
 	}
-	//wait a bit...
-	//TODO: client signal API, similar to os.Notify(signal)
-	//      wait for client setup
-	time.Sleep(50 * time.Millisecond)
-	//ready
+	//wait for the client to establish its server connection.
+	//negative tests may never connect (e.g. rejected client certs):
+	//their own assertions decide the outcome
+	if !client.Ready(ctx) {
+		t.Log("setup: client did not become ready")
+	}
 	return server, client, teardown
 }
 
