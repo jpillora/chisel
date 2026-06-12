@@ -95,7 +95,7 @@ func (t *Tunnel) BindSSH(ctx context.Context, c ssh.Conn, reqs <-chan *ssh.Reque
 	}
 	//block until closed
 	go t.handleSSHRequests(reqs)
-	go t.handleSSHChannels(chans)
+	go t.handleSSHChannels(ctx, chans)
 	t.Debugf("SSH connected")
 	err := c.Wait()
 	t.Debugf("SSH disconnected")

@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T10:45:45Z
+* updated: 2026-06-12T10:52:18Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -311,11 +311,11 @@ Add `syscall.SIGTERM` (unix) and make a second signal force-exit. Use `http.Serv
 
 ## 19. Half-close support + dial-failure propagation through tunnels
 
-* status: open
+* status: closed
 * priority: P2
 * type: task
 * created: 2026-06-10T10:23:53Z
-* updated: 2026-06-10T13:10:01Z
+* updated: 2026-06-12T10:52:18Z
 
 ### Problem
 
