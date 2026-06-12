@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:44:17Z
+* updated: 2026-06-12T11:52:45Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -602,11 +602,11 @@ Evaluate building on webdial vs the standalone implementation offered in the iss
 
 ## 31. PROXY protocol support (server ingress + reverse-remote egress)
 
-* status: open
+* status: inprogress
 * priority: P4
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:47:23Z
 
 ### Idea
 
@@ -622,11 +622,11 @@ Interacts with requestlog TrustProxy (`server/server.go:176-178`). Parsing must 
 
 ## 32. Unix domain socket remotes
 
-* status: open
+* status: inprogress
 * priority: P4
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:48:47Z
 
 ### Idea
 
@@ -640,11 +640,11 @@ Main blocker is remote syntax — `settings.Remote` parsing is colon-delimited (
 
 ## 33. Key/TLS management UX bundle
 
-* status: open
+* status: inprogress
 * priority: P4
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:49:43Z
 * --keygen-json (PR #460): emit {key, fingerprint} JSON for automation; pairs with #499 (key automation ask).
 
 ### Bundle
@@ -658,11 +658,11 @@ Keep `test/e2e/env_key_test.go` green throughout — regression test for [#570](
 
 ## 34. Assorted feature asks worth triaging
 
-* status: open
+* status: inprogress
 * priority: P4
 * type: idea
 * created: 2026-06-10T10:24:37Z
-* updated: 2026-06-10T13:10:57Z
+* updated: 2026-06-12T11:50:36Z
 
 ### Grab-bag from the last 100 issues
 
@@ -675,9 +675,10 @@ Keep `test/e2e/env_key_test.go` green throughout — regression test for [#570](
 
 ## 35. Dependabot rot: switch to grouped monthly updates or renovate
 
-* status: open
+* status: inprogress
 * priority: P4
 * type: task
 * created: 2026-06-12T10:40:33Z
+* updated: 2026-06-12T11:52:45Z
 
 The dependabot config produced 11 stale PRs that sat unmerged for years (closed 2026-06-12 in task 21). Decide between dependabot grouped monthly updates or renovate, then implement. Refs: [#559](https://github.com/jpillora/chisel/issues/559) (renovate suggestion), [#452](https://github.com/jpillora/chisel/issues/452) (confusing \"fake pushes\" from dependabot).
