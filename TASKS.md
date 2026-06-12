@@ -3,7 +3,7 @@
 a [meads](https://github.com/jpillora/meads) (`md`) managed task log
 
 * created: 2026-06-10T10:22:47Z
-* updated: 2026-06-12T11:30:50Z
+* updated: 2026-06-12T11:33:12Z
 
 ## 1. Keepalive ping has no timeout - dead connections are never detected
 
@@ -439,11 +439,11 @@ In `share/version.go`, when BuildVersion is the default, fall back to `runtime/d
 
 ## 24. Accept socks5:// scheme in client --proxy
 
-* status: open
+* status: closed
 * priority: P3
 * type: task
 * created: 2026-06-10T10:23:53Z
-* updated: 2026-06-10T13:10:28Z
+* updated: 2026-06-12T11:33:12Z
 
 ### Problem
 

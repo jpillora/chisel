@@ -317,6 +317,8 @@ $ chisel client --help
     "#" in the password must be written as "%23".
     For example, http://admin:password@my-server.com:8081
             or: socks://admin:password@my-server.com:1080
+    The socks://, socks5:// and socks5h:// schemes are equivalent:
+    DNS is always resolved by the proxy.
 
     --header, Set a custom header in the form "HeaderName: HeaderContent".
     Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")

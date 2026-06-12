@@ -283,10 +283,11 @@ func (c *Client) setProxy(u *url.URL, d *websocket.Dialer) error {
 		}
 		return nil
 	}
-	// SOCKS5 proxy
-	if u.Scheme != "socks" && u.Scheme != "socks5h" {
+	// SOCKS5 proxy. all variants behave identically: DNS is
+	// resolved by the proxy (golang.org/x/net/proxy.SOCKS5)
+	if u.Scheme != "socks" && u.Scheme != "socks5" && u.Scheme != "socks5h" {
 		return fmt.Errorf(
-			"unsupported socks proxy type: %s:// (only socks5h:// or socks:// is supported)",
+			"unsupported socks proxy type: %s:// (only socks://, socks5:// or socks5h:// are supported)",
 			u.Scheme,
 		)
 	}
