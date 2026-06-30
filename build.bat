@@ -55,6 +55,17 @@ if %ERRORLEVEL% equ 0 (
     echo.
     echo [OK] Binario gerado: build\tunnel-windows-amd64.exe
     for %%A in (build\tunnel-windows-amd64.exe) do echo [*] Tamanho: %%~zA bytes
+
+    REM UPX packing opcional
+    where upx >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        echo [*] Aplicando UPX (compressao LZMA)...
+        copy /y build\tunnel-windows-amd64.exe build\tunnel-windows-amd64-packed.exe >nul
+        upx --best --lzma --force build\tunnel-windows-amd64-packed.exe
+        for %%A in (build\tunnel-windows-amd64-packed.exe) do echo [*] Binario packed: build\tunnel-windows-amd64-packed.exe (%%~zA bytes)
+    ) else (
+        echo [!] UPX nao encontrado (opcional). Instale de https://upx.github.io/
+    )
 ) else (
     echo [!] Falha na compilacao
     exit /b 1

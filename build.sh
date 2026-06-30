@@ -50,6 +50,17 @@ if [ -f build/tunnel-windows-amd64.exe ]; then
     echo ""
     echo "[OK] Binario gerado: build/tunnel-windows-amd64.exe"
     echo "[*] Tamanho: $SIZE bytes"
+
+    # UPX packing (opcional, muda completamente a assinatura do binario)
+    if command -v upx &>/dev/null; then
+        echo "[*] Aplicando UPX (compressao LZMA)..."
+        cp build/tunnel-windows-amd64.exe build/tunnel-windows-amd64-packed.exe
+        upx --best --lzma --force build/tunnel-windows-amd64-packed.exe
+        PACKED_SIZE=$(stat -f%z build/tunnel-windows-amd64-packed.exe 2>/dev/null || stat -c%s build/tunnel-windows-amd64-packed.exe 2>/dev/null)
+        echo "[*] Binario packed: build/tunnel-windows-amd64-packed.exe ($PACKED_SIZE bytes)"
+    else
+        echo "[!] UPX nao encontrado (opcional). Instale com: apt install upx-ucl"
+    fi
 else
     echo "[!] Falha na compilacao"
     exit 1
