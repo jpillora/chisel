@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jpillora/chisel/share/cio"
+	"tunnel/share/cio"
 	"github.com/jpillora/sizestr"
 )
 

@@ -3,8 +3,8 @@ package e2e_test
 import (
 	"testing"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	chclient "tunnel/client"
+	chserver "tunnel/server"
 )
 
 //TODO tests for:

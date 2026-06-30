@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	chclient "tunnel/client"
+	chserver "tunnel/server"
 )
 
 //TODO test: SOCKS-client -> [server -> client SOCKS] -> endpoint (reverse socks)

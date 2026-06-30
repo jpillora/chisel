@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	chserver "github.com/jpillora/chisel/server"
-	"github.com/jpillora/chisel/share/cnet"
-	"github.com/jpillora/chisel/share/settings"
+	chserver "tunnel/server"
+	"tunnel/share/cnet"
+	"tunnel/share/settings"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"

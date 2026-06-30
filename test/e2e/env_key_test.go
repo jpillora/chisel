@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	chclient "github.com/jpillora/chisel/client"
-	chserver "github.com/jpillora/chisel/server"
+	chclient "tunnel/client"
+	chserver "tunnel/server"
 )
 
 func TestChiselKeyEnvironmentVariable(t *testing.T) {
