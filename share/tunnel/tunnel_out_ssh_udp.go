@@ -1,11 +1,13 @@
 package tunnel
 
 import (
+	"context"
 	"encoding/gob"
 	"io"
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jpillora/chisel/share/cio"
@@ -13,11 +15,14 @@ import (
 )
 
 func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	conns := &udpConns{
 		Logger: l,
 		m:      map[string]*udpConn{},
+		ctx:    ctx,
 	}
-	defer conns.closeAll()
+	defer t.closeAllUDPConnections(conns)
 	h := &udpHandler{
 		Logger:   l,
 		hostPort: hostPort,
@@ -60,8 +65,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 	//for a reply.
 	//TODO configurable
 	//TODO++ dont use go-routines, switch to pollable
-	//  array of listeners where all listeners are
-	//  sweeped periodically, removing the idle ones
+	//  array of listeners
 	const maxConns = 100
 	if !exists {
 		if h.udpConns.len() <= maxConns {
@@ -74,6 +78,7 @@ func (h *udpHandler) handleWrite(p *udpPacket) error {
 	if err != nil {
 		return err
 	}
+	conn.lastUsed.Store(time.Now().UnixMilli())
 	return nil
 }
 
@@ -82,15 +87,13 @@ func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 	defer h.udpConns.remove(conn.id)
 	buff := make([]byte, h.maxMTU)
 	for {
-		//response must arrive within 15 seconds
-		deadline := settings.EnvDuration("UDP_DEADLINE", 15*time.Second)
-		conn.SetReadDeadline(time.Now().Add(deadline))
 		//read response
 		n, err := conn.Read(buff)
 		if err != nil {
-			if !os.IsTimeout(err) && err != io.EOF {
-				h.Debugf("read error: %s", err)
+			if conn.closedBySweeperOrTunnel.Load() || os.IsTimeout(err) || err == io.EOF {
+				break
 			}
+			h.Debugf("read error: %s", err)
 			break
 		}
 		b := buff[:n]
@@ -100,6 +103,7 @@ func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
 			h.Debugf("encode error: %s", err)
 			return
 		}
+		conn.lastUsed.Store(time.Now().UnixMilli())
 	}
 }
 
@@ -107,6 +111,8 @@ type udpConns struct {
 	*cio.Logger
 	sync.Mutex
 	m map[string]*udpConn
+	ctx context.Context
+	sweeping bool
 }
 
 func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
@@ -122,7 +128,9 @@ func (cs *udpConns) dial(id, addr string) (*udpConn, bool, error) {
 			id:   id,
 			Conn: c, // cnet.MeterConn(cs.Logger.Fork(addr), c),
 		}
+		conn.lastUsed.Store(time.Now().UnixMilli())
 		cs.m[id] = conn
+		cs.ensureSweeping()
 	}
 	return conn, ok, nil
 }
@@ -140,9 +148,10 @@ func (cs *udpConns) remove(id string) {
 	cs.Unlock()
 }
 
-func (cs *udpConns) closeAll() {
+func (t *Tunnel) closeAllUDPConnections(cs *udpConns) {
 	cs.Lock()
 	for id, conn := range cs.m {
+		conn.closedBySweeperOrTunnel.Store(true)
 		conn.Close()
 		delete(cs.m, id)
 	}
@@ -152,4 +161,51 @@ func (cs *udpConns) closeAll() {
 type udpConn struct {
 	id string
 	net.Conn
+	lastUsed atomic.Int64
+	closedBySweeperOrTunnel atomic.Bool
+}
+
+func (cs *udpConns) ensureSweeping() {
+	if (cs.sweeping) {
+		return;
+	}
+	cs.Debugf("start sweeping udp connections")
+	cs.sweeping = true;
+	// Evaluate UDP_DEADLINE for backward compatibility,
+	// prefer UDP_IDLE_TIMEOUT.
+	timeout := settings.EnvDuration("UDP_IDLE_TIMEOUT", settings.EnvDuration("UDP_DEADLINE", 15*time.Second))
+	interval := max(min(3*time.Second, timeout/2), 100 * time.Millisecond)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				cs.Lock()
+
+				if len(cs.m) == 0 {
+					cs.Debugf("stop sweeping udp connections")
+					cs.sweeping = false;
+					cs.Unlock()
+					return;
+				}
+
+				now := time.Now()
+
+				for id, conn := range cs.m {
+					if now.Sub(time.UnixMilli(conn.lastUsed.Load())) > timeout {
+						conn.closedBySweeperOrTunnel.Store(true);
+						conn.Close()
+						delete(cs.m, id)
+					}
+				}
+
+				cs.Unlock()
+			case <-cs.ctx.Done():
+					cs.Debugf("stop sweeping udp connections (shutdown)")
+					return
+			}
+		}
+	}()
 }
