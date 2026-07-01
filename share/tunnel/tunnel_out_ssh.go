@@ -51,7 +51,10 @@ func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 	//check ACL against the actual requested destination
 	//(socks channels are checked against the well-known token "socks")
 	if t.Config.ACL != nil && !t.Config.ACL(hostPort) {
-		t.Debugf("Denied connection to %s (ACL)", hostPort)
+		//info-level: post-1.12 the most likely cause is an authfile
+		//missing a "socks" grant, and operators need to see that
+		//without -v
+		t.Infof("Denied connection to %s (ACL)", hostPort)
 		ch.Reject(ssh.Prohibited, "access denied")
 		return
 	}
