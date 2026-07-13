@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -176,18 +177,60 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 }
 
 func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
+	//set CHISEL_KEEPALIVE_TIMEOUT=0 to disable the timeout (ping blocks forever)
+	timeout := settings.EnvDuration("KEEPALIVE_TIMEOUT", 2*t.Config.KeepAlive)
+
 	//ping forever
 	for {
 		time.Sleep(t.Config.KeepAlive)
-		_, b, err := sshConn.SendRequest("ping", true, nil)
-		if err != nil {
-			break
-		}
-		if len(b) > 0 && !bytes.Equal(b, []byte("pong")) {
-			t.Debugf("strange ping response")
+		if err := pingWithTimeout(sshConn, timeout); err != nil {
+			t.Debugf("Keepalive failed: %s", err)
 			break
 		}
 	}
 	//close ssh connection on abnormal ping
 	sshConn.Close()
+}
+
+func pingWithTimeout(sshConn ssh.Conn, timeout time.Duration) error {
+	//timeout disabled: block until the ping completes
+	if timeout <= 0 {
+		_, b, err := sshConn.SendRequest("ping", true, nil)
+		return checkPong(b, err)
+	}
+
+	type pingResponse struct {
+		body []byte
+		err  error
+	}
+
+	resp := make(chan pingResponse, 1)
+
+	go func() {
+		_, b, err := sshConn.SendRequest("ping", true, nil)
+		resp <- pingResponse{body: b, err: err}
+	}()
+
+	timer := time.NewTimer(timeout)
+
+	defer timer.Stop()
+
+	select {
+	case r := <-resp:
+		return checkPong(r.body, r.err)
+	case <-timer.C:
+		return fmt.Errorf("ping timed out after %s", timeout)
+	}
+}
+
+func checkPong(body []byte, err error) error {
+	if err != nil {
+		return err
+	}
+
+	if len(body) > 0 && !bytes.Equal(body, []byte("pong")) {
+		return errors.New("strange ping response")
+	}
+
+	return nil
 }
