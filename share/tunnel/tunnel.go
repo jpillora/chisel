@@ -179,14 +179,32 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 	//ping forever
 	for {
 		time.Sleep(t.Config.KeepAlive)
-		_, b, err := sshConn.SendRequest("ping", true, nil)
-		if err != nil {
-			break
+		// SendRequest blocks indefinitely on a dead connection (e.g. after
+		// sleep/wake), so run it in a goroutine and treat no response within
+		// KeepAlive as a failure.
+		type result struct {
+			b   []byte
+			err error
 		}
-		if len(b) > 0 && !bytes.Equal(b, []byte("pong")) {
-			t.Debugf("strange ping response")
-			break
+		ch := make(chan result, 1)
+		go func() {
+			_, b, err := sshConn.SendRequest("ping", true, nil)
+			ch <- result{b, err}
+		}()
+		select {
+		case r := <-ch:
+			if r.err != nil {
+				break
+			}
+			if len(r.b) > 0 && !bytes.Equal(r.b, []byte("pong")) {
+				t.Debugf("strange ping response")
+				break
+			}
+			continue
+		case <-time.After(t.Config.KeepAlive):
+			t.Debugf("ping timeout")
 		}
+		break
 	}
 	//close ssh connection on abnormal ping
 	sshConn.Close()
