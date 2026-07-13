@@ -1,30 +1,36 @@
 package tunnel
 
-import (
-	"sync"
-	"sync/atomic"
-)
+import "sync"
 
 type waitGroup struct {
+	mu    sync.Mutex
 	inner sync.WaitGroup
-	n     int32
+	n     int
 }
 
 func (w *waitGroup) Add(n int) {
-	atomic.AddInt32(&w.n, int32(n))
+	w.mu.Lock()
+	w.n += n
 	w.inner.Add(n)
+	w.mu.Unlock()
 }
 
 func (w *waitGroup) Done() {
-	if n := atomic.LoadInt32(&w.n); n > 0 && atomic.CompareAndSwapInt32(&w.n, n, n-1) {
+	w.mu.Lock()
+	if w.n > 0 {
+		w.n--
 		w.inner.Done()
 	}
+	w.mu.Unlock()
 }
 
 func (w *waitGroup) DoneAll() {
-	for atomic.LoadInt32(&w.n) > 0 {
-		w.Done()
+	w.mu.Lock()
+	for w.n > 0 {
+		w.n--
+		w.inner.Done()
 	}
+	w.mu.Unlock()
 }
 
 func (w *waitGroup) Wait() {

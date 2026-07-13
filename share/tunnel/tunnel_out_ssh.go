@@ -47,7 +47,9 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		return
 	}
 	//check ACL against the actual requested destination
-	if t.Config.ACL != nil && !socks && !t.Config.ACL(hostPort) {
+	//(hostPort == "socks" for socks channels, so socks is gated too,
+	//symmetric with the config-time UserAddr() check in server_handler.go)
+	if t.Config.ACL != nil && !t.Config.ACL(hostPort) {
 		t.Debugf("Denied connection to %s (ACL)", hostPort)
 		ch.Reject(ssh.Prohibited, "access denied")
 		return

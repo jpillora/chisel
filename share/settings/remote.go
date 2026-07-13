@@ -221,6 +221,13 @@ func (r Remote) UserAddr() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
 	}
+	//forward socks is granted via the literal "socks" token, matching the
+	//per-channel ACL check in tunnel_out_ssh.go (ExtraData == "socks").
+	//Without this it would be ":" (empty host:port), which is opaque and
+	//inconsistent with the channel-level check.
+	if r.Socks {
+		return "socks"
+	}
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
