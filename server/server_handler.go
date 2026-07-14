@@ -66,7 +66,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	// pull the users from the session map
 	var user *settings.User
-	if s.users.Len() > 0 {
+	if s.users.Len() > 0 || s.urlUsers != nil {
 		sid := string(sshConn.SessionID())
 		u, ok := s.sessions.Get(sid)
 		if !ok {
