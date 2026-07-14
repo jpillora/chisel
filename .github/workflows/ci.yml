@@ -4,9 +4,6 @@ on:
   push: {}
 permissions: write-all
 jobs:
-  # ================
-  # BUILD AND TEST JOB
-  # ================
   test:
     name: Build & Test
     strategy:
@@ -28,9 +25,6 @@ jobs:
         run: go build -v -o /dev/null .
       - name: Test
         run: go test -v ./...
-  # ================
-  # RELEASE BINARIES (on push "v*" tag)
-  # ================
   release_binaries:
     name: Release Binaries
     needs: test
@@ -50,9 +44,6 @@ jobs:
           GOTOOLCHAIN: auto
         with:
           args: release --config .github/goreleaser.yml
-  # ================
-  # RELEASE DOCKER IMAGES (on push "v*" tag)
-  # ================
   release_docker:
     name: Release Docker Images
     needs: test
@@ -61,32 +52,75 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v5
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: jpillora/chisel
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: .github/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/386,linux/arm/v7,linux/arm/v6
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build and push all architectures
+        env:
+          CHISEL_VER: ${{ github.ref_name }}
+        run: |
+          set -e
+          IMAGE=jpillora/chisel
+          VERSION="${CHISEL_VER#v}"
+
+          # Architecture matrix: per-platform tag, GOARCH, GOARM
+          # GOARM is empty for non-ARM architectures (Go uses its default)
+          ARCHES=(
+            "amd64 amd64"
+            "arm64 arm64"
+            "386 386"
+            "armv5 arm 5"
+            "armv6 arm 6"
+            "armv7 arm 7"
+            "ppc64le ppc64le"
+            "ppc64 ppc64"
+            "mips mips"
+            "mipsle mipsle"
+            "mips64 mips64"
+            "mips64le mips64le"
+            "s390x s390x"
+          )
+
+          ALL_TAGS=""
+          for entry in "${ARCHES[@]}"; do
+            read -r tag goarch goarm <<< "$entry"
+            build_args="--build-arg GOARCH=$goarch --build-arg CHISEL_VERSION=$VERSION"
+            [ -n "$goarm" ] && build_args="$build_args --build-arg GOARM=$goarm"
+            echo "=== Building $tag (GOARCH=$goarch GOARM=$goarm) ==="
+            docker build $build_args --tag $IMAGE:$tag --file .github/Dockerfile .
+            .github/verify-binary.sh "$goarch" "$IMAGE:$tag" "$VERSION"
+            docker push $IMAGE:$tag
+            ALL_TAGS="$ALL_TAGS $IMAGE:$tag"
+          done
+
+          # Create multi-arch manifest for the version tag
+          echo "=== Creating manifest $IMAGE:$VERSION ==="
+          docker manifest create $IMAGE:$VERSION $ALL_TAGS
+
+          # Annotate each entry with correct platform metadata
+          # Without this, all images would be marked linux/amd64 because
+          # the build ran on an amd64 host regardless of GOARCH.
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:amd64 --arch amd64
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:arm64 --arch arm64
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:386 --arch 386
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:armv5 --arch arm --variant v5
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:armv6 --arch arm --variant v6
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:armv7 --arch arm --variant v7
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:ppc64le --arch ppc64le
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:ppc64 --arch ppc64
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:mips --arch mips
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:mipsle --arch mipsle
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:mips64 --arch mips64
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:mips64le --arch mips64le
+          docker manifest annotate $IMAGE:$VERSION $IMAGE:s390x --arch s390x
+
+          docker manifest push $IMAGE:$VERSION
+
+          # Create additional semver tags (major.minor and major)
+          for tv in "${VERSION%.*}" "${VERSION%%.*}"; do
+            echo "=== Creating manifest $IMAGE:$tv ==="
+            docker manifest create $IMAGE:$tv $ALL_TAGS
+            docker manifest push $IMAGE:$tv
+          done
