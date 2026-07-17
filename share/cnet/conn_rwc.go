@@ -57,5 +57,8 @@ func (c *rwcConn) CloseWrite() error {
 	if cw, ok := c.ReadWriteCloser.(closeWriter); ok {
 		return cw.CloseWrite()
 	}
-	return nil
+	//underlying stream can't half-close; fall back to a full close so the
+	//peer still observes EOF (otherwise cio.Pipe treats the no-op as a
+	//successful half-close and the opposite copy can block forever)
+	return c.Close()
 }
