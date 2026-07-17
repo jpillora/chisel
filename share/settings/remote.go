@@ -119,7 +119,7 @@ func DecodeRemote(s string) (*Remote, error) {
 	}
 	if r.LocalProto != r.RemoteProto {
 		//TODO support cross protocol
-		//tcp <-> udp, is faily straight forward
+		//tcp <-> udp, is fairly straightforward
 		//udp <-> tcp, is trickier since udp is stateless and tcp is not
 		return nil, errors.New("cross-protocol remotes are not supported yet")
 	}
@@ -153,11 +153,13 @@ func isHost(s string) bool {
 
 var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 
-//L4Proto extacts the layer-4 protocol from the given string
+//L4Proto extracts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
-		return strings.ToLower(s[:l-4]), s[l-3:]
+		//lowercase the proto to match the case-insensitive regex,
+		//all later comparisons expect "tcp"/"udp"
+		return strings.ToLower(s[:l-4]), strings.ToLower(s[l-3:])
 	}
 	return s, ""
 }
@@ -221,10 +223,6 @@ func (r Remote) UserAddr() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
 	}
-	//forward socks is granted via the literal "socks" token, matching the
-	//per-channel ACL check in tunnel_out_ssh.go (ExtraData == "socks").
-	//Without this it would be ":" (empty host:port), which is opaque and
-	//inconsistent with the channel-level check.
 	if r.Socks {
 		return "socks"
 	}

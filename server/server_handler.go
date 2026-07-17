@@ -1,6 +1,7 @@
 package chserver
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -64,16 +65,19 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		s.Debugf("Failed to handshake (%s)", err)
 		return
 	}
-	// pull the users from the session map
+	// resolve the user from the authenticated username set by
+	// authUser (nil permissions means auth is disabled: allow-all)
 	var user *settings.User
-	if s.users.Len() > 0 {
-		sid := string(sshConn.SessionID())
-		u, ok := s.sessions.Get(sid)
-		if !ok {
-			panic("bug in ssh auth handler")
+	if sshConn.Permissions != nil {
+		n := sshConn.Permissions.Extensions["user"]
+		u, found := s.users.Get(n)
+		if !found {
+			//user was removed by an authfile reload mid-handshake
+			l.Infof("User %s no longer exists", n)
+			sshConn.Close()
+			return
 		}
 		user = u
-		s.sessions.Del(sid)
 	}
 	// chisel server handshake (reverse of client handshake)
 	// verify configuration
@@ -84,6 +88,13 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	case r = <-reqs:
 	case <-time.After(settings.EnvDuration("CONFIG_TIMEOUT", 10*time.Second)):
 		l.Debugf("Timeout waiting for configuration")
+		sshConn.Close()
+		return
+	}
+	if r == nil {
+		//connection closed before the config request arrived; the
+		//closed request channel yields nil
+		l.Debugf("Connection closed before configuration")
 		sshConn.Close()
 		return
 	}
@@ -100,13 +111,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		failed(s.Errorf("invalid config"))
 		return
 	}
-	//print if client and server  versions dont match
+	//print if client and server versions dont match,
+	//skipping dev/unknown builds where the mismatch is meaningless
 	cv := strings.TrimPrefix(c.Version, "v")
-	if cv == "" {
-		cv = "<unknown>"
-	}
 	sv := strings.TrimPrefix(chshare.BuildVersion, "v")
-	if cv != sv {
+	devVersion := func(v string) bool {
+		return v == "" || strings.HasPrefix(v, "0.0.0")
+	}
+	if cv != sv && !devVersion(cv) && !devVersion(sv) {
 		l.Infof("Client version (%s) differs from server version (%s)", cv, sv)
 	}
 	//validate remotes
@@ -123,7 +135,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		//confirm reverse tunnels are allowed
 		if r.Reverse && !s.config.Reverse {
 			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
-			failed(s.Errorf("Reverse port forwaring not enabled on server"))
+			failed(s.Errorf("Reverse port forwarding not enabled on server"))
 			return
 		}
 		//confirm reverse tunnel is available
@@ -132,8 +144,17 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	//successfuly validated config!
+	//successfully validated config!
 	r.Reply(true, nil)
+	//log session opens at info level so operators can see connected
+	//clients, their IPs and declared remotes without debug mode
+	username := "-"
+	if user != nil {
+		username = user.Name
+	}
+	opened := time.Now()
+	l.Infof("Open (user=%s addr=%s remotes=%s)",
+		username, req.RemoteAddr, strings.Join(c.Remotes.Encode(), ","))
 	//tunnel per ssh connection
 	tunnelConfig := tunnel.Config{
 		Logger:    l,
@@ -142,9 +163,15 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	}
-	//enforce ACL on every channel, not just the initial config
+	//enforce ACL on every channel, not just the initial config.
+	//the user is re-resolved from the live index per channel, so
+	//authfile reloads apply to connected clients' new tunnels
 	if user != nil {
-		tunnelConfig.ACL = user.HasAccess
+		name := user.Name
+		tunnelConfig.ACL = func(addr string) bool {
+			u, found := s.users.Get(name)
+			return found && u.HasAccess(addr)
+		}
 	}
 	tunnel := tunnel.New(tunnelConfig)
 	//bind
@@ -163,9 +190,10 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		return tunnel.BindRemotes(ctx, serverInbound)
 	})
 	err = eg.Wait()
+	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
-		l.Debugf("Closed connection (%s)", err)
-	} else {
-		l.Debugf("Closed connection")
+		errmsg = fmt.Sprintf(" (error %s)", err)
 	}
+	l.Infof("Close (user=%s addr=%s duration=%s)%s",
+		username, req.RemoteAddr, time.Since(opened), errmsg)
 }

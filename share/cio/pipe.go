@@ -2,47 +2,59 @@ package cio
 
 import (
 	"io"
-	"log"
 	"sync"
 )
 
+//closeWriter is implemented by connections which support
+//half-close (*net.TCPConn, ssh.Channel, cnet rwcConn)
+type closeWriter interface {
+	CloseWrite() error
+}
+
+//Pipe copies between src and dst in both directions, propagating
+//half-closes: when one direction reaches a clean EOF, the write side
+//of its destination is closed (CloseWrite) while the other direction
+//keeps flowing. Copy errors tear down both ends. Both connections
+//are fully closed before Pipe returns.
 func Pipe(src io.ReadWriteCloser, dst io.ReadWriteCloser) (int64, int64) {
 	var sent, received int64
 	var wg sync.WaitGroup
-	var o sync.Once
-	close := func() {
+	teardown := func() {
 		src.Close()
 		dst.Close()
 	}
 	wg.Add(2)
 	go func() {
-		received, _ = io.Copy(src, dst)
-		o.Do(close)
-		wg.Done()
+		defer wg.Done()
+		var err error
+		sent, err = io.Copy(dst, src)
+		if err != nil {
+			teardown()
+			return
+		}
+		closeWrite(dst)
 	}()
 	go func() {
-		sent, _ = io.Copy(dst, src)
-		o.Do(close)
-		wg.Done()
+		defer wg.Done()
+		var err error
+		received, err = io.Copy(src, dst)
+		if err != nil {
+			teardown()
+			return
+		}
+		closeWrite(src)
 	}()
 	wg.Wait()
+	teardown()
 	return sent, received
 }
 
-const vis = false
-
-type pipeVisPrinter struct {
-	name string
-}
-
-func (p pipeVisPrinter) Write(b []byte) (int, error) {
-	log.Printf(">>> %s: %x", p.name, b)
-	return len(b), nil
-}
-
-func pipeVis(name string, r io.Reader) io.Reader {
-	if vis {
-		return io.TeeReader(r, pipeVisPrinter{name})
+//closeWrite half-closes the connection when supported,
+//falling back to a full close
+func closeWrite(c io.ReadWriteCloser) {
+	if cw, ok := c.(closeWriter); ok {
+		cw.CloseWrite()
+		return
 	}
-	return r
+	c.Close()
 }

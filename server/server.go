@@ -2,8 +2,8 @@ package chserver
 
 import (
 	"context"
-	"errors"
-	"log"
+	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -34,7 +34,7 @@ type Config struct {
 	TLS       TLSConfig
 }
 
-// Server respresent a chisel service
+// Server represent a chisel service
 type Server struct {
 	*cio.Logger
 	config       *Config
@@ -42,7 +42,6 @@ type Server struct {
 	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
 }
@@ -59,20 +58,21 @@ func NewServer(c *Config) (*Server, error) {
 		config:     c,
 		httpServer: cnet.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
-		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
 	server.users = settings.NewUserIndex(server.Logger)
-	if c.AuthFile != "" {
-		if err := server.users.LoadUsers(c.AuthFile); err != nil {
-			return nil, err
-		}
-	}
+	//pin the --auth user first so authfile reloads cannot drop it
 	if c.Auth != "" {
 		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
 		u.Name, u.Pass = settings.ParseAuth(c.Auth)
-		if u.Name != "" {
-			server.users.AddUser(u)
+		if u.Name == "" {
+			return nil, server.Errorf("invalid auth string, expected <user>:<pass>")
+		}
+		server.users.PinUser(u)
+	}
+	if c.AuthFile != "" {
+		if err := server.users.LoadUsers(c.AuthFile); err != nil {
+			return nil, err
 		}
 	}
 
@@ -86,7 +86,7 @@ func NewServer(c *Config) (*Server, error) {
 		} else {
 			key, err = os.ReadFile(c.KeyFile)
 			if err != nil {
-				log.Fatalf("Failed to read key file %s", c.KeyFile)
+				return nil, server.Errorf("Failed to read key file %s: %s", c.KeyFile, err)
 			}
 		}
 
@@ -94,21 +94,21 @@ func NewServer(c *Config) (*Server, error) {
 		if ccrypto.IsChiselKey(key) {
 			pemBytes, err = ccrypto.ChiselKey2PEM(key)
 			if err != nil {
-				log.Fatalf("Invalid key %s", string(key))
+				return nil, server.Errorf("Invalid chisel key: %s", err)
 			}
 		}
 	} else {
 		//generate private key (optionally using seed)
 		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
 		if err != nil {
-			log.Fatal("Failed to generate key")
+			return nil, server.Errorf("Failed to generate key: %s", err)
 		}
 	}
 
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
-		log.Fatal("Failed to parse key")
+		return nil, server.Errorf("Failed to parse key: %s", err)
 	}
 	//fingerprint this key
 	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
@@ -204,14 +204,16 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
-		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+	if !found || subtle.ConstantTimeCompare([]byte(user.Pass), password) != 1 {
+		//info level: operators should see failed attempts (#521)
+		s.Infof("Login failed for user %s (%s)", n, c.RemoteAddr())
+		return nil, fmt.Errorf("invalid authentication for username: %s", n)
 	}
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
+	// pass the username through to the handshake handler, which
+	// re-resolves the user (no session state to leak or race)
+	return &ssh.Permissions{
+		Extensions: map[string]string{"user": n},
+	}, nil
 }
 
 // AddUser adds a new user into the server user index

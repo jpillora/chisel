@@ -1,10 +1,12 @@
 package tunnel
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
@@ -24,13 +26,13 @@ func (t *Tunnel) handleSSHRequests(reqs <-chan *ssh.Request) {
 	}
 }
 
-func (t *Tunnel) handleSSHChannels(chans <-chan ssh.NewChannel) {
+func (t *Tunnel) handleSSHChannels(ctx context.Context, chans <-chan ssh.NewChannel) {
 	for ch := range chans {
-		go t.handleSSHChannel(ch)
+		go t.handleSSHChannel(ctx, ch)
 	}
 }
 
-func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
+func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 	if !t.Config.Outbound {
 		t.Debugf("Denied outbound connection")
 		ch.Reject(ssh.Prohibited, "Denied outbound connection")
@@ -47,20 +49,38 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		return
 	}
 	//check ACL against the actual requested destination
-	//(hostPort == "socks" for socks channels, so socks is gated too,
-	//symmetric with the config-time UserAddr() check in server_handler.go)
+	//(socks channels are checked against the well-known token "socks")
 	if t.Config.ACL != nil && !t.Config.ACL(hostPort) {
-		t.Debugf("Denied connection to %s (ACL)", hostPort)
+		//info-level: post-1.12 the most likely cause is an authfile
+		//missing a "socks" grant, and operators need to see that
+		//without -v
+		t.Infof("Denied connection to %s (ACL)", hostPort)
 		ch.Reject(ssh.Prohibited, "access denied")
 		return
+	}
+	//tcp: dial the target before accepting the channel, so dial
+	//failures propagate to the inbound side instead of presenting
+	//a successful connection to a dead target
+	var dst net.Conn
+	if !socks && !udp {
+		d := net.Dialer{Timeout: settings.EnvDuration("DIAL_TIMEOUT", 30*time.Second)}
+		c, err := d.DialContext(ctx, "tcp", hostPort)
+		if err != nil {
+			t.Debugf("Failed to dial %s: %s", hostPort, err)
+			ch.Reject(ssh.ConnectionFailed, err.Error())
+			return
+		}
+		dst = c
 	}
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)
+		if dst != nil {
+			dst.Close()
+		}
 		return
 	}
 	stream := io.ReadWriteCloser(sshChan)
-	//cnet.MeterRWC(t.Logger.Fork("sshchan"), sshChan)
 	defer stream.Close()
 	go ssh.DiscardRequests(reqs)
 	l := t.Logger.Fork("conn#%d", t.connStats.New())
@@ -72,7 +92,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)
 	} else {
-		err = t.handleTCP(l, stream, hostPort)
+		err = t.handleTCP(l, stream, dst)
 	}
 	t.connStats.Close()
 	errmsg := ""
@@ -86,11 +106,7 @@ func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 	return t.socksServer.ServeConn(cnet.NewRWCConn(src))
 }
 
-func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
-	dst, err := net.Dial("tcp", hostPort)
-	if err != nil {
-		return err
-	}
+func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, dst net.Conn) error {
 	s, r := cio.Pipe(src, dst)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil

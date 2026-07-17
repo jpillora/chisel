@@ -28,6 +28,8 @@ func (t *Tunnel) handleUDP(l *cio.Logger, rwc io.ReadWriteCloser, hostPort strin
 		},
 		udpConns: conns,
 		maxMTU:   settings.EnvInt("UDP_MAX_SIZE", 9012),
+		maxConns: settings.EnvInt("UDP_MAX_CONNS", 100),
+		deadline: settings.EnvDuration("UDP_DEADLINE", 15*time.Second),
 	}
 	h.Debugf("UDP max size: %d bytes", h.maxMTU)
 	for {
@@ -43,48 +45,72 @@ type udpHandler struct {
 	hostPort string
 	*udpChannel
 	*udpConns
-	maxMTU int
+	maxMTU    int
+	maxConns  int
+	deadline  time.Duration
+	lastSweep time.Time
 }
 
 func (h *udpHandler) handleWrite(p *udpPacket) error {
 	if err := h.r.Decode(&p); err != nil {
 		return err
 	}
+	//remove idle write-only connections,
+	//making room for new flows to become readable again
+	h.sweepWriteOnly()
 	//dial now, we know we must write
 	conn, exists, err := h.udpConns.dial(p.Src, h.hostPort)
 	if err != nil {
 		return err
 	}
 	//however, we dont know if we must read...
-	//spawn up to <max-conns> go-routines to wait
-	//for a reply.
-	//TODO configurable
-	//TODO++ dont use go-routines, switch to pollable
-	//  array of listeners where all listeners are
-	//  sweeped periodically, removing the idle ones
-	const maxConns = 100
+	//spawn up to <max-conns> (UDP_MAX_CONNS) go-routines
+	//to wait for replies; flows beyond the cap are write-only
+	//(replies are dropped) and are swept once idle
 	if !exists {
-		if h.udpConns.len() <= maxConns {
+		if h.udpConns.len() <= h.maxConns {
 			go h.handleRead(p, conn)
 		} else {
-			h.Debugf("exceeded max udp connections (%d)", maxConns)
+			conn.writeOnly = true
+			h.Debugf("exceeded max udp connections (%d), flow %s is write-only", h.maxConns, p.Src)
 		}
 	}
-	_, err = conn.Write(p.Payload)
-	if err != nil {
-		return err
+	if _, err := conn.Write(p.Payload); err != nil {
+		//write failures (broken flow, ICMP unreachable, conn
+		//closed by its reader) drop the flow, not the channel
+		h.Debugf("write error (%s): %s", p.Src, err)
+		h.udpConns.remove(conn.id)
+		conn.Close()
+		return nil
+	}
+	if conn.writeOnly {
+		conn.lastWrite = time.Now()
 	}
 	return nil
 }
 
+//sweepWriteOnly closes and removes write-only connections which have
+//been idle for longer than the read deadline. it runs in the write
+//goroutine (at most once per second) so it cannot race in-flight writes.
+func (h *udpHandler) sweepWriteOnly() {
+	now := time.Now()
+	if now.Sub(h.lastSweep) < time.Second {
+		return
+	}
+	h.lastSweep = now
+	h.udpConns.sweepWriteOnly(now.Add(-h.deadline))
+}
+
 func (h *udpHandler) handleRead(p *udpPacket, conn *udpConn) {
-	//ensure connection is cleaned up
-	defer h.udpConns.remove(conn.id)
+	//ensure connection is cleaned up and closed
+	defer func() {
+		h.udpConns.remove(conn.id)
+		conn.Close()
+	}()
 	buff := make([]byte, h.maxMTU)
 	for {
-		//response must arrive within 15 seconds
-		deadline := settings.EnvDuration("UDP_DEADLINE", 15*time.Second)
-		conn.SetReadDeadline(time.Now().Add(deadline))
+		//response must arrive within the deadline
+		conn.SetReadDeadline(time.Now().Add(h.deadline))
 		//read response
 		n, err := conn.Read(buff)
 		if err != nil {
@@ -149,7 +175,24 @@ func (cs *udpConns) closeAll() {
 	cs.Unlock()
 }
 
+//sweepWriteOnly closes and removes write-only connections
+//whose last write is older than the given time
+func (cs *udpConns) sweepWriteOnly(olderThan time.Time) {
+	cs.Lock()
+	defer cs.Unlock()
+	for id, conn := range cs.m {
+		if conn.writeOnly && conn.lastWrite.Before(olderThan) {
+			conn.Close()
+			delete(cs.m, id)
+		}
+	}
+}
+
 type udpConn struct {
 	id string
 	net.Conn
+	//write-only flows (over the conn cap) have no read goroutine;
+	//these fields are only touched by the single write goroutine
+	writeOnly bool
+	lastWrite time.Time
 }

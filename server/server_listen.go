@@ -28,19 +28,19 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 		return nil, errors.New("cannot use key/cert and domains")
 	}
 	var tlsConf *tls.Config
+	extra := ""
 	if hasDomains {
 		tlsConf = s.tlsLetsEncrypt(s.config.TLS.Domains)
+		if port != "443" {
+			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
+		}
 	}
-	extra := ""
 	if hasKeyCert {
 		c, err := s.tlsKeyCert(s.config.TLS.Key, s.config.TLS.Cert, s.config.TLS.CA)
 		if err != nil {
 			return nil, err
 		}
 		tlsConf = c
-		if port != "443" && hasDomains {
-			extra = " (WARNING: LetsEncrypt will attempt to connect to your domain on port 443)"
-		}
 	}
 	//tcp listen
 	l, err := net.Listen("tcp", host+":"+port)
@@ -53,9 +53,7 @@ func (s *Server) listener(host, port string) (net.Listener, error) {
 		proto += "s"
 		l = tls.NewListener(l, tlsConf)
 	}
-	if err == nil {
-		s.Infof("Listening on %s://%s:%s%s", proto, host, port, extra)
-	}
+	s.Infof("Listening on %s://%s:%s%s", proto, host, port, extra)
 	return l, nil
 }
 

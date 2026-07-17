@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 type wsConn struct {
@@ -14,13 +15,17 @@ type wsConn struct {
 
 //NewWebSocketConn converts a websocket.Conn into a net.Conn
 func NewWebSocketConn(websocketConn *websocket.Conn) net.Conn {
+	//ssh packets are at most ~35KB, so cap inbound messages to
+	//prevent pre-auth memory exhaustion from oversized frames.
+	//tune with WS_READ_LIMIT (0 disables the limit)
+	websocketConn.SetReadLimit(int64(settings.EnvInt("WS_READ_LIMIT", 64*1024)))
 	c := wsConn{
 		Conn: websocketConn,
 	}
 	return &c
 }
 
-//Read is not threadsafe though thats okay since there
+//Read is not threadsafe though that's okay since there
 //should never be more than one reader
 func (c *wsConn) Read(dst []byte) (int, error) {
 	ldst := len(dst)

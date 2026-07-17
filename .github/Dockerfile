@@ -1,16 +1,10 @@
-# build stage
-FROM golang:alpine AS build
-RUN apk update && apk add git
-ADD . /src
-WORKDIR /src
-ENV CGO_ENABLED=0
-RUN go build \
-    -ldflags "-X github.com/jpillora/chisel/share.BuildVersion=$(git describe --abbrev=0 --tags)" \
-    -o /tmp/bin
-# run stage
+# goreleaser builds the binary and provides it in the build context
+FROM alpine:3 AS certs
+RUN apk add --no-cache ca-certificates
+
 FROM scratch
 LABEL maintainer="dev@jpillora.com"
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
-COPY --from=build /tmp/bin /app/bin
+COPY chisel /app/bin
 ENTRYPOINT ["/app/bin"]

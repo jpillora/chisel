@@ -2,7 +2,6 @@ package chclient
 
 import (
 	"crypto/elliptic"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,13 +13,13 @@ import (
 )
 
 func TestCustomHeaders(t *testing.T) {
-	//fake server
+	//fake server, records the header for the main goroutine to
+	//assert (t.Fatal must not be called from the handler goroutine)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	var gotFoo string
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if req.Header.Get("Foo") != "Bar" {
-			t.Fatal("expected header Foo to be 'Bar'")
-		}
+		gotFoo = req.Header.Get("Foo")
 		wg.Done()
 	}))
 	defer server.Close()
@@ -36,12 +35,15 @@ func TestCustomHeaders(t *testing.T) {
 	}
 	c, err := NewClient(&config)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	go c.Run()
-	//wait for test to complete
+	//wait for the fake server to receive the request
 	wg.Wait()
 	c.Close()
+	if gotFoo != "Bar" {
+		t.Fatalf("expected header Foo to be 'Bar', got %q", gotFoo)
+	}
 }
 
 func TestFallbackLegacyFingerprint(t *testing.T) {

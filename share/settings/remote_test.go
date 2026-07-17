@@ -79,6 +79,18 @@ func TestRemoteDecode(t *testing.T) {
 			"0.0.0.0:53:1.1.1.1:53/udp",
 		},
 		{
+			//uppercase suffix parses to lowercase proto
+			"1.1.1.1:53/UDP",
+			Remote{
+				LocalPort:   "53",
+				LocalProto:  "udp",
+				RemoteHost:  "1.1.1.1",
+				RemotePort:  "53",
+				RemoteProto: "udp",
+			},
+			"0.0.0.0:53:1.1.1.1:53/udp",
+		},
+		{
 			"localhost:5353:1.1.1.1:53/udp",
 			Remote{
 				LocalHost:   "localhost",

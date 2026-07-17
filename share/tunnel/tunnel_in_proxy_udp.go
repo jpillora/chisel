@@ -64,7 +64,7 @@ type udpListener struct {
 
 func (u *udpListener) run(ctx context.Context) error {
 	defer u.inbound.Close()
-	//udp doesnt accept connections,
+	//udp doesn't accept connections,
 	//udp simply forwards packets
 	//and therefore only needs to listen
 	eg, ctx := errgroup.WithContext(ctx)
@@ -88,7 +88,7 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		//read from inbound udp
 		u.inbound.SetReadDeadline(time.Now().Add(time.Second))
 		n, addr, err := u.inbound.ReadFromUDP(buff)
-		if e, ok := err.(net.Error); ok && (e.Timeout() || e.Temporary()) {
+		if e, ok := err.(net.Error); ok && e.Timeout() {
 			continue
 		}
 		if err != nil {
@@ -178,7 +178,7 @@ func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {
 		c: rwc,
 	}
 	u.outbound = o
-	u.Debugf("aquired channel")
+	u.Debugf("acquired channel")
 	return o, nil
 }
 
