@@ -52,7 +52,10 @@ func (c *rwcConn) SetWriteDeadline(t time.Time) error {
 }
 
 //CloseWrite propagates half-closes to the underlying
-//connection when supported (e.g. ssh.Channel)
+//connection when supported (e.g. ssh.Channel). When the underlying
+//stream cannot half-close, it falls back to a full Close — sacrificing
+//any in-flight reverse traffic — so the peer observes EOF rather than
+//cio.Pipe hanging on a half-close that never happened
 func (c *rwcConn) CloseWrite() error {
 	if cw, ok := c.ReadWriteCloser.(closeWriter); ok {
 		return cw.CloseWrite()
