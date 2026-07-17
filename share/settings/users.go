@@ -116,6 +116,7 @@ func (u *UserIndex) addWatchEvents() error {
 	}
 	configPath, err := filepath.Abs(u.configFile)
 	if err != nil {
+		watcher.Close()
 		return err
 	}
 	//watch the parent directory instead of the file itself, so the watch
@@ -123,6 +124,7 @@ func (u *UserIndex) addWatchEvents() error {
 	//than write to it (vim tmp+rename, truncate+write, kubernetes
 	//configmap symlink swaps)
 	if err := watcher.Add(filepath.Dir(configPath)); err != nil {
+		watcher.Close()
 		return err
 	}
 	//track the resolved path to catch symlink retargets
@@ -134,6 +136,12 @@ func (u *UserIndex) addWatchEvents() error {
 		const debounce = 100 * time.Millisecond
 		timer := time.NewTimer(debounce)
 		timer.Stop()
+		//fsnotify does not reliably deliver directory events for
+		//kubelet-style symlink swaps on every platform (notably
+		//macOS/kqueue), so reconcile the resolved path periodically
+		//as a fallback
+		reconcile := time.NewTicker(time.Second)
+		defer reconcile.Stop()
 		for {
 			select {
 			case e, ok := <-watcher.Events:
@@ -148,6 +156,12 @@ func (u *UserIndex) addWatchEvents() error {
 					u.Infof("Failed to reload the users configuration: %s", err)
 				} else {
 					u.Debugf("Users configuration successfully reloaded from: %s", u.configFile)
+				}
+			case <-reconcile.C:
+				//catch symlink retargets that arrived without an event
+				if current, err := filepath.EvalSymlinks(configPath); err == nil && current != realPath {
+					realPath = current
+					timer.Reset(debounce)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
