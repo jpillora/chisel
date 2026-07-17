@@ -91,6 +91,13 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		sshConn.Close()
 		return
 	}
+	if r == nil {
+		//connection closed before the config request arrived; the
+		//closed request channel yields nil
+		l.Debugf("Connection closed before configuration")
+		sshConn.Close()
+		return
+	}
 	failed := func(err error) {
 		l.Debugf("Failed: %s", err)
 		r.Reply(false, []byte(err.Error()))

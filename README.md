@@ -538,6 +538,7 @@ Since WebSockets support is required:
   - graceful shutdown on SIGTERM with HTTP request draining (`CHISEL_SHUTDOWN_GRACE`); a second signal force-exits
   - UDP exit nodes no longer break or leak past 100 concurrent flows (`CHISEL_UDP_MAX_CONNS`)
   - inbound websocket messages are size-capped pre-auth (`CHISEL_WS_READ_LIMIT`)
+  - server no longer panics when a client disconnects between the SSH handshake and its config request (#608)
   - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
   - `go install` builds report their real version; sessions and failed logins are logged at info level
   - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions
