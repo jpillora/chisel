@@ -117,6 +117,9 @@ dockers:
       - "--platform=linux/ppc64le"
     goarch: ppc64le
 
+# version manifests only — floating tags (latest / X / X.Y) are promoted
+# by .github/workflows/promote.yml when the draft GitHub release is
+# published (release stage 2)
 docker_manifests:
   - name_template: "ghcr.io/jpillora/chisel:{{ .Version }}"
     image_templates:
@@ -127,67 +130,7 @@ docker_manifests:
       - "ghcr.io/jpillora/chisel:{{ .Version }}-386"
       - "ghcr.io/jpillora/chisel:{{ .Version }}-ppc64le"
 
-  - name_template: "ghcr.io/jpillora/chisel:{{ .Major }}"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
-    image_templates:
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-386"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
-  - name_template: "ghcr.io/jpillora/chisel:{{ .Major }}.{{ .Minor }}"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
-    image_templates:
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-386"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
-  - name_template: "ghcr.io/jpillora/chisel:latest"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
-    image_templates:
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-386"
-      - "ghcr.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
   - name_template: "docker.io/jpillora/chisel:{{ .Version }}"
-    image_templates:
-      - "docker.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "docker.io/jpillora/chisel:{{ .Version }}-386"
-      - "docker.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
-  - name_template: "docker.io/jpillora/chisel:{{ .Major }}"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
-    image_templates:
-      - "docker.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "docker.io/jpillora/chisel:{{ .Version }}-386"
-      - "docker.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
-  - name_template: "docker.io/jpillora/chisel:{{ .Major }}.{{ .Minor }}"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
-    image_templates:
-      - "docker.io/jpillora/chisel:{{ .Version }}-amd64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-arm64"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv7"
-      - "docker.io/jpillora/chisel:{{ .Version }}-armv6"
-      - "docker.io/jpillora/chisel:{{ .Version }}-386"
-      - "docker.io/jpillora/chisel:{{ .Version }}-ppc64le"
-
-  - name_template: "docker.io/jpillora/chisel:latest"
-    skip_push: "{{ if .Prerelease }}true{{ else }}false{{ end }}"
     image_templates:
       - "docker.io/jpillora/chisel:{{ .Version }}-amd64"
       - "docker.io/jpillora/chisel:{{ .Version }}-arm64"

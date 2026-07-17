@@ -43,8 +43,11 @@ jobs:
       - name: Test
         run: go test -v ./...
   # ================
-  # RELEASE (on push "v*" tag)
-  # Builds binaries, packages, and multi-arch Docker images via GoReleaser
+  # RELEASE STAGE 1 (on push "v*" tag, after merging to master)
+  # Creates a DRAFT GitHub release and pushes version-tagged binaries,
+  # packages, and multi-arch Docker images via GoReleaser. Floating
+  # Docker tags (latest / X / X.Y) are not touched here — publishing
+  # the draft release triggers promote.yml (stage 2) which retags them.
   # ================
   release:
     name: Release
