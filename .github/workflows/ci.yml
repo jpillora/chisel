@@ -86,7 +86,26 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: v2.12.7
+          # v2.12.7 silently produced corrupt .gz archives (#610); v2.17.0
+          # verified clean — reproduce/verify with 3x snapshot A/B runs
+          # before changing this pin
+          version: v2.17.0
           args: release --clean --config .github/goreleaser.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify archive integrity
+        # goreleaser can exit 0 while emitting corrupt archives (#610) —
+        # fail the job so a broken draft is never published (stage 2 only
+        # promotes what a human publishes, and a red job blocks that)
+        run: |
+          set -euo pipefail
+          bad=0
+          for f in dist/*.gz dist/*.zip; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *.gz)  gzip -t "$f" || { echo "CORRUPT: $f"; bad=1; } ;;
+              *.zip) unzip -t "$f" >/dev/null || { echo "CORRUPT: $f"; bad=1; } ;;
+            esac
+          done
+          [ "$bad" = 0 ] && echo "all archives verified"
+          exit "$bad"
