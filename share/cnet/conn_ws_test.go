@@ -2,6 +2,7 @@ package cnet
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,9 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//wsPair returns the server side of a websocket connection wrapped in
-//NewWebSocketConn, plus the raw client side for sending test frames.
-func wsPair(t *testing.T) (serverSide chan interface{}, client *websocket.Conn) {
+// wsPair returns reads from the server side of a websocket connection wrapped
+// in NewWebSocketConn, plus the raw client side for sending test messages.
+func wsPair(t *testing.T, readSize int) (serverSide chan interface{}, client *websocket.Conn) {
 	t.Helper()
 	upgrader := websocket.Upgrader{}
 	out := make(chan interface{}, 1)
@@ -24,8 +25,9 @@ func wsPair(t *testing.T) (serverSide chan interface{}, client *websocket.Conn) 
 			return
 		}
 		conn := NewWebSocketConn(ws)
+		defer conn.Close()
 		conn.SetDeadline(time.Now().Add(5 * time.Second))
-		buf := make([]byte, 1024)
+		buf := make([]byte, readSize)
 		n, err := conn.Read(buf)
 		if err != nil {
 			out <- err
@@ -43,37 +45,90 @@ func wsPair(t *testing.T) (serverSide chan interface{}, client *websocket.Conn) 
 	return out, ws
 }
 
-//TestWSConnReadLimit verifies that an oversized inbound message errors
-//the read instead of being buffered into memory.
-func TestWSConnReadLimit(t *testing.T) {
-	out, client := wsPair(t)
-	//bigger than the 64KB default limit
-	big := bytes.Repeat([]byte("x"), 128*1024)
-	if err := client.WriteMessage(websocket.BinaryMessage, big); err != nil {
-		t.Fatal(err)
-	}
-	switch v := (<-out).(type) {
-	case error:
-		//read correctly failed
-	case []byte:
-		t.Fatalf("oversized message was read (%d bytes leaked through)", len(v))
-	default:
-		_ = v
-	}
-}
-
-//TestWSConnReadNormal verifies normal-sized messages still flow.
-func TestWSConnReadNormal(t *testing.T) {
-	out, client := wsPair(t)
-	if err := client.WriteMessage(websocket.BinaryMessage, []byte("hello")); err != nil {
+// TestWSConnReadDefaultAllowsSSHPacketEnvelope verifies that the default has
+// room for x/crypto/ssh's 256 KiB packet ceiling plus transport overhead.
+func TestWSConnReadDefaultAllowsSSHPacketEnvelope(t *testing.T) {
+	t.Setenv("CHISEL_WS_READ_LIMIT", "")
+	const sshPacketWithHeadroom = sshMaxTransportPacket + 4*1024
+	out, client := wsPair(t, sshPacketWithHeadroom)
+	message := bytes.Repeat([]byte("x"), sshPacketWithHeadroom)
+	if err := client.WriteMessage(websocket.BinaryMessage, message); err != nil {
 		t.Fatal(err)
 	}
 	switch v := (<-out).(type) {
 	case []byte:
-		if string(v) != "hello" {
-			t.Fatalf("got %q", v)
+		if !bytes.Equal(v, message) {
+			t.Fatalf("read %d bytes, want %d", len(v), len(message))
 		}
 	case error:
 		t.Fatalf("read failed: %v", v)
+	}
+}
+
+// TestWSConnReadDefaultRejectsOversizedMessage verifies that the finite default
+// still rejects messages above its pre-auth bound.
+func TestWSConnReadDefaultRejectsOversizedMessage(t *testing.T) {
+	t.Setenv("CHISEL_WS_READ_LIMIT", "")
+	out, client := wsPair(t, defaultWebSocketReadLimit+1)
+	message := bytes.Repeat([]byte("x"), defaultWebSocketReadLimit+1)
+	if err := client.WriteMessage(websocket.BinaryMessage, message); err != nil {
+		t.Fatal(err)
+	}
+	switch v := (<-out).(type) {
+	case error:
+		if !errors.Is(v, websocket.ErrReadLimit) {
+			t.Fatalf("read failed with %v, want %v", v, websocket.ErrReadLimit)
+		}
+	case []byte:
+		t.Fatalf("oversized message was read (%d bytes leaked through)", len(v))
+	}
+}
+
+func TestWSConnReadCustomLimit(t *testing.T) {
+	const limit = 32 * 1024
+	t.Setenv("CHISEL_WS_READ_LIMIT", "32768")
+	out, client := wsPair(t, limit+1)
+	if err := client.WriteMessage(websocket.BinaryMessage, bytes.Repeat([]byte("x"), limit+1)); err != nil {
+		t.Fatal(err)
+	}
+	v, ok := (<-out).(error)
+	if !ok {
+		t.Fatal("message above custom limit was read")
+	}
+	if !errors.Is(v, websocket.ErrReadLimit) {
+		t.Fatalf("read failed with %v, want %v", v, websocket.ErrReadLimit)
+	}
+}
+
+func TestWSConnReadNegativeLimitUsesDefault(t *testing.T) {
+	t.Setenv("CHISEL_WS_READ_LIMIT", "-1")
+	out, client := wsPair(t, defaultWebSocketReadLimit+1)
+	message := bytes.Repeat([]byte("x"), defaultWebSocketReadLimit+1)
+	if err := client.WriteMessage(websocket.BinaryMessage, message); err != nil {
+		t.Fatal(err)
+	}
+	v, ok := (<-out).(error)
+	if !ok {
+		t.Fatal("negative limit disabled the read cap")
+	}
+	if !errors.Is(v, websocket.ErrReadLimit) {
+		t.Fatalf("read failed with %v, want %v", v, websocket.ErrReadLimit)
+	}
+}
+
+func TestWSConnReadLimitDisabled(t *testing.T) {
+	t.Setenv("CHISEL_WS_READ_LIMIT", "0")
+	message := bytes.Repeat([]byte("x"), defaultWebSocketReadLimit+1)
+	out, client := wsPair(t, len(message))
+	if err := client.WriteMessage(websocket.BinaryMessage, message); err != nil {
+		t.Fatal(err)
+	}
+	switch v := (<-out).(type) {
+	case []byte:
+		if !bytes.Equal(v, message) {
+			t.Fatalf("read %d bytes, want %d", len(v), len(message))
+		}
+	case error:
+		t.Fatalf("read failed with limit disabled: %v", v)
 	}
 }

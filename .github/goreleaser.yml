@@ -50,10 +50,21 @@ archives:
         formats: [zip]
     files:
       - none*
+checksum:
+  # The publishing workflow stages preflight-verified archives outside dist,
+  # then sets this glob so the real release checksums those exact files.
+  # Empty by default so normal local/snapshot releases keep standard behavior.
+  extra_files:
+    - glob: '{{ envOrDefault "RELEASE_ARCHIVES_GLOB" "" }}'
 release:
   draft: true
   replace_existing_draft: true
   prerelease: auto
+  # In CI, these are the archives produced and checked by the non-publishing
+  # preflight. The publishing run uses --skip=archive, so it cannot replace
+  # them with rebuilt, unvalidated archives.
+  extra_files:
+    - glob: '{{ envOrDefault "RELEASE_ARCHIVES_GLOB" "" }}'
 changelog:
   sort: asc
   filters:

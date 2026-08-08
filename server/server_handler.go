@@ -62,7 +62,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
-		s.Debugf("Failed to handshake (%s)", err)
+		s.logHandshakeFailure(err)
 		return
 	}
 	// resolve the user from the authenticated username set by
@@ -196,4 +196,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	l.Infof("Close (user=%s addr=%s duration=%s)%s",
 		username, req.RemoteAddr, time.Since(opened), errmsg)
+}
+
+func (s *Server) logHandshakeFailure(err error) {
+	s.Debugf("Failed to handshake (%q)", err.Error())
 }
