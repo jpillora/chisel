@@ -12,15 +12,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//HTTPServer extends net/http Server and
-//adds graceful shutdowns
+// HTTPServer extends net/http Server and
+// adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server
 	waiterMux sync.Mutex
 	waiter    *errgroup.Group
 }
 
-//NewHTTPServer creates a new HTTPServer
+// NewHTTPServer creates a new HTTPServer
 func NewHTTPServer() *HTTPServer {
 	return &HTTPServer{
 		Server: &http.Server{},
@@ -54,7 +54,7 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 	h.waiter.Go(func() error {
 		return h.Serve(l)
 	})
-	go func() {
+	h.waiter.Go(func() error {
 		<-ctx.Done()
 		//graceful shutdown: stop accepting, drain in-flight requests
 		//for a grace period, then force-close the remainder. hijacked
@@ -64,7 +64,8 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 		defer cancel()
 		h.Server.Shutdown(c)
 		h.Close()
-	}()
+		return nil
+	})
 	return nil
 }
 
