@@ -73,7 +73,7 @@ jobs:
           go-version: stable
           cache: true
       - name: Build release archives without publishing
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           # v2.12.7 silently produced corrupt .gz archives (#610); v2.17.0
@@ -123,7 +123,7 @@ jobs:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish with GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           # v2.12.7 silently produced corrupt .gz archives (#610); v2.17.0
