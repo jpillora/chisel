@@ -44,10 +44,12 @@ jobs:
         run: go test -v ./...
   # ================
   # RELEASE STAGE 1 (on push "v*" tag, after merging to master)
-  # Creates a DRAFT GitHub release and pushes version-tagged binaries,
-  # packages, and multi-arch Docker images via GoReleaser. Floating
-  # Docker tags (latest / X / X.Y) are not touched here — publishing
-  # the draft release triggers promote.yml (stage 2) which retags them.
+  # Builds and verifies the versioned archives without credentials, then
+  # creates a DRAFT GitHub release containing those exact archives and the
+  # packages built by the publishing run. It also pushes version-tagged
+  # multi-arch Docker images via GoReleaser. Floating Docker tags (latest /
+  # X / X.Y) are not touched here — publishing the draft release triggers
+  # promote.yml (stage 2) which retags them.
   # ================
   release:
     name: Release
@@ -62,11 +64,49 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # Do not leave the write-capable job token in Git configuration;
+          # the preflight must run without publication credentials.
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: stable
           cache: true
+      - name: Build release archives without publishing
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          # v2.12.7 silently produced corrupt .gz archives (#610); v2.17.0
+          # verified clean — reproduce/verify with 3x snapshot A/B runs
+          # before changing this pin
+          version: v2.17.0
+          args: release --clean --config .github/goreleaser.yml --skip=publish,docker,nfpm
+      - name: Verify and stage release archives
+        # Fail closed before credentials are used. The publishing run skips
+        # its archive pipe and uploads these exact files from outside dist.
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=(dist/*.gz dist/*.zip)
+          if (( ${#archives[@]} == 0 )); then
+            echo "::error::GoReleaser produced no .gz or .zip archives"
+            exit 1
+          fi
+
+          bad=0
+          for archive in "${archives[@]}"; do
+            case "$archive" in
+              *.gz)  gzip -t "$archive" || { echo "CORRUPT: $archive"; bad=1; } ;;
+              *.zip) unzip -t "$archive" >/dev/null || { echo "CORRUPT: $archive"; bad=1; } ;;
+            esac
+          done
+          if (( bad != 0 )); then
+            exit "$bad"
+          fi
+
+          mkdir -p release/archives
+          mv -- "${archives[@]}" release/archives/
+          echo "verified and staged ${#archives[@]} release archives"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
@@ -82,7 +122,7 @@ jobs:
         with:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Run GoReleaser
+      - name: Publish with GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -90,22 +130,10 @@ jobs:
           # verified clean — reproduce/verify with 3x snapshot A/B runs
           # before changing this pin
           version: v2.17.0
-          args: release --clean --config .github/goreleaser.yml
+          # GoReleaser OSS v2.17.0 cannot publish a previous dist directory.
+          # Rebuild binaries for packages/images, but preserve the verified
+          # archives by skipping this run's archive pipe.
+          args: release --clean --config .github/goreleaser.yml --skip=archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Verify archive integrity
-        # goreleaser can exit 0 while emitting corrupt archives (#610) —
-        # fail the job so a broken draft is never published (stage 2 only
-        # promotes what a human publishes, and a red job blocks that)
-        run: |
-          set -euo pipefail
-          bad=0
-          for f in dist/*.gz dist/*.zip; do
-            [ -e "$f" ] || continue
-            case "$f" in
-              *.gz)  gzip -t "$f" || { echo "CORRUPT: $f"; bad=1; } ;;
-              *.zip) unzip -t "$f" >/dev/null || { echo "CORRUPT: $f"; bad=1; } ;;
-            esac
-          done
-          [ "$bad" = 0 ] && echo "all archives verified"
-          exit "$bad"
+          RELEASE_ARCHIVES_GLOB: release/archives/*
