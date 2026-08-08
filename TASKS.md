@@ -286,7 +286,7 @@ Return errors; `main.go` already log.Fatals on the returned error.
 
 ### Fix
 
-Call `SetReadLimit` on both server (`server/server_handler.go` after Upgrade) and client (`client/client_connect.go` after Dial), or switch wsConn.Read to NextReader-based streaming. The pinned `x/crypto/ssh` supports transport packets up to 256 KiB, so the limit must also accommodate packet framing, padding, and authentication overhead; 512 KiB provides that headroom while retaining a finite pre-auth bound. The `WS_BUFF_SIZE` env already tunes buffer sizes.
+Call `SetReadLimit` on both server (`server/server_handler.go` after Upgrade) and client (`client/client_connect.go` after Dial), or switch wsConn.Read to NextReader-based streaming. The pinned `x/crypto/ssh` supports transport packets up to 256 KiB, so the limit must sit above that plus framing; 512 KiB clears it with room to spare while retaining a finite pre-auth bound. The `WS_BUFF_SIZE` env already tunes buffer sizes.
 
 ## 18. Graceful shutdown: handle SIGTERM and use http.Server.Shutdown
 

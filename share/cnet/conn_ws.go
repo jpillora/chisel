@@ -14,9 +14,11 @@ type wsConn struct {
 }
 
 const (
-	// x/crypto/ssh caps transport packets at 256 KiB. Doubling that ceiling
-	// accommodates length, padding, and authentication overhead while retaining
-	// a finite bound on messages received before SSH authentication.
+	// x/crypto/ssh rejects transport packets whose length field exceeds this,
+	// so a full wire packet tops out around 256 KiB plus the 4-byte length and
+	// a MAC. Doubling leaves the exact framing overhead unspecified rather than
+	// tracking a dependency's internals, while retaining a finite bound on
+	// messages received before SSH authentication.
 	sshMaxTransportPacket     = 256 * 1024
 	defaultWebSocketReadLimit = 2 * sshMaxTransportPacket
 )
