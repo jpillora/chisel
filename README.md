@@ -387,7 +387,7 @@ $ chisel client --help
 
 Encryption is always enabled. When you start up a chisel server, it will generate an in-memory ECDSA public/private key pair. The public key fingerprint (base64 encoded SHA256) will be displayed as the server starts. Instead of generating a random key, the server may optionally specify a key file, using the `--keyfile` option. When clients connect, they will also display the server's public key fingerprint. The client can force a particular fingerprint using the `--fingerprint` option. Legacy MD5 fingerprints are still accepted but must be the full 16-octet colon form — truncated prefixes are rejected. See the `--help` above for more information.
 
-The server also caps inbound websocket message sizes before authentication (`CHISEL_WS_READ_LIMIT`, default 64KB), so unauthenticated peers cannot exhaust memory with oversized frames.
+The server also caps inbound websocket message sizes before authentication (`CHISEL_WS_READ_LIMIT`, default 512 KiB), so unauthenticated peers cannot exhaust memory with oversized messages. The default accommodates `x/crypto/ssh`'s 256 KiB maximum transport packet plus framing, padding, and authentication overhead. Only `0` disables the limit; negative values fall back to the safe default.
 
 ### Authentication
 
@@ -487,7 +487,7 @@ Less common knobs are environment variables, all read with a `CHISEL_` prefix (e
 | `SSH_WAIT`      | both        | `35s`              | how long new tunnels wait for an active connection |
 | `PING_TIMEOUT`  | both        | keepalive interval | keepalive ping reply timeout (no pings if `--keepalive 0`) |
 | `DIAL_TIMEOUT`  | exit node   | `30s`              | tcp dial timeout for tunnel targets                |
-| `WS_READ_LIMIT` | both        | `65536`            | max inbound websocket message bytes (0 = no limit) |
+| `WS_READ_LIMIT` | both        | `524288`           | max inbound websocket message bytes (0 = no limit; negative = default) |
 | `WS_BUFF_SIZE`  | both        | go default         | websocket read/write buffer sizes                  |
 | `UDP_MAX_SIZE`  | both        | `9012`             | max udp packet bytes                               |
 | `UDP_DEADLINE`  | exit node   | `15s`              | udp flow read deadline and idle-sweep age          |
