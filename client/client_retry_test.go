@@ -2,9 +2,15 @@ package chclient
 
 import (
 	"context"
+	"errors"
+	"net"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	chserver "github.com/jpillora/chisel/server"
 )
 
 func TestRetryIntervalDefaults(t *testing.T) {
@@ -53,9 +59,12 @@ func TestRetryIntervalExplicit(t *testing.T) {
 // TestGiveUpReturnsError verifies that exhausting --max-retry-count
 // surfaces an error (non-zero process exit) instead of nil.
 func TestGiveUpReturnsError(t *testing.T) {
-	//port 1 is reserved/unbound: connection refused immediately
+	dialErr := errors.New("test dial failure")
 	c, err := NewClient(&Config{
-		Server:        "http://127.0.0.1:1",
+		Server: "http://example.invalid",
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			return nil, dialErr
+		},
 		MaxRetryCount: 0,
 	})
 	if err != nil {
@@ -73,4 +82,82 @@ func TestGiveUpReturnsError(t *testing.T) {
 	if !strings.Contains(err.Error(), "exhausted") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestCancelledContextWinsOverRetryExhaustion(t *testing.T) {
+	var dials atomic.Int32
+	c, err := NewClient(&Config{
+		Server: "http://example.invalid",
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			dials.Add(1)
+			return nil, errors.New("unexpected dial")
+		},
+		MaxRetryCount: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := c.connectionLoop(ctx); err != nil {
+		t.Fatalf("cancelled connection loop returned an error: %v", err)
+	}
+	if got := dials.Load(); got != 0 {
+		t.Fatalf("cancelled connection loop made %d dials, want 0", got)
+	}
+}
+
+func TestCancellationAfterConnectionWinsOverRetryExhaustion(t *testing.T) {
+	serverCtx, stopServer := context.WithCancel(context.Background())
+	server, err := chserver.NewServer(&chserver.Config{KeySeed: "retry-cancel-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := availableTCPPort(t)
+	if err := server.StartContext(serverCtx, "127.0.0.1", port); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		stopServer()
+		if err := server.Wait(); err != nil {
+			t.Errorf("server shutdown: %v", err)
+		}
+	}()
+
+	clientCtx, stopClient := context.WithCancel(context.Background())
+	c, err := NewClient(&Config{
+		Fingerprint:   server.GetFingerprint(),
+		Server:        "http://127.0.0.1:" + port,
+		MaxRetryCount: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Start(clientCtx); err != nil {
+		t.Fatal(err)
+	}
+	defer stopClient()
+
+	readyCtx, stopReady := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopReady()
+	if !c.Ready(readyCtx) {
+		t.Fatal("client did not establish a connection")
+	}
+	stopClient()
+	if err := c.Wait(); err != nil {
+		t.Fatalf("cancelled connected client returned an error: %v", err)
+	}
+}
+
+func availableTCPPort(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return strconv.Itoa(port)
 }

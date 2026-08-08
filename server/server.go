@@ -206,7 +206,7 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	user, found := s.users.Get(n)
 	if !found || subtle.ConstantTimeCompare([]byte(user.Pass), password) != 1 {
 		//info level: operators should see failed attempts (#521)
-		s.Infof("Login failed for user %s (%s)", n, c.RemoteAddr())
+		s.Infof("Login failed for user %q (%s)", n, c.RemoteAddr())
 		return nil, fmt.Errorf("invalid authentication for username: %s", n)
 	}
 	// pass the username through to the handshake handler, which

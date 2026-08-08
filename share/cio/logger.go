@@ -2,11 +2,12 @@ package cio
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 )
 
-//Logger is pkg/log Logger with prefixing and 2 log levels
+// Logger is pkg/log Logger with prefixing and 2 log levels
 type Logger struct {
 	Info, Debug bool
 	//internal
@@ -43,6 +44,11 @@ func (l *Logger) Debugf(f string, args ...interface{}) {
 
 func (l *Logger) Errorf(f string, args ...interface{}) error {
 	return fmt.Errorf(l.prefix+": "+f, args...)
+}
+
+// SetOutput sets the destination for logger output.
+func (l *Logger) SetOutput(w io.Writer) {
+	l.logger.SetOutput(w)
 }
 
 func (l *Logger) Fork(prefix string, args ...interface{}) *Logger {

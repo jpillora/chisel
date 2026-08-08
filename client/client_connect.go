@@ -25,6 +25,12 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 	}
 	for {
 		connected, err := c.connectionOnce(ctx)
+		// Cancellation is a normal shutdown, even when the final connection
+		// attempt also consumes the configured retry budget.
+		if ctx.Err() != nil {
+			c.Infof("Cancelled")
+			return nil
+		}
 		//reset backoff after successful connections
 		if connected {
 			b.Reset()
