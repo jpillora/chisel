@@ -13,12 +13,12 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-//TLSConfig enables configures TLS
+// TLSConfig enables configures TLS
 type TLSConfig struct {
-	Key     string
-	Cert    string
-	Domains []string
-	CA      string
+	Key     string   `opts:"name=tls-key,short=-" help:"Enables TLS and provides optional path to a PEM-encoded TLS private key. When this flag is set, you must also set --tls-cert, and you cannot set --tls-domain."`
+	Cert    string   `opts:"name=tls-cert,short=-" help:"Enables TLS and provides optional path to a PEM-encoded TLS certificate. When this flag is set, you must also set --tls-key, and you cannot set --tls-domain."`
+	Domains []string `opts:"name=tls-domain,short=-" help:"Enables TLS and automatically acquires a TLS key and certificate using LetsEncrypt. Setting --tls-domain requires port 443. You may specify multiple --tls-domain flags to serve multiple domains. The resulting files are cached in the \"$HOME/.cache/chisel\" directory. You can modify this path by setting the CHISEL_LE_CACHE variable, or disable caching by setting this variable to \"-\". You can optionally provide a certificate notification email by setting CHISEL_LE_EMAIL."`
+	CA      string   `opts:"name=tls-ca,short=-" help:"a path to a PEM encoded CA certificate bundle or a directory holding multiple PEM encode CA certificate bundle files, which is used to validate client connections. The provided CA certificates will be used instead of the system roots. This is commonly used to implement mutual-TLS."`
 }
 
 func (s *Server) listener(host, port string) (net.Listener, error) {
