@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,215 +16,166 @@ import (
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cos"
 	"github.com/jpillora/chisel/share/settings"
+	"github.com/jpillora/opts"
 )
 
-var help = `
-  Usage: chisel [command] [--help]
+// chiselRepo is rendered in the "Read more:" section of every help screen.
+const chiselRepo = "https://github.com/jpillora/chisel"
 
-  Version: ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
+// versionTemplate keeps the Go runtime version alongside the build version in
+// the help text. The --version flag still prints the build version alone.
+var versionTemplate = "\n{{bold \"Version:\"}}\n{{.Pad}}{{accent \"" +
+	chshare.BuildVersion + " (" + runtime.Version() + ")\"}}\n"
 
-  Commands:
-    server - runs chisel in server mode
-    client - runs chisel in client mode
-
-  Read more:
-    https://github.com/jpillora/chisel
-
-`
+type rootOptions struct{}
 
 func main() {
+	serverConfig := newServerOptions()
+	clientConfig := newClientOptions()
+	cli := newCLI(serverConfig, clientConfig)
 
-	version := flag.Bool("version", false, "")
-	v := flag.Bool("v", false, "")
-	flag.Bool("help", false, "")
-	flag.Bool("h", false, "")
-	flag.Usage = func() {}
-	flag.Parse()
-
-	if *version || *v {
-		fmt.Println(chshare.BuildVersion)
-		os.Exit(0)
+	parsed, err := cli.ParseArgsError(os.Args)
+	if err != nil {
+		// opts deliberately models help and version as successful parse exits.
+		// Keep Chisel's historical stdout and trailing-newline behaviour.
+		if isHelpExit(err, os.Args[1:]) {
+			fmt.Print(err)
+			return
+		}
+		if err.Error() == chshare.BuildVersion && hasRootVersionFlag(os.Args[1:]) {
+			fmt.Println(err)
+			return
+		}
+		fmt.Fprint(os.Stderr, parsed.Selected().Help())
+		os.Exit(1)
 	}
-
-	args := flag.Args()
-
-	subcmd := ""
-	if len(args) > 0 {
-		subcmd = args[0]
-		args = args[1:]
+	if !parsed.IsRunnable() {
+		fmt.Print(parsed.Help())
+		return
 	}
-
-	switch subcmd {
-	case "server":
-		server(args)
-	case "client":
-		client(args)
-	default:
-		fmt.Print(help)
-		os.Exit(0)
-	}
-}
-
-var commonHelp = `
-    --pid Generate pid file in current working directory
-
-    -v, Enable verbose logging
-
-    --help, This help text
-
-  Signals:
-    The chisel process is listening for:
-      a SIGINT or SIGTERM to begin a graceful shutdown
-        (a second signal forces an immediate exit),
-      a SIGUSR2 to print process stats, and
-      a SIGHUP to short-circuit the client reconnect timer
-
-  Version:
-    ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
-
-  Read more:
-    https://github.com/jpillora/chisel
-
-`
-
-func generatePidFile() {
-	pid := []byte(strconv.Itoa(os.Getpid()))
-	if err := os.WriteFile("chisel.pid", pid, 0644); err != nil {
+	if err := parsed.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-var serverHelp = `
-  Usage: chisel server [options]
+func newCLI(serverConfig *serverOptions, clientConfig *clientOptions) opts.Opts {
+	return opts.New(&rootOptions{}).
+		Name("chisel").
+		Version(chshare.BuildVersion).
+		Repo(chiselRepo).
+		DocSet("version", versionTemplate).
+		AddCommand(newServerCLI(serverConfig)).
+		AddCommand(newClientCLI(clientConfig))
+}
 
-  Options:
+func newServerCLI(serverConfig *serverOptions) opts.Opts {
+	return opts.New(serverConfig).
+		Name("server").
+		Summary("runs chisel in server mode").
+		Repo(chiselRepo).
+		DocSet("version", versionTemplate).
+		DocAfter("flaggroups", "signals", signalsTemplate)
+}
 
-    --host, Defines the HTTP listening host – the network interface
-    (defaults the environment variable HOST and falls back to 0.0.0.0).
+func newClientCLI(clientConfig *clientOptions) opts.Opts {
+	return opts.New(clientConfig).
+		Name("client").
+		Summary("runs chisel in client mode").
+		Repo(chiselRepo).
+		DocSet("version", versionTemplate).
+		DocAfter("summary", "remotes", remotesTemplate).
+		DocAfter("flaggroups", "signals", signalsTemplate)
+}
 
-    --port, -p, Defines the HTTP listening port (defaults to the environment
-    variable PORT and falls back to port 8080).
-
-    --key, (deprecated use --keygen and --keyfile instead)
-    An optional string to seed the generation of a ECDSA public
-    and private key pair. All communications will be secured using this
-    key pair. Share the subsequent fingerprint with clients to enable detection
-    of man-in-the-middle attacks (defaults to the CHISEL_KEY environment
-    variable, otherwise a new key is generate each run).
-
-    --keygen, A path to write a newly generated PEM-encoded SSH private key file.
-    If users depend on your --key fingerprint, you may also include your --key to
-    output your existing key. Use - (dash) to output the generated key to stdout.
-
-    --keyfile, An optional path to a PEM-encoded SSH private key. When
-    this flag is set, the --key option is ignored, and the provided private key
-    is used to secure all communications. (defaults to the CHISEL_KEY_FILE
-    environment variable). Since ECDSA keys are short, you may also set keyfile
-    to the inline key string itself, exactly as printed by --keygen (a base64
-    string with a "ck-" prefix); no extra base64 encoding is needed.
-
-    --authfile, An optional path to a users.json file. This file should
-    be an object with users defined like:
-      {
-        "<user:pass>": ["<addr-regex>","<addr-regex>"]
-      }
-    when <user> connects, their <pass> will be verified and then
-    each of the remote addresses will be compared against the list
-    of address regular expressions for a match. Patterns are NOT
-    anchored by default: "10.0.0.1:80" also matches
-    "210.0.0.1:8080", and "." matches any character. Anchor your
-    patterns, e.g. "^10\.0\.0\.1:80$". The empty string ""
-    matches every address. Addresses will
-    always come in the form "<remote-host>:<remote-port>" for normal remotes,
-    "R:<local-interface>:<local-port>" for reverse port forwarding
-    remotes, and "socks" for SOCKS5 proxy access. Note that SOCKS5
-    access previously bypassed this list; existing authfiles which
-    should allow SOCKS5 must add an entry matching "socks" (the
-    empty wildcard "" matches everything, including "socks"). This
-    file will be automatically reloaded on change. Reloads apply
-    to new connections and to new tunnels of connected clients;
-    established tunnels are not interrupted.
-
-    --auth, An optional string representing a single user with full
-    access, in the form of <user:pass>. It is equivalent to creating an
-    authfile with {"<user:pass>": [""]}. If unset, it will use the
-    environment variable AUTH.
-
-    --keepalive, An optional keepalive interval. Since the underlying
-    transport is HTTP, in many instances we'll be traversing through
-    proxies, often these proxies will close idle connections. You must
-    specify a time with a unit, for example '5s' or '2m'. Defaults
-    to '25s' (set to 0s to disable).
-
-    --backend, Specifies another HTTP server to proxy requests to when
-    chisel receives a normal HTTP request. Useful for hiding chisel in
-    plain sight. --proxy is accepted as an alias for this flag.
-
-    --socks5, Allow clients to access the internal SOCKS5 proxy. See
-    chisel client --help for more information.
-
-    --reverse, Allow clients to specify reverse port forwarding remotes
-    in addition to normal remotes.
-
-    --tls-key, Enables TLS and provides optional path to a PEM-encoded
-    TLS private key. When this flag is set, you must also set --tls-cert,
-    and you cannot set --tls-domain.
-
-    --tls-cert, Enables TLS and provides optional path to a PEM-encoded
-    TLS certificate. When this flag is set, you must also set --tls-key,
-    and you cannot set --tls-domain.
-
-    --tls-domain, Enables TLS and automatically acquires a TLS key and
-    certificate using LetsEncrypt. Setting --tls-domain requires port 443.
-    You may specify multiple --tls-domain flags to serve multiple domains.
-    The resulting files are cached in the "$HOME/.cache/chisel" directory.
-    You can modify this path by setting the CHISEL_LE_CACHE variable,
-    or disable caching by setting this variable to "-". You can optionally
-    provide a certificate notification email by setting CHISEL_LE_EMAIL.
-
-    --tls-ca, a path to a PEM encoded CA certificate bundle or a directory
-    holding multiple PEM encode CA certificate bundle files, which is used to 
-    validate client connections. The provided CA certificates will be used 
-    instead of the system roots. This is commonly used to implement mutual-TLS. 
-` + commonHelp
-
-func server(args []string) {
-
-	flags := flag.NewFlagSet("server", flag.ContinueOnError)
-
-	config := &chserver.Config{}
-	flags.StringVar(&config.KeySeed, "key", "", "")
-	flags.StringVar(&config.KeyFile, "keyfile", "", "")
-	flags.StringVar(&config.AuthFile, "authfile", "", "")
-	flags.StringVar(&config.Auth, "auth", "", "")
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
-	flags.StringVar(&config.Proxy, "proxy", "", "")
-	flags.StringVar(&config.Proxy, "backend", "", "")
-	flags.BoolVar(&config.Socks5, "socks5", false, "")
-	flags.BoolVar(&config.Reverse, "reverse", false, "")
-	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
-	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
-	flags.Var(multiFlag{&config.TLS.Domains}, "tls-domain", "")
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
-
-	host := flags.String("host", "", "")
-	p := flags.String("p", "", "")
-	port := flags.String("port", "", "")
-	pid := flags.Bool("pid", false, "")
-	verbose := flags.Bool("v", false, "")
-	keyGen := flags.String("keygen", "", "")
-
-	flags.Usage = func() {
-		fmt.Print(serverHelp)
-		os.Exit(0)
-	}
-	flags.Parse(args)
-
-	if *keyGen != "" {
-		if err := ccrypto.GenerateKeyFile(*keyGen, config.KeySeed); err != nil {
-			log.Fatal(err)
+func hasHelpFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-help" || arg == "--h" || arg == "-h" {
+			return true
 		}
-		return
+	}
+	return false
+}
+
+func isHelpExit(err error, args []string) bool {
+	message := err.Error()
+	return hasHelpFlag(args) && strings.Contains(message, "Usage:") && !strings.Contains(message, "Error:")
+}
+
+func hasRootVersionFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" || arg == "-" || !strings.HasPrefix(arg, "-") {
+			return false
+		}
+		if arg == "--version" || arg == "-version" || arg == "--v" || arg == "-v" {
+			return true
+		}
+	}
+	return false
+}
+
+func optsTagValue(tag, key string) string {
+	for _, part := range strings.Split(tag, ",") {
+		name, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if ok && name == key {
+			return value
+		}
+	}
+	return ""
+}
+
+// signalsTemplate documents the signals both commands handle. The layout is
+// deliberate, so it is rendered verbatim rather than reflowed.
+const signalsTemplate = "\n{{bold \"Signals:\"}}\n" +
+	"{{.Pad}}The chisel process is listening for:\n" +
+	"{{.Pad}}  a SIGINT or SIGTERM to begin a graceful shutdown\n" +
+	"{{.Pad}}    (a second signal forces an immediate exit),\n" +
+	"{{.Pad}}  a SIGUSR2 to print process stats, and\n" +
+	"{{.Pad}}  a SIGHUP to short-circuit the client reconnect timer\n"
+
+func generatePidFile() error {
+	pid := []byte(strconv.Itoa(os.Getpid()))
+	return os.WriteFile("chisel.pid", pid, 0644)
+}
+
+type sharedStringFlag struct {
+	target *string
+}
+
+func (f sharedStringFlag) String() string {
+	if f.target == nil {
+		return ""
+	}
+	return *f.target
+}
+
+func (f *sharedStringFlag) Set(value string) error {
+	*f.target = value
+	return nil
+}
+
+// Field order determines the order flags appear in the help text.
+type serverOptions struct {
+	Host   string `opts:"name=host,short=-" help:"Defines the HTTP listening host – the network interface (defaults the environment variable HOST and falls back to 0.0.0.0)."`
+	Port   string `opts:"name=port,short=p" help:"Defines the HTTP listening port (defaults to the environment variable PORT and falls back to port 8080)."`
+	KeyGen string `opts:"name=keygen,short=-" help:"A path to write a newly generated PEM-encoded SSH private key file. If users depend on your --key fingerprint, you may also include your --key to output your existing key. Use - (dash) to output the generated key to stdout."`
+	chserver.Config
+	ProxyAlias sharedStringFlag `opts:"name=proxy,mode=flag,short=-" help:"Alias for --backend."`
+	PID        bool             `opts:"name=pid,short=-" help:"Generate pid file in current working directory"`
+	Verbose    bool             `opts:"name=verbose,short=v" help:"Enable verbose logging"`
+}
+
+func newServerOptions() *serverOptions {
+	o := &serverOptions{}
+	o.Config.KeepAlive = 25 * time.Second
+	o.ProxyAlias.target = &o.Config.Proxy
+	return o
+}
+
+func (o *serverOptions) Run() error {
+	config := &o.Config
+
+	if o.KeyGen != "" {
+		return ccrypto.GenerateKeyFile(o.KeyGen, config.KeySeed)
 	}
 
 	if config.KeySeed != "" {
@@ -233,20 +183,17 @@ func server(args []string) {
 		log.Print("Please use `chisel server --keygen /file/path`, followed by `chisel server --keyfile /file/path` to specify the SSH private key")
 	}
 
-	if *host == "" {
-		*host = os.Getenv("HOST")
+	if o.Host == "" {
+		o.Host = os.Getenv("HOST")
 	}
-	if *host == "" {
-		*host = "0.0.0.0"
+	if o.Host == "" {
+		o.Host = "0.0.0.0"
 	}
-	if *port == "" {
-		*port = *p
+	if o.Port == "" {
+		o.Port = os.Getenv("PORT")
 	}
-	if *port == "" {
-		*port = os.Getenv("PORT")
-	}
-	if *port == "" {
-		*port = "8080"
+	if o.Port == "" {
+		o.Port = "8080"
 	}
 	if config.KeyFile == "" {
 		config.KeyFile = settings.Env("KEY_FILE")
@@ -259,252 +206,148 @@ func server(args []string) {
 	}
 	s, err := chserver.NewServer(config)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	s.Debug = *verbose
-	if *pid {
-		generatePidFile()
+	s.Debug = o.Verbose
+	if o.PID {
+		if err := generatePidFile(); err != nil {
+			return err
+		}
 	}
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
-	if err := s.StartContext(ctx, *host, *port); err != nil {
-		log.Fatal(err)
+	if err := s.StartContext(ctx, o.Host, o.Port); err != nil {
+		return err
 	}
-	if err := s.Wait(); err != nil {
-		log.Fatal(err)
-	}
+	return s.Wait()
 }
 
-type multiFlag struct {
-	values *[]string
-}
-
-func (flag multiFlag) String() string {
-	return strings.Join(*flag.values, ", ")
-}
-
-func (flag multiFlag) Set(arg string) error {
-	*flag.values = append(*flag.values, arg)
-	return nil
-}
-
-type headerFlags struct {
-	http.Header
-}
-
-func (flag *headerFlags) String() string {
-	out := ""
-	for k, v := range flag.Header {
-		out += fmt.Sprintf("%s: %s\n", k, v)
-	}
-	return out
-}
-
-func (flag *headerFlags) Set(arg string) error {
+func setHeader(headers http.Header, arg string) error {
 	index := strings.Index(arg, ":")
 	if index < 0 {
 		return fmt.Errorf(`Invalid header (%s). Should be in the format "HeaderName: HeaderContent"`, arg)
 	}
-	if flag.Header == nil {
-		flag.Header = http.Header{}
-	}
 	key := arg[0:index]
 	value := arg[index+1:]
-	flag.Header.Set(key, strings.TrimSpace(value))
+	headers.Set(key, strings.TrimSpace(value))
 	return nil
 }
 
-var clientHelp = `
-  Usage: chisel client [options] <server> <remote> [remote] [remote] ...
+// remotesTemplate documents the <remote> syntax. Its bullet lists, examples and
+// ProxyCommand snippet are laid out by hand, so it is rendered verbatim.
+const remotesTemplate = `
+<server> is the URL to the chisel server.
 
-  <server> is the URL to the chisel server.
+<remote>s are remote connections tunneled through the server, each of
+which come in the form:
 
-  <remote>s are remote connections tunneled through the server, each of
-  which come in the form:
+  <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
-    <local-host>:<local-port>:<remote-host>:<remote-port>/<protocol>
+  ■ local-host defaults to 0.0.0.0 (all interfaces).
+  ■ local-port defaults to remote-port.
+  ■ remote-port is required*.
+  ■ remote-host defaults to 127.0.0.1 (server localhost).
+  ■ protocol defaults to tcp.
 
-    ■ local-host defaults to 0.0.0.0 (all interfaces).
-    ■ local-port defaults to remote-port.
-    ■ remote-port is required*.
-    ■ remote-host defaults to 127.0.0.1 (server localhost).
-    ■ protocol defaults to tcp.
+which shares <remote-host>:<remote-port> from the server to the client
+as <local-host>:<local-port>, or:
 
-  which shares <remote-host>:<remote-port> from the server to the client
-  as <local-host>:<local-port>, or:
+  R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
-    R:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
+which does reverse port forwarding, sharing <remote-host>:<remote-port>
+from the client to the server's <local-interface>:<local-port>.
 
-  which does reverse port forwarding, sharing <remote-host>:<remote-port>
-  from the client to the server's <local-interface>:<local-port>.
+  example remotes
 
-    example remotes
+    3000
+    example.com:3000
+    3000:google.com:80
+    192.168.0.5:3000:google.com:80
+    socks
+    5000:socks
+    R:2222:localhost:22
+    R:socks
+    R:5000:socks
+    stdio:example.com:22
+    1.1.1.1:53/udp
 
-      3000
-      example.com:3000
-      3000:google.com:80
-      192.168.0.5:3000:google.com:80
-      socks
-      5000:socks
-      R:2222:localhost:22
-      R:socks
-      R:5000:socks
-      stdio:example.com:22
-      1.1.1.1:53/udp
+  When the chisel server has --socks5 enabled, remotes can
+  specify "socks" in place of remote-host and remote-port.
+  The default local host and port for a "socks" remote is
+  127.0.0.1:1080. Connections to this remote will terminate
+  at the server's internal SOCKS5 proxy. When the server also
+  has --authfile set, SOCKS5 access requires an entry matching
+  the token "socks" in the user's address list.
 
-    When the chisel server has --socks5 enabled, remotes can
-    specify "socks" in place of remote-host and remote-port.
-    The default local host and port for a "socks" remote is
-    127.0.0.1:1080. Connections to this remote will terminate
-    at the server's internal SOCKS5 proxy. When the server also
-    has --authfile set, SOCKS5 access requires an entry matching
-    the token "socks" in the user's address list.
+  When the chisel server has --reverse enabled, remotes can
+  be prefixed with R to denote that they are reversed. That
+  is, the server will listen and accept connections, and they
+  will be proxied through the client which specified the remote.
+  Reverse remotes specifying "R:socks" will listen on the server's
+  default socks port (1080) and terminate the connection at the
+  client's internal SOCKS5 proxy.
 
-    When the chisel server has --reverse enabled, remotes can
-    be prefixed with R to denote that they are reversed. That
-    is, the server will listen and accept connections, and they
-    will be proxied through the client which specified the remote.
-    Reverse remotes specifying "R:socks" will listen on the server's
-    default socks port (1080) and terminate the connection at the
-    client's internal SOCKS5 proxy.
+  When stdio is used as local-host, the tunnel will connect standard
+  input/output of this program with the remote. This is useful when
+  combined with ssh ProxyCommand. You can use
+    ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
+        user@example.com
+  to connect to an SSH server through the tunnel.
+`
 
-    When stdio is used as local-host, the tunnel will connect standard
-    input/output of this program with the remote. This is useful when 
-    combined with ssh ProxyCommand. You can use
-      ssh -o ProxyCommand='chisel client chiselserver stdio:%h:%p' \
-          user@example.com
-    to connect to an SSH server through the tunnel.
+// Field order determines the order flags appear in the help text.
+type clientOptions struct {
+	chclient.Config
+	Header   []string `opts:"name=header,short=-" help:"Set a custom header in the form \"HeaderName: HeaderContent\". Can be used multiple times. (e.g --header \"Foo: Bar\" --header \"Hello: World\")"`
+	Hostname string   `opts:"name=hostname,short=-" help:"Optionally set the 'Host' header (defaults to the host found in the server url)."`
+	SNI      string   `opts:"name=sni,short=-" help:"Override the ServerName when using TLS (defaults to the hostname)."`
+	PID      bool     `opts:"name=pid,short=-" help:"Generate pid file in current working directory"`
+}
 
-  Options:
+func newClientOptions() *clientOptions {
+	o := &clientOptions{}
+	o.Config.KeepAlive = 25 * time.Second
+	o.Config.MaxRetryCount = -1
+	o.Config.Headers = http.Header{}
+	return o
+}
 
-    --fingerprint, A *strongly recommended* fingerprint string
-    to perform host-key validation against the server's public key.
-    Fingerprint mismatches will close the connection.
-    Fingerprints are generated by hashing the ECDSA public key using
-    SHA256 and encoding the result in base64.
-    Fingerprints must be 44 characters containing a trailing equals (=).
-    Legacy MD5 colon fingerprints (deprecated) are still accepted,
-    but only in their full 16-octet form; truncated prefixes are
-    rejected.
-
-    --auth, An optional username and password (client authentication)
-    in the form: "<user>:<pass>". These credentials are compared to
-    the credentials inside the server's --authfile. defaults to the
-    AUTH environment variable.
-
-    --keepalive, An optional keepalive interval. Since the underlying
-    transport is HTTP, in many instances we'll be traversing through
-    proxies, often these proxies will close idle connections. You must
-    specify a time with a unit, for example '5s' or '2m'. Defaults
-    to '25s' (set to 0s to disable).
-
-    --max-retry-count, Maximum number of times to retry before exiting.
-    Defaults to unlimited.
-
-    --min-retry-interval, Minimum wait time before retrying after a
-    disconnection. Defaults to 1 second.
-
-    --max-retry-interval, Maximum wait time before retrying after a
-    disconnection. Defaults to 5 minutes.
-
-    --proxy, An optional HTTP CONNECT or SOCKS5 proxy which will be
-    used to reach the chisel server. Authentication can be specified
-    inside the URL. Credentials must be URL-encoded; for example a
-    "#" in the password must be written as "%23".
-    For example, http://admin:password@my-server.com:8081
-            or: socks://admin:password@my-server.com:1080
-    The socks://, socks5:// and socks5h:// schemes are equivalent:
-    DNS is always resolved by the proxy.
-
-    --header, Set a custom header in the form "HeaderName: HeaderContent".
-    Can be used multiple times. (e.g --header "Foo: Bar" --header "Hello: World")
-
-    --hostname, Optionally set the 'Host' header (defaults to the host
-    found in the server url).
-
-    --sni, Override the ServerName when using TLS (defaults to the 
-    hostname).
-
-    --tls-ca, An optional root certificate bundle used to verify the
-    chisel server. Only valid when connecting to the server with
-    "https" or "wss". By default, the operating system CAs will be used.
-
-    --tls-skip-verify, Skip server TLS certificate verification of
-    chain and host name (if TLS is used for transport connections to
-    server). If set, client accepts any TLS certificate presented by
-    the server and any host name in that certificate. This only affects
-    transport https (wss) connection. Chisel server's public key
-    may be still verified (see --fingerprint) after inner connection
-    is established.
-
-    --tls-key, a path to a PEM encoded private key used for client 
-    authentication (mutual-TLS).
-
-    --tls-cert, a path to a PEM encoded certificate matching the provided 
-    private key. The certificate must have client authentication 
-    enabled (mutual-TLS).
-` + commonHelp
-
-func client(args []string) {
-	flags := flag.NewFlagSet("client", flag.ContinueOnError)
-	config := chclient.Config{Headers: http.Header{}}
-	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
-	flags.StringVar(&config.Auth, "auth", "", "")
-	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
-	flags.IntVar(&config.MaxRetryCount, "max-retry-count", -1, "")
-	flags.DurationVar(&config.MinRetryInterval, "min-retry-interval", 0, "")
-	flags.DurationVar(&config.MaxRetryInterval, "max-retry-interval", 0, "")
-	flags.StringVar(&config.Proxy, "proxy", "", "")
-	flags.StringVar(&config.TLS.CA, "tls-ca", "", "")
-	flags.BoolVar(&config.TLS.SkipVerify, "tls-skip-verify", false, "")
-	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
-	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
-	flags.Var(&headerFlags{config.Headers}, "header", "")
-	hostname := flags.String("hostname", "", "")
-	sni := flags.String("sni", "", "")
-	pid := flags.Bool("pid", false, "")
-	verbose := flags.Bool("v", false, "")
-	flags.Usage = func() {
-		fmt.Print(clientHelp)
-		os.Exit(0)
+func (o *clientOptions) Run() error {
+	config := &o.Config
+	for _, header := range o.Header {
+		if err := setHeader(config.Headers, header); err != nil {
+			return err
+		}
 	}
-	flags.Parse(args)
-	//pull out options, put back remaining args
-	args = flags.Args()
-	if len(args) < 2 {
-		log.Fatalf("A server and least one remote is required")
-	}
-	config.Server = args[0]
-	config.Remotes = args[1:]
 	//default auth
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
 	}
 	//move hostname onto headers
-	if *hostname != "" {
-		config.Headers.Set("Host", *hostname)
-		config.TLS.ServerName = *hostname
+	if o.Hostname != "" {
+		config.Headers.Set("Host", o.Hostname)
+		config.TLS.ServerName = o.Hostname
 	}
 
-	if *sni != "" {
-		config.TLS.ServerName = *sni
+	if o.SNI != "" {
+		config.TLS.ServerName = o.SNI
 	}
 
 	//ready
-	c, err := chclient.NewClient(&config)
+	c, err := chclient.NewClient(config)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	c.Debug = *verbose
-	if *pid {
-		generatePidFile()
+	c.Debug = config.Verbose
+	if o.PID {
+		if err := generatePidFile(); err != nil {
+			return err
+		}
 	}
 	go cos.GoStats()
 	ctx := cos.InterruptContext()
 	if err := c.Start(ctx); err != nil {
-		log.Fatal(err)
+		return err
 	}
-	if err := c.Wait(); err != nil {
-		log.Fatal(err)
-	}
+	return c.Wait()
 }
