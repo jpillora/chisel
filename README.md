@@ -528,7 +528,7 @@ Since WebSockets support is required:
 - `1.9` - Bump to Go 1.21. Switch from `--key` seed to P256 key strings with `--key{gen,file}` (by @cmenginnz)
 - `1.10` - Bump to Go 1.22. Add `.rpm` `.deb` and `.apk` to releases. Fix bad version comparison.
 - `1.11` - Bump to Go 1.25.1. Update all dependencies.
-- `1.12` - (unreleased) Reliability and security pass:
+- `1.12` - Reliability and security pass:
   - keepalive pings now time out (`CHISEL_PING_TIMEOUT`), so dead connections reconnect promptly after sleep/wake, NAT timeouts and server restarts
   - authfile reloads survive editor renames and kubernetes configmap swaps, and apply live to connected clients (new tunnels; established tunnels are not interrupted)
   - **breaking**: with `--socks5` + `--authfile`, SOCKS5 access now requires an authfile entry matching `socks` (wildcard `""` entries keep working)
@@ -541,7 +541,8 @@ Since WebSockets support is required:
   - server no longer panics when a client disconnects between the SSH handshake and its config request (#608)
   - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
   - `go install` builds report their real version; sessions and failed logins are logged at info level
-  - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions; releasing is two-stage — tagging builds a draft GitHub release plus version-tagged images, and publishing the draft promotes the Docker `latest` / `X` / `X.Y` tags
+  - release binaries are built with Go 1.27.0; `x/crypto/ssh` is updated to v0.55.0 to address GO-2026-6303
+  - releases now ship ko-built, scratch-based multi-arch images with CA roots to GHCR and Docker Hub; releasing is two-stage — tagging builds a draft GitHub release plus version-tagged images, and publishing the draft promotes the Docker `latest` / `X` / `X.Y` tags
 
 ### Upgrading to 1.12
 
