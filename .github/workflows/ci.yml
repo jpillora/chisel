@@ -80,7 +80,7 @@ jobs:
           # verified clean — reproduce/verify with 3x snapshot A/B runs
           # before changing this pin
           version: v2.17.0
-          args: release --clean --config .github/goreleaser.yml --skip=publish,docker,nfpm
+          args: release --clean --config .github/goreleaser.yml --skip=publish,nfpm
       - name: Verify and stage release archives
         # Fail closed before credentials are used. The publishing run skips
         # its archive pipe and uploads these exact files from outside dist.
@@ -107,10 +107,8 @@ jobs:
           mkdir -p release/archives
           mv -- "${archives[@]}" release/archives/
           echo "verified and staged ${#archives[@]} release archives"
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+      - name: Build scratch + CA base for ko
+        run: docker build --tag chisel-ko-base:local --file .github/ko-base.Dockerfile .github
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
@@ -131,9 +129,11 @@ jobs:
           # before changing this pin
           version: v2.17.0
           # GoReleaser OSS v2.17.0 cannot publish a previous dist directory.
-          # Rebuild binaries for packages/images, but preserve the verified
+          # Rebuild binaries for packages/ko images, but preserve the verified
           # archives by skipping this run's archive pipe.
-          args: release --clean --config .github/goreleaser.yml --skip=archive
+          # Stable 1.12 follows three release candidates, so an automatically
+          # generated changelog would only contain the final post-RC commits.
+          args: release --clean --config .github/goreleaser.yml --skip=archive --release-notes=.github/releases/1.12.0.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_ARCHIVES_GLOB: release/archives/*
