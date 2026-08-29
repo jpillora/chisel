@@ -74,7 +74,7 @@ changelog:
       - "^test:"
 
 # ko builds and publishes the versioned multi-arch index directly. Its local
-# base is an architecture-neutral scratch image containing only CA roots; CI
+# registry serves a six-platform scratch base containing only CA roots; CI
 # builds it from .github/ko-base.Dockerfile before the publishing run.
 # Floating tags (latest / X / X.Y) are still promoted only when the draft
 # GitHub release is published (release stage 2).
@@ -87,7 +87,7 @@ kos:
       - docker.io/jpillora/chisel
     tags:
       - "{{ .Version }}"
-    base_image: chisel-ko-base:local
+    base_image: localhost:5000/chisel-ko-base:local
     user: "0"
     bare: true
     preserve_import_paths: false

@@ -107,8 +107,28 @@ jobs:
           mkdir -p release/archives
           mv -- "${archives[@]}" release/archives/
           echo "verified and staged ${#archives[@]} release archives"
-      - name: Build scratch + CA base for ko
-        run: docker build --tag chisel-ko-base:local --file .github/ko-base.Dockerfile .github
+      - name: Start local registry for ko base
+        run: |
+          docker run --detach --name chisel-ko-registry \
+            --publish 127.0.0.1:5000:5000 \
+            registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+      - name: Set up Docker Buildx for ko base
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: network=host
+          buildkitd-config-inline: |
+            [registry."localhost:5000"]
+              http = true
+              insecure = true
+      - name: Build six-platform scratch + CA base for ko
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64,linux/ppc64le,linux/386,linux/arm/v7,linux/arm/v6 \
+            --provenance=false \
+            --sbom=false \
+            --tag localhost:5000/chisel-ko-base:local \
+            --file .github/ko-base.Dockerfile \
+            --push .github
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
