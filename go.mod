@@ -4,14 +4,12 @@ go 1.25.0
 
 toolchain go1.25.7
 
-replace github.com/jpillora/opts => ../opts
-
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/jpillora/backoff v1.0.0
-	github.com/jpillora/opts v1.8.0
+	github.com/jpillora/opts v1.8.1
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
 	golang.org/x/crypto v0.54.0
