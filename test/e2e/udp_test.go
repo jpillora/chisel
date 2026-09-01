@@ -73,6 +73,59 @@ func TestUDP(t *testing.T) {
 	}
 }
 
+func TestReverseUDP(t *testing.T) {
+	echoPort := availableUDPPort()
+	echoAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:"+echoPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	echo, err := net.ListenUDP("udp", echoAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer echo.Close()
+	go func() {
+		buf := make([]byte, 128)
+		for {
+			n, addr, err := echo.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			echo.WriteToUDP(buf[:n], addr)
+		}
+	}()
+
+	inboundPort := availableUDPPort()
+	teardown := simpleSetup(t,
+		&chserver.Config{Reverse: true},
+		&chclient.Config{Remotes: []string{
+			"R:" + inboundPort + ":127.0.0.1:" + echoPort + "/udp",
+		}},
+	)
+	defer teardown()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.Dial("udp", "127.0.0.1:"+inboundPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = conn.Write([]byte("reverse"))
+		if err == nil {
+			buf := make([]byte, 128)
+			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			n, readErr := conn.Read(buf)
+			if readErr == nil && string(buf[:n]) == "reverse" {
+				conn.Close()
+				return
+			}
+		}
+		conn.Close()
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("reverse UDP packet did not round-trip")
+}
+
 func availableUDPPort() string {
 	a, _ := net.ResolveUDPAddr("udp", ":0")
 	l, err := net.ListenUDP("udp", a)
