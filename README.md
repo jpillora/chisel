@@ -37,7 +37,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 
 [![Releases](https://img.shields.io/github/release/jpillora/chisel.svg)](https://github.com/jpillora/chisel/releases) [![Releases](https://img.shields.io/github/downloads/jpillora/chisel/total.svg)](https://github.com/jpillora/chisel/releases)
 
-See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel! | bash`
+See [the latest release](https://github.com/jpillora/chisel/releases/latest) or download and install it now with `curl https://i.jpillora.com/chisel?type=script | bash`
 
 Binaries are built with the latest Go release, which sets the minimum OS versions: Windows 10 / Server 2016, macOS 12, Linux kernel 3.2, FreeBSD 12.2. For older systems (e.g. Windows 7), use [release v1.8.1](https://github.com/jpillora/chisel/releases/tag/v1.8.1) or earlier.
 
