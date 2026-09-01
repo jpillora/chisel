@@ -18,18 +18,19 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//listenUDP is a special listener which forwards packets via
-//the bound ssh connection. tricky part is multiplexing lots of
-//udp clients through the entry node. each will listen on its
-//own source-port for a response:
-//                                                (random)
-//    src-1 1111->...                         dst-1 6345->7777
-//    src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
-//    src-3 3333->...    listener    handler  dst-1 1444->7777
+// listenUDP is a special listener which forwards packets via
+// the bound ssh connection. tricky part is multiplexing lots of
+// udp clients through the entry node. each will listen on its
+// own source-port for a response:
 //
-//we must store these mappings (1111-6345, etc) in memory for a length
-//of time, so that when the exit node receives a response on 6345, it
-//knows to return it to 1111.
+//	                                            (random)
+//	src-1 1111->...                         dst-1 6345->7777
+//	src-2 2222->... <---> udp <---> udp <-> dst-1 7543->7777
+//	src-3 3333->...    listener    handler  dst-1 1444->7777
+//
+// we must store these mappings (1111-6345, etc) in memory for a length
+// of time, so that when the exit node receives a response on 6345, it
+// knows to return it to 1111.
 func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpListener, error) {
 	a, err := net.ResolveUDPAddr("udp", remote.Local())
 	if err != nil {
@@ -41,11 +42,14 @@ func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpLi
 	}
 	//ready
 	u := &udpListener{
-		Logger:  l,
-		sshTun:  sshTun,
-		remote:  remote,
-		inbound: conn,
-		maxMTU:  settings.EnvInt("UDP_MAX_SIZE", 9012),
+		Logger:       l,
+		sshTun:       sshTun,
+		remote:       remote,
+		inbound:      conn,
+		maxMTU:       settings.EnvInt("UDP_MAX_SIZE", 9012),
+		peers:        map[string]udpPeer{},
+		peerDeadline: settings.EnvDuration("UDP_DEADLINE", 15*time.Second),
+		maxPeers:     settings.EnvInt("UDP_MAX_CONNS", 100),
 	}
 	u.Debugf("UDP max size: %d bytes", u.maxMTU)
 	return u, nil
@@ -53,13 +57,24 @@ func listenUDP(l *cio.Logger, sshTun sshTunnel, remote *settings.Remote) (*udpLi
 
 type udpListener struct {
 	*cio.Logger
-	sshTun      sshTunnel
-	remote      *settings.Remote
-	inbound     *net.UDPConn
-	outboundMut sync.Mutex
-	outbound    *udpChannel
-	sent, recv  int64
-	maxMTU      int
+	sshTun       sshTunnel
+	remote       *settings.Remote
+	inbound      *net.UDPConn
+	outboundMut  sync.Mutex
+	outbound     *udpChannel
+	peerMut      sync.Mutex
+	peers        map[string]udpPeer
+	peerDeadline time.Duration
+	maxPeers     int
+	sent, recv   int64
+	maxMTU       int
+}
+
+// udpPeer is a listener peer that actually sent a datagram to the bound UDP
+// socket. Only these addresses may receive a return packet from the client.
+type udpPeer struct {
+	addr     *net.UDPAddr
+	lastSeen time.Time
 }
 
 func (u *udpListener) run(ctx context.Context) error {
@@ -94,6 +109,9 @@ func (u *udpListener) runInbound(ctx context.Context) error {
 		if err != nil {
 			return u.Errorf("read error: %w", err)
 		}
+		// Only accept return packets for peers which have actually sent to
+		// this listener. The peer address is otherwise client-controlled.
+		u.rememberPeer(addr)
 		//upsert ssh channel
 		uc, err := u.getUDPChan(ctx)
 		if err != nil {
@@ -134,10 +152,12 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 		} else if err != nil {
 			return u.Errorf("decode error: %w", err)
 		}
-		//write back to inbound udp
-		addr, err := net.ResolveUDPAddr("udp", p.Src)
-		if err != nil {
-			return u.Errorf("resolve error: %w", err)
+		//write back to an observed UDP peer only. p.Src comes from the SSH
+		//client, so it must not be resolved or used as a new destination.
+		addr, ok := u.returnPeer(p.Src)
+		if !ok {
+			u.Debugf("Dropping UDP return packet for unobserved peer %q", p.Src)
+			continue
 		}
 		n, err := u.inbound.WriteToUDP(p.Payload, addr)
 		if err != nil {
@@ -147,6 +167,68 @@ func (u *udpListener) runOutbound(ctx context.Context) error {
 		atomic.AddInt64(&u.recv, int64(n))
 	}
 	return nil
+}
+
+// rememberPeer records an address obtained directly from ReadFromUDP. Entries
+// expire after UDP_DEADLINE and the map is capped at UDP_MAX_CONNS so an
+// Internet-facing listener cannot retain unbounded peer state.
+func (u *udpListener) rememberPeer(addr *net.UDPAddr) {
+	now := time.Now()
+	key := addr.String()
+	u.peerMut.Lock()
+	defer u.peerMut.Unlock()
+	if u.peers == nil {
+		u.peers = map[string]udpPeer{}
+	}
+	u.expirePeers(now)
+	if _, found := u.peers[key]; !found && len(u.peers) >= u.maxPeers {
+		u.evictOldestPeer()
+	}
+	// ReadFromUDP allocates the address today, but retain our own copy so the
+	// peer table cannot depend on that implementation detail.
+	peerAddr := *addr
+	peerAddr.IP = append(net.IP(nil), addr.IP...)
+	u.peers[key] = udpPeer{addr: &peerAddr, lastSeen: now}
+}
+
+// returnPeer obtains a non-expired peer recorded by rememberPeer. Matching the
+// exact string sent by runInbound also rejects hostname and alternate-address
+// encodings supplied by a client.
+func (u *udpListener) returnPeer(src string) (*net.UDPAddr, bool) {
+	now := time.Now()
+	u.peerMut.Lock()
+	defer u.peerMut.Unlock()
+	peer, found := u.peers[src]
+	if !found {
+		return nil, false
+	}
+	if peer.lastSeen.Before(now.Add(-u.peerDeadline)) {
+		delete(u.peers, src)
+		return nil, false
+	}
+	return peer.addr, true
+}
+
+func (u *udpListener) expirePeers(now time.Time) {
+	for key, peer := range u.peers {
+		if peer.lastSeen.Before(now.Add(-u.peerDeadline)) {
+			delete(u.peers, key)
+		}
+	}
+}
+
+func (u *udpListener) evictOldestPeer() {
+	var oldestKey string
+	var oldest time.Time
+	for key, peer := range u.peers {
+		if oldestKey == "" || peer.lastSeen.Before(oldest) {
+			oldestKey = key
+			oldest = peer.lastSeen
+		}
+	}
+	if oldestKey != "" {
+		delete(u.peers, oldestKey)
+	}
 }
 
 func (u *udpListener) getUDPChan(ctx context.Context) (*udpChannel, error) {

@@ -490,8 +490,8 @@ Less common knobs are environment variables, all read with a `CHISEL_` prefix (e
 | `WS_READ_LIMIT` | both        | `524288`           | max inbound websocket message bytes (0 = no limit; negative = default) |
 | `WS_BUFF_SIZE`  | both        | go default         | websocket read/write buffer sizes                  |
 | `UDP_MAX_SIZE`  | both        | `9012`             | max udp packet bytes                               |
-| `UDP_DEADLINE`  | exit node   | `15s`              | udp flow read deadline and idle-sweep age          |
-| `UDP_MAX_CONNS` | exit node   | `100`              | max concurrent udp flows per tunnel                |
+| `UDP_DEADLINE`  | both        | `15s`              | udp flow read deadline and return-peer expiry      |
+| `UDP_MAX_CONNS` | both        | `100`              | max udp flows or return peers per tunnel           |
 | `SHUTDOWN_GRACE`| server      | `5s`               | http request drain time on shutdown                |
 
 `HOST`, `PORT`, `AUTH`, and `CHISEL_KEY`/`CHISEL_KEY_FILE` are documented in the `--help` texts above.
