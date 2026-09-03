@@ -1,1 +1,2 @@
 .github/workflows/ci.yml merge=ours
+.github/workflows/promote.yml merge=ours
