@@ -7,8 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"syscall"
-	"log"
 )
 
 //InterruptContext returns a context which is cancelled on OS
