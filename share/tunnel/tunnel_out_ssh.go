@@ -39,10 +39,14 @@ func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 		return
 	}
 	remote := string(ch.ExtraData())
+	socksUDP := remote == socksUDPDestination
 	//extract protocol
 	hostPort, proto := settings.L4Proto(remote)
 	udp := proto == "udp"
-	socks := hostPort == "socks"
+	socks := hostPort == "socks" || socksUDP
+	if socksUDP {
+		hostPort = "socks" // UDP associations use the same capability and ACL
+	}
 	if socks && t.socksServer == nil {
 		t.Debugf("Denied socks request, please enable socks")
 		ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled")
@@ -87,7 +91,11 @@ func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 	//ready to handle
 	t.connStats.Open()
 	l.Debugf("Open %s", t.connStats.String())
-	if socks {
+	if socksUDP {
+		if err = writeSocksBytes(stream, []byte(socksUDPReady)); err == nil {
+			err = t.handleSocksUDP(ctx, l, stream)
+		}
+	} else if socks {
 		err = t.handleSocks(stream)
 	} else if udp {
 		err = t.handleUDP(l, stream, hostPort)

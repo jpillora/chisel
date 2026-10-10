@@ -2,6 +2,7 @@ package settings
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -146,5 +147,65 @@ func TestRemoteDecode(t *testing.T) {
 		if e := got.Encode(); test.Encoded != e {
 			t.Fatalf("encode #%d '%s' expected\n  %#v\ngot\n  %#v", i+1, test.Input, test.Encoded, e)
 		}
+	}
+}
+
+func TestUDPSocksRemote(t *testing.T) {
+	for _, test := range []struct {
+		input, host, port string
+		reverse           bool
+	}{
+		{"udpsocks", "127.0.0.1", "1080", false},
+		{"5000:udpsocks", "127.0.0.1", "5000", false},
+		{"0.0.0.0:5000:udpsocks", "0.0.0.0", "5000", false},
+		{"localhost:5000:udpsocks", "localhost", "5000", false},
+		{"[::1]:5000:udpsocks", "[::1]", "5000", false},
+		{"R:udpsocks", "127.0.0.1", "1080", true},
+		{"R:5000:udpsocks", "127.0.0.1", "5000", true},
+		{"R:[::]:5000:udpsocks", "[::]", "5000", true},
+	} {
+		t.Run(test.input, func(t *testing.T) {
+			r, err := DecodeRemote(test.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := &Remote{LocalHost: test.host, LocalPort: test.port, LocalProto: "tcp", RemoteProto: "tcp", Socks: true, UDPSocks: true, Reverse: test.reverse}
+			if !reflect.DeepEqual(r, want) {
+				t.Fatalf("decoded %#v, want %#v", r, want)
+			}
+			encoded := test.host + ":" + test.port + ":udpsocks"
+			permission := "socks"
+			if test.reverse {
+				encoded = "R:" + encoded
+				permission = "R:" + test.host + ":" + test.port
+			}
+			if r.Encode() != encoded || r.Remote() != "udpsocks" || !strings.HasSuffix(r.String(), "=>udpsocks") || r.UserAddr() != permission {
+				t.Fatalf("encode=%q remote=%q string=%q permission=%q", r.Encode(), r.Remote(), r.String(), r.UserAddr())
+			}
+			decoded, err := DecodeRemote(r.Encode())
+			if err != nil || !reflect.DeepEqual(decoded, r) {
+				t.Fatalf("remote round trip: %#v, %v", decoded, err)
+			}
+			config := Config{Version: "test", Remotes: Remotes{r}}
+			got, err := DecodeConfig(EncodeConfig(config))
+			if err != nil || !reflect.DeepEqual(got, &config) {
+				t.Fatalf("configuration round trip: %#v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestUDPSocksInvalidRemote(t *testing.T) {
+	for _, input := range []string{
+		"0:udpsocks", "127.0.0.1:0:udpsocks", "R:0:udpsocks",
+		"-1:udpsocks", "65536:udpsocks", "1080:1081:udpsocks",
+		"localhost:localhost:udpsocks", "1080/udp:udpsocks", "1080:udpsocks/udp",
+		"stdio:udpsocks", "stdio:1080:udpsocks", "R:stdio:udpsocks",
+	} {
+		t.Run(input, func(t *testing.T) {
+			if r, err := DecodeRemote(input); err == nil {
+				t.Fatalf("invalid remote accepted: %#v", r)
+			}
+		})
 	}
 }

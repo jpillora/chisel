@@ -12,12 +12,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//sshTunnel exposes a subset of Tunnel to subtypes
+// sshTunnel exposes a subset of Tunnel to subtypes
 type sshTunnel interface {
 	getSSH(ctx context.Context) ssh.Conn
 }
 
-//Proxy is the inbound portion of a Tunnel
+// Proxy is the inbound portion of a Tunnel
 type Proxy struct {
 	*cio.Logger
 	sshTun sshTunnel
@@ -27,10 +27,11 @@ type Proxy struct {
 	dialer net.Dialer
 	tcp    *net.TCPListener
 	udp    *udpListener
+	socks  *socksProxy
 	mu     sync.Mutex
 }
 
-//NewProxy creates a Proxy
+// NewProxy creates a Proxy
 func NewProxy(logger *cio.Logger, sshTun sshTunnel, index int, remote *settings.Remote) (*Proxy, error) {
 	id := index + 1
 	p := &Proxy{
@@ -50,12 +51,18 @@ func (p *Proxy) listen() error {
 		if err != nil {
 			return p.Errorf("resolve: %s", err)
 		}
+		if p.remote.UDPSocks && addr.Port == 0 {
+			return p.Errorf("udpsocks requires a nonzero listening port")
+		}
 		l, err := net.ListenTCP("tcp", addr)
 		if err != nil {
 			return p.Errorf("tcp: %s", err)
 		}
 		p.Infof("Listening")
 		p.tcp = l
+		if p.remote.UDPSocks {
+			p.socks = newSocksProxy(p)
+		}
 	} else if p.remote.LocalProto == "udp" {
 		l, err := listenUDP(p.Logger, p.sshTun, p.remote)
 		if err != nil {
@@ -69,24 +76,33 @@ func (p *Proxy) listen() error {
 	return nil
 }
 
-//Close unbinds the proxy's listeners. proxies which have
-//been Run are instead closed by cancelling their context.
+// Close unbinds the proxy's listeners. proxies which have
+// been Run are instead closed by cancelling their context.
 func (p *Proxy) Close() error {
+	var err error
 	if p.tcp != nil {
-		return p.tcp.Close()
+		err = p.tcp.Close()
+	}
+	if p.socks != nil && p.socks.udp != nil {
+		if e := p.socks.udp.Close(); err == nil {
+			err = e
+		}
 	}
 	if p.udp != nil {
 		return p.udp.inbound.Close()
 	}
-	return nil
+	return err
 }
 
-//Run enables the proxy and blocks while its active,
-//close the proxy by cancelling the context.
+// Run enables the proxy and blocks while its active,
+// close the proxy by cancelling the context.
 func (p *Proxy) Run(ctx context.Context) error {
 	if p.remote.Stdio {
 		return p.runStdio(ctx)
 	} else if p.remote.LocalProto == "tcp" {
+		if p.socks != nil {
+			return p.socks.run(ctx)
+		}
 		return p.runTCP(ctx)
 	} else if p.remote.LocalProto == "udp" {
 		return p.udp.run(ctx)
@@ -130,7 +146,12 @@ func (p *Proxy) runTCP(ctx context.Context) error {
 			close(done)
 			return err
 		}
-		go p.pipeRemote(ctx, src)
+		if p.socks != nil {
+			p.socks.workers.Add(1)
+			go p.socks.serve(ctx, src.(*net.TCPConn))
+		} else {
+			go p.pipeRemote(ctx, src)
+		}
 	}
 }
 
