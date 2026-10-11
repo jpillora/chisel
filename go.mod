@@ -1,6 +1,6 @@
 module github.com/jpillora/chisel
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.27.0
 
@@ -13,9 +13,9 @@ require (
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
 	github.com/txthinking/socks5 v0.0.0-20260601051520-339b044ab0eb
-	golang.org/x/crypto v0.55.0
-	golang.org/x/net v0.57.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/net v0.58.0
+	golang.org/x/sync v0.23.0
 )
 
 require (
@@ -27,6 +27,6 @@ require (
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
 	github.com/txthinking/runnergroup v0.0.0-20210608031112-152c7c4432bf // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
