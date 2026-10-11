@@ -25,6 +25,9 @@ import (
 //   127.0.0.1:1080:socks
 //     local  127.0.0.1:1080
 //     remote socks
+//   127.0.0.1:1080:udpsocks
+//     local  127.0.0.1:1080 (TCP and UDP)
+//     remote udpsocks
 //   stdio:example.com:22
 //     local  stdio
 //     remote example.com:22
@@ -35,7 +38,7 @@ import (
 type Remote struct {
 	LocalHost, LocalPort, LocalProto    string
 	RemoteHost, RemotePort, RemoteProto string
-	Socks, Reverse, Stdio               bool
+	Socks, UDPSocks, Reverse, Stdio     bool
 }
 
 const revPrefix = "R:"
@@ -57,8 +60,9 @@ func DecodeRemote(s string) (*Remote, error) {
 	for i := len(parts) - 1; i >= 0; i-- {
 		p := parts[i][1]
 		//remote portion is socks?
-		if i == len(parts)-1 && p == "socks" {
+		if i == len(parts)-1 && (p == "socks" || p == "udpsocks") {
 			r.Socks = true
+			r.UDPSocks = p == "udpsocks"
 			continue
 		}
 		//local portion is stdio?
@@ -75,11 +79,22 @@ func DecodeRemote(s string) (*Remote, error) {
 			}
 		}
 		if isPort(p) {
+			if r.UDPSocks && r.LocalPort != "" {
+				return nil, errors.New("udpsocks accepts one shared TCP and UDP port")
+			}
 			if !r.Socks && r.RemotePort == "" {
 				r.RemotePort = p
 			}
 			r.LocalPort = p
 			continue
+		}
+		if r.UDPSocks {
+			if _, err := strconv.Atoi(p); err == nil {
+				return nil, errors.New("udpsocks port must be between 1 and 65535")
+			}
+			if r.LocalHost != "" {
+				return nil, errors.New("udpsocks accepts one local interface")
+			}
 		}
 		if !r.Socks && (r.RemotePort == "" && r.LocalPort == "") {
 			return nil, errors.New("Missing ports")
@@ -124,7 +139,10 @@ func DecodeRemote(s string) (*Remote, error) {
 		return nil, errors.New("cross-protocol remotes are not supported yet")
 	}
 	if r.Socks && r.RemoteProto != "tcp" {
-		return nil, errors.New("only TCP SOCKS is supported")
+		return nil, errors.New("SOCKS remotes require TCP; use udpsocks for UDP ASSOCIATE")
+	}
+	if r.UDPSocks && r.Stdio {
+		return nil, errors.New("udpsocks requires a TCP and UDP listener; stdio is unsupported")
 	}
 	if r.Stdio && r.Reverse {
 		return nil, errors.New("stdio cannot be reversed")
@@ -153,7 +171,7 @@ func isHost(s string) bool {
 
 var l4Proto = regexp.MustCompile(`(?i)\/(tcp|udp)$`)
 
-//L4Proto extracts the layer-4 protocol from the given string
+// L4Proto extracts the layer-4 protocol from the given string
 func L4Proto(s string) (head, proto string) {
 	if l4Proto.MatchString(s) {
 		l := len(s)
@@ -164,7 +182,7 @@ func L4Proto(s string) (head, proto string) {
 	return s, ""
 }
 
-//implement Stringer
+// implement Stringer
 func (r Remote) String() string {
 	sb := strings.Builder{}
 	if r.Reverse {
@@ -179,7 +197,7 @@ func (r Remote) String() string {
 	return sb.String()
 }
 
-//Encode remote to a string
+// Encode remote to a string
 func (r Remote) Encode() string {
 	if r.LocalPort == "" {
 		r.LocalPort = r.RemotePort
@@ -195,7 +213,7 @@ func (r Remote) Encode() string {
 	return local + ":" + remote
 }
 
-//Local is the decodable local portion
+// Local is the decodable local portion
 func (r Remote) Local() string {
 	if r.Stdio {
 		return "stdio"
@@ -206,8 +224,11 @@ func (r Remote) Local() string {
 	return r.LocalHost + ":" + r.LocalPort
 }
 
-//Remote is the decodable remote portion
+// Remote is the decodable remote portion
 func (r Remote) Remote() string {
+	if r.UDPSocks {
+		return "udpsocks"
+	}
 	if r.Socks {
 		return "socks"
 	}
@@ -217,8 +238,8 @@ func (r Remote) Remote() string {
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-//UserAddr is checked when checking if a
-//user has access to a given remote
+// UserAddr is checked when checking if a
+// user has access to a given remote
 func (r Remote) UserAddr() string {
 	if r.Reverse {
 		return "R:" + r.LocalHost + ":" + r.LocalPort
@@ -229,7 +250,7 @@ func (r Remote) UserAddr() string {
 	return r.RemoteHost + ":" + r.RemotePort
 }
 
-//CanListen checks if the port can be listened on
+// CanListen checks if the port can be listened on
 func (r Remote) CanListen() bool {
 	//valid protocols
 	switch r.LocalProto {
@@ -258,7 +279,7 @@ func (r Remote) CanListen() bool {
 
 type Remotes []*Remote
 
-//Filter out forward reversed/non-reversed remotes
+// Filter out forward reversed/non-reversed remotes
 func (rs Remotes) Reversed(reverse bool) Remotes {
 	subset := Remotes{}
 	for _, r := range rs {
@@ -270,7 +291,7 @@ func (rs Remotes) Reversed(reverse bool) Remotes {
 	return subset
 }
 
-//Encode back into strings
+// Encode back into strings
 func (rs Remotes) Encode() []string {
 	s := make([]string, len(rs))
 	for i, r := range rs {

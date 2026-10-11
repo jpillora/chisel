@@ -265,15 +265,18 @@ from the client to the server's <local-interface>:<local-port>.
     192.168.0.5:3000:google.com:80
     socks
     5000:socks
+    udpsocks
+    5000:udpsocks
     R:2222:localhost:22
     R:socks
     R:5000:socks
+    R:5000:udpsocks
     stdio:example.com:22
     1.1.1.1:53/udp
 
   When the chisel server has --socks5 enabled, remotes can
-  specify "socks" in place of remote-host and remote-port.
-  The default local host and port for a "socks" remote is
+  specify "socks" or "udpsocks" in place of remote-host and
+  remote-port. Both default to the local host and port
   127.0.0.1:1080. Connections to this remote will terminate
   at the server's internal SOCKS5 proxy. When the server also
   has --authfile set, SOCKS5 access requires an entry matching
@@ -286,6 +289,17 @@ from the client to the server's <local-interface>:<local-port>.
   Reverse remotes specifying "R:socks" will listen on the server's
   default socks port (1080) and terminate the connection at the
   client's internal SOCKS5 proxy.
+
+  The "socks" remote supports TCP CONNECT only. Use "udpsocks"
+  for TCP CONNECT and UDP ASSOCIATE, including "R:udpsocks".
+  It binds TCP and UDP on the same configured interface and port;
+  the UDP relay never uses a randomly allocated listening port.
+  UDP requires support on both Chisel peers. Destination names are
+  resolved at the exit node. If UDP cannot bind, TCP remains available
+  and UDP ASSOCIATE fails; no alternate port is used. Clients using
+  a zero UDP source port allow one pending association per source IP
+  until the first valid datagram pins it. BIND, UDP fragmentation,
+  and udpsocks over stdio are not supported.
 
   When stdio is used as local-host, the tunnel will connect standard
   input/output of this program with the remote. This is useful when

@@ -26,7 +26,7 @@ type testLayout struct {
 	udpServer  bool
 }
 
-func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chclient.Client, teardown func()) {
+func (tl *testLayout) setup(t testing.TB) (server *chserver.Server, client *chclient.Client, teardown func()) {
 	//start of the world
 	// goroutines := runtime.NumGoroutine()
 	//root cancel
@@ -56,11 +56,15 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 		}()
 	}
 	//server
+	_, benchmarking := t.(*testing.B)
 	server, err := chserver.NewServer(tl.server)
 	if err != nil {
 		t.Fatal(err)
 	}
-	server.Debug = debug
+	server.Debug = debug && !benchmarking
+	if benchmarking {
+		server.SetOutput(io.Discard)
+	}
 	port := availablePort()
 	if err := server.StartContext(ctx, "127.0.0.1", port); err != nil {
 		t.Fatal(err)
@@ -88,7 +92,10 @@ func (tl *testLayout) setup(t *testing.T) (server *chserver.Server, client *chcl
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.Debug = debug
+	client.Debug = debug && !benchmarking
+	if benchmarking {
+		client.SetOutput(io.Discard)
+	}
 	if err := client.Start(ctx); err != nil {
 		t.Fatal(err)
 	}

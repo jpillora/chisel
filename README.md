@@ -263,15 +263,18 @@ $ chisel client --help
       192.168.0.5:3000:google.com:80
       socks
       5000:socks
+      udpsocks
+      5000:udpsocks
       R:2222:localhost:22
       R:socks
       R:5000:socks
+      R:5000:udpsocks
       stdio:example.com:22
       1.1.1.1:53/udp
 
     When the chisel server has --socks5 enabled, remotes can
-    specify "socks" in place of remote-host and remote-port.
-    The default local host and port for a "socks" remote is
+    specify "socks" or "udpsocks" in place of remote-host and
+    remote-port. Both default to the local host and port
     127.0.0.1:1080. Connections to this remote will terminate
     at the server's internal SOCKS5 proxy. When the server also
     has --authfile set, SOCKS5 access requires an entry matching
@@ -284,6 +287,17 @@ $ chisel client --help
     Reverse remotes specifying "R:socks" will listen on the server's
     default socks port (1080) and terminate the connection at the
     client's internal SOCKS5 proxy.
+
+    The "socks" remote supports TCP CONNECT only. Use "udpsocks"
+    for TCP CONNECT and UDP ASSOCIATE, including "R:udpsocks".
+    It binds TCP and UDP on the same configured interface and port;
+    the UDP relay never uses a randomly allocated listening port.
+    UDP requires support on both Chisel peers. Destination names are
+    resolved at the exit node. If UDP cannot bind, TCP remains available
+    and UDP ASSOCIATE fails; no alternate port is used. Clients using
+    a zero UDP source port allow one pending association per source IP
+    until the first valid datagram pins it. BIND, UDP fragmentation,
+    and udpsocks over stdio are not supported.
 
     When stdio is used as local-host, the tunnel will connect standard
     input/output of this program with the remote. This is useful when 
@@ -452,6 +466,14 @@ For mutual TLS, also pass `--tls-ca` to the server and `--tls-cert`/`--tls-key` 
 
 Note: if the server also uses `--authfile`, users need an entry matching the token `socks` to use the proxy (see [Authentication](#authentication)).
 
+For setup commands, reverse mode, and a UDP client example, see the [SOCKS5 UDP user guide](example/udpsocks.md).
+
+Ordinary `socks` remotes support TCP CONNECT only and bind no UDP socket. To enable both TCP CONNECT and UDP ASSOCIATE, use `udpsocks` (or `R:udpsocks` for reverse mode), for example `1080:udpsocks`. Both types default to `127.0.0.1:1080` and use the same SOCKS access permissions. A `udpsocks` listener binds TCP and UDP on the same configured interface and port, sharing one UDP relay socket across associations without allocating random listening ports. UDP clients keep their TCP control connection open and send SOCKS-encapsulated datagrams to that port. Datagram destination names are resolved at the exit node, and the UDP traffic travels through the encrypted SSH tunnel. Upgrade both Chisel peers for UDP; TCP SOCKS remains compatible with older peers.
+
+When exposing a `udpsocks` listener through a firewall or container, allow both TCP and UDP on its configured port. UDP ASSOCIATE returns the local IP accepting the TCP connection, which must be reachable by the SOCKS client. For Linux Docker listeners, use `--network host` with the remote `0.0.0.0:1080:udpsocks` to avoid advertising an isolated container address. Container port mappings need both `-p 1080:1080/tcp` and `-p 1080:1080/udp`, plus reachability to the advertised relay IP. If the UDP port is occupied, Chisel logs that UDP is unavailable, retains TCP service, and rejects UDP ASSOCIATE without using an alternate port; restart the proxy after freeing the port.
+
+An association accepts packets from its TCP peer's IP. A declared UDP source port reserves that endpoint; a zero source port is pinned by its first valid datagram. Only one unpinned association per IP is allowed, so clients sharing an IP should declare their UDP source ports or send the first datagram before opening another association. Duplicate source-port reservations are rejected. Closing the control connection or losing SSH ends the association; reconnecting requires a new UDP ASSOCIATE. BIND, UDP fragmentation, and `stdio:udpsocks` are unsupported.
+
 ### Reverse SOCKS with an Authfile
 
 To let a specific client act as a SOCKS exit node, grant it the reverse-socks listener address (`R:socks` listens on the server's `127.0.0.1:1080`):
@@ -468,6 +490,8 @@ chisel client --auth exituser:password <server-address> R:socks
 # server-side consumers point SOCKS5 clients at 127.0.0.1:1080,
 # and their traffic exits via the chisel client's network
 ```
+
+Use `R:udpsocks` in the client command to also enable UDP ASSOCIATE on the same server port; the authfile grant stays the same.
 
 See also the step-by-step [reverse tunneling example](example/reverse-tunneling-authenticated.md).
 
@@ -486,15 +510,17 @@ Less common knobs are environment variables, all read with a `CHISEL_` prefix (e
 | `CONFIG_TIMEOUT`| server      | `10s`              | wait for the client's config request               |
 | `SSH_WAIT`      | both        | `35s`              | how long new tunnels wait for an active connection |
 | `PING_TIMEOUT`  | both        | keepalive interval | keepalive ping reply timeout (no pings if `--keepalive 0`) |
-| `DIAL_TIMEOUT`  | exit node   | `30s`              | tcp dial timeout for tunnel targets                |
+| `DIAL_TIMEOUT`  | both        | `30s`              | tcp target dial, SOCKS handshake, and SOCKS UDP DNS timeout |
 | `WS_READ_LIMIT` | both        | `524288`           | max inbound websocket message bytes (0 = no limit; negative = default) |
 | `WS_BUFF_SIZE`  | both        | go default         | websocket read/write buffer sizes                  |
-| `UDP_MAX_SIZE`  | both        | `9012`             | max udp packet bytes                               |
-| `UDP_DEADLINE`  | both        | `15s`              | udp flow read deadline and return-peer expiry      |
-| `UDP_MAX_CONNS` | both        | `100`              | max udp flows or return peers per tunnel           |
+| `UDP_MAX_SIZE`  | both        | `9012`             | max udp packet bytes (includes the SOCKS UDP header) |
+| `UDP_DEADLINE`  | both        | `15s`              | udp flow read deadline and return-peer expiry; SOCKS UDP destination idle timeout |
+| `UDP_MAX_CONNS` | both        | `100`              | max udp flows or return peers; SOCKS UDP associations per listener and destinations per association |
 | `SHUTDOWN_GRACE`| server      | `5s`               | http request drain time on shutdown                |
 
 `HOST`, `PORT`, `AUTH`, and `CHISEL_KEY`/`CHISEL_KEY_FILE` are documented in the `--help` texts above.
+
+SOCKS UDP uses hard association and destination limits and drops packets beyond them. Each association queues up to 16 outbound datagrams; full queues drop packets without blocking other clients. For SOCKS UDP, nonpositive size/connection limits or idle deadlines use the defaults, and packet size is capped at 65507 bytes. Operating systems can impose a smaller UDP send limit: macOS defaults to 9216 bytes (`net.inet.udp.maxdgram`). The default 9012-byte Chisel limit fits within that bound.
 
 #### Caveats
 
