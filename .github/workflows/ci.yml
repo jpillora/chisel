@@ -140,7 +140,15 @@ jobs:
         with:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Select release notes
+        run: |
+          notes=".github/releases/${GITHUB_REF_NAME#v}.md"
+          if [[ -f "$notes" ]]; then
+            echo "CHISEL_RELEASE_NOTES_ARG=--release-notes=$notes" >> "$GITHUB_ENV"
+          fi
       - name: Publish with GoReleaser
+        # Use curated notes for this tag when present; otherwise GoReleaser
+        # generates its normal changelog.
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -151,9 +159,7 @@ jobs:
           # GoReleaser OSS v2.17.0 cannot publish a previous dist directory.
           # Rebuild binaries for packages/ko images, but preserve the verified
           # archives by skipping this run's archive pipe.
-          # Stable 1.12 follows three release candidates, so an automatically
-          # generated changelog would only contain the final post-RC commits.
-          args: release --clean --config .github/goreleaser.yml --skip=archive --release-notes=.github/releases/1.12.0.md
+          args: release --clean --config .github/goreleaser.yml --skip=archive ${{ env.CHISEL_RELEASE_NOTES_ARG }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_ARCHIVES_GLOB: release/archives/*
