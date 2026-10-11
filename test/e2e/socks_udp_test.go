@@ -94,6 +94,27 @@ func socksUDPClient(t *testing.T, host string) *net.UDPConn {
 	return c
 }
 
+// Reserve UDP on a TCP-available port. Choosing a random UDP port can collide
+// with an existing TCP socket and make a bind-failure test fail before it
+// reaches the UDP behavior it is intended to exercise.
+func socksUDPBlocker(t *testing.T) *net.UDPConn {
+	t.Helper()
+	for range 10 {
+		addr, err := net.ResolveUDPAddr("udp4", "127.0.0.1:"+availablePort())
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := net.ListenUDP("udp4", addr)
+		if err != nil {
+			continue
+		}
+		t.Cleanup(func() { c.Close() })
+		return c
+	}
+	t.Fatal("cannot reserve UDP on a TCP-available port")
+	return nil
+}
+
 func socksUDPEcho(t testing.TB, network, addr string) *net.UDPAddr {
 	t.Helper()
 	a, err := net.ResolveUDPAddr(network, addr)
@@ -181,7 +202,7 @@ func TestSocksTCPOnly(t *testing.T) {
 			t.Run(fmt.Sprintf("reverse=%t/udpOccupied=%t", reverse, occupied), func(t *testing.T) {
 				port := availablePort()
 				if occupied {
-					blocker := socksUDPClient(t, "127.0.0.1")
+					blocker := socksUDPBlocker(t)
 					port = strconv.Itoa(blocker.LocalAddr().(*net.UDPAddr).Port)
 				}
 				addr, _ := setupSocksRemoteOn(t, reverse, "127.0.0.1", port, "socks")
@@ -350,7 +371,7 @@ func TestSocksUDPRejectsUnassociatedAndMalformedPackets(t *testing.T) {
 }
 
 func TestSocksUDPBindFailureKeepsTCP(t *testing.T) {
-	blocker := socksUDPClient(t, "127.0.0.1")
+	blocker := socksUDPBlocker(t)
 	port := strconv.Itoa(blocker.LocalAddr().(*net.UDPAddr).Port)
 	addr, _ := setupSocksUDP(t, false, port)
 	_, _, code := socksUDPControl(t, addr, 0)
