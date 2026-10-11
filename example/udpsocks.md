@@ -166,8 +166,10 @@ UDP ASSOCIATE advertises the concrete local IP accepting the TCP control connect
 | UDP stops after reconnecting | Keep the TCP control connection open. Losing that connection or the SSH tunnel ends the association; create a new UDP ASSOCIATE after reconnecting. |
 | Large or fragmented datagrams disappear | Fragmented SOCKS UDP packets are unsupported. The default packet limit is 9012 bytes, including the SOCKS UDP header. |
 
-Only datagrams from the TCP peer's IP are accepted. A declared source port reserves that endpoint; otherwise, the first valid datagram pins the association to its source port. DNS names in UDP destination headers are resolved at the exit machine.
+On the exposed relay, only client datagrams from the TCP peer's IP are accepted. A declared source port reserves that endpoint; otherwise, the first valid datagram pins the association to its source port. DNS names in UDP destination headers are resolved at the exit machine.
 
-Defaults are 100 associations per listener, 100 destinations per association, and a 15-second idle timeout for each destination socket. An expired destination socket is recreated on the next packet. Each association queues up to 16 outbound datagrams and drops overflow. Tune these with `CHISEL_UDP_MAX_CONNS`, `CHISEL_UDP_DEADLINE`, and `CHISEL_UDP_MAX_SIZE` on the relevant peers.
+Each association uses at most one outgoing socket per address family, retaining its source port across destination changes and idle periods until the association closes. Replies may use a different source address or UDP port, as protocols such as TFTP require; the SOCKS reply header carries the actual source address and port. Incoming replies do not allocate additional destination tracking entries.
+
+Defaults are 100 associations per listener, 100 destinations per association, and a 15-second idle timeout for destination tracking. Expired destinations free capacity and are resolved again on the next packet; the outgoing sockets remain available until the association closes. Each association queues up to 16 outbound datagrams and drops overflow. Tune these with `CHISEL_UDP_MAX_CONNS`, `CHISEL_UDP_DEADLINE`, and `CHISEL_UDP_MAX_SIZE` on the relevant peers.
 
 SOCKS BIND, UDP fragmentation, and `stdio:udpsocks` are unsupported. UDP is best-effort: queue and resource limits can drop packets, and reconnecting does not replay them.

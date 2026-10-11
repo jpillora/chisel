@@ -12,7 +12,7 @@ import (
 )
 
 type socksUDPFlow struct {
-	conn     net.Conn
+	addr     *net.UDPAddr
 	lastSeen time.Time // protected by the handler mutex
 }
 
@@ -24,6 +24,7 @@ type socksUDPHandler struct {
 	deadline time.Duration
 	mu       sync.Mutex
 	flows    map[string]*socksUDPFlow
+	sockets  map[string]*net.UDPConn // one unconnected socket per address family
 	workers  sync.WaitGroup
 }
 
@@ -33,7 +34,7 @@ func (t *Tunnel) handleSocksUDP(ctx context.Context, logger *cio.Logger, stream 
 	h := &socksUDPHandler{
 		stream: &socksUDPStream{ReadWriteCloser: stream, max: size},
 		logger: logger, ctx: ctx, maxConns: conns, deadline: deadline,
-		flows: make(map[string]*socksUDPFlow),
+		flows: make(map[string]*socksUDPFlow), sockets: make(map[string]*net.UDPConn),
 	}
 	stop := context.AfterFunc(ctx, func() { stream.Close() })
 	defer func() {
@@ -41,9 +42,8 @@ func (t *Tunnel) handleSocksUDP(ctx context.Context, logger *cio.Logger, stream 
 		stop()
 		stream.Close()
 		h.mu.Lock()
-		for key, f := range h.flows {
-			delete(h.flows, key)
-			f.conn.Close()
+		for _, conn := range h.sockets {
+			conn.Close()
 		}
 		h.mu.Unlock()
 		h.workers.Wait()
@@ -61,86 +61,133 @@ func (t *Tunnel) handleSocksUDP(ctx context.Context, logger *cio.Logger, stream 
 	}
 }
 
+// Expiration bounds destination state without closing the association's
+// sockets: protocols such as TFTP must retain their source port even when
+// the remote endpoint changes. Caller holds h.mu.
+func (h *socksUDPHandler) expire(now time.Time) {
+	for key, f := range h.flows {
+		if now.Sub(f.lastSeen) >= h.deadline {
+			delete(h.flows, key)
+		}
+	}
+}
+
+func (h *socksUDPHandler) resolve(addr socksAddress) (*net.UDPAddr, error) {
+	ip := net.ParseIP(addr.host)
+	zone := ""
+	if ip == nil {
+		ctx, cancel := context.WithTimeout(h.ctx, settings.EnvDuration("DIAL_TIMEOUT", 30*time.Second))
+		defer cancel()
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, addr.host)
+		if err != nil {
+			return nil, err
+		}
+		if len(ips) == 0 {
+			return nil, &net.DNSError{Err: "no addresses", Name: addr.host, IsNotFound: true}
+		}
+		ip, zone = ips[0].IP, ips[0].Zone
+	}
+	return &net.UDPAddr{IP: ip, Port: int(addr.port), Zone: zone}, nil
+}
+
 func (h *socksUDPHandler) write(addr socksAddress, payload []byte) {
 	key := addr.destination()
 	h.mu.Lock()
+	h.expire(time.Now())
 	f := h.flows[key]
 	full := len(h.flows) >= h.maxConns
 	h.mu.Unlock()
 	if f == nil {
 		if full {
-			return // hard cap: no write-only sockets or unbounded reader state
+			return // hard cap: no unbounded destination state
 		}
-		d := net.Dialer{Timeout: settings.EnvDuration("DIAL_TIMEOUT", 30*time.Second)}
-		conn, err := d.DialContext(h.ctx, "udp", key)
+		resolved, err := h.resolve(addr)
 		if err != nil {
-			h.logger.Debugf("SOCKS UDP dial %s: %s", key, err)
+			h.logger.Debugf("SOCKS UDP resolve %s: %s", key, err)
 			return
 		}
-		f = &socksUDPFlow{conn: conn, lastSeen: time.Now()}
-		f.conn.SetReadDeadline(f.lastSeen.Add(h.deadline))
-		h.mu.Lock()
-		h.flows[key] = f
-		h.mu.Unlock()
-		h.workers.Add(1)
-		go h.readReplies(key, f)
+		f = &socksUDPFlow{addr: resolved}
 	}
-	// Refresh activity before writing, so a reader timeout cannot expire an
-	// otherwise active send-only flow. UDP errors affect only this destination.
+	network := "udp6"
+	if f.addr.IP.To4() != nil {
+		network = "udp4"
+	}
 	h.mu.Lock()
-	if h.flows[key] != f {
-		h.mu.Unlock()
-		return
+	conn := h.sockets[network]
+	if conn == nil {
+		var err error
+		conn, err = net.ListenUDP(network, nil)
+		if err != nil {
+			h.mu.Unlock()
+			h.logger.Debugf("SOCKS UDP listen %s: %s", network, err)
+			return
+		}
+		h.sockets[network] = conn
+		h.workers.Add(1)
+		go h.readReplies(network, conn)
 	}
 	f.lastSeen = time.Now()
-	f.conn.SetReadDeadline(f.lastSeen.Add(h.deadline))
+	h.flows[key] = f
 	h.mu.Unlock()
-	f.conn.SetWriteDeadline(time.Now().Add(h.deadline))
-	if _, err := f.conn.Write(payload); err != nil {
+	conn.SetWriteDeadline(time.Now().Add(h.deadline))
+	if _, err := conn.WriteToUDP(payload, f.addr); err != nil {
 		h.logger.Debugf("SOCKS UDP write %s: %s", key, err)
-		h.remove(key, f)
-	}
-}
-
-func (h *socksUDPHandler) remove(key string, f *socksUDPFlow) {
-	h.mu.Lock()
-	if h.flows[key] == f {
+		h.mu.Lock()
 		delete(h.flows, key)
+		h.mu.Unlock()
 	}
-	h.mu.Unlock()
-	f.conn.Close()
 }
 
-func (h *socksUDPHandler) readReplies(key string, f *socksUDPFlow) {
+// Prefer an exact endpoint match when refreshing destination activity. For
+// replies from a new port, refresh the latest request to that host without
+// allocating additional destination state. Replies from other hosts are also
+// relayed but do not refresh destination state. Caller holds h.mu.
+func (h *socksUDPHandler) replyFlow(addr *net.UDPAddr) *socksUDPFlow {
+	var latest *socksUDPFlow
+	for _, f := range h.flows {
+		if !f.addr.IP.Equal(addr.IP) || f.addr.Zone != addr.Zone {
+			continue
+		}
+		if f.addr.Port == addr.Port {
+			return f
+		}
+		if latest == nil || f.lastSeen.After(latest.lastSeen) {
+			latest = f
+		}
+	}
+	return latest
+}
+
+func (h *socksUDPHandler) readReplies(network string, conn *net.UDPConn) {
 	defer h.workers.Done()
-	defer h.remove(key, f)
-	addr := f.conn.RemoteAddr().(*net.UDPAddr)
-	header := append([]byte{0, 0, 0}, socksIPPort(addr.IP, addr.Port)...)
+	defer func() {
+		h.mu.Lock()
+		if h.sockets[network] == conn {
+			delete(h.sockets, network)
+		}
+		h.mu.Unlock()
+		conn.Close()
+	}()
 	buf := make([]byte, h.stream.max+1)
 	for {
-		n, err := f.conn.Read(buf)
-		if socksUDPTooLarge(n, h.stream.max-len(header), err) {
+		n, addr, err := conn.ReadFromUDP(buf)
+		if socksUDPTooLarge(n, h.stream.max, err) {
 			continue
 		}
 		if err != nil {
-			if e, ok := err.(net.Error); ok && e.Timeout() {
-				h.mu.Lock()
-				active := h.flows[key] == f && time.Since(f.lastSeen) < h.deadline
-				if active {
-					f.conn.SetReadDeadline(f.lastSeen.Add(h.deadline))
-				} else if h.flows[key] == f {
-					delete(h.flows, key)
-				}
-				h.mu.Unlock()
-				if active {
-					continue
-				}
-			}
 			return
 		}
+		header := append([]byte{0, 0, 0}, socksIPPort(addr.IP, addr.Port)...)
+		if n > h.stream.max-len(header) {
+			continue
+		}
 		h.mu.Lock()
-		f.lastSeen = time.Now()
-		f.conn.SetReadDeadline(f.lastSeen.Add(h.deadline))
+		now := time.Now()
+		h.expire(now)
+		f := h.replyFlow(addr)
+		if f != nil {
+			f.lastSeen = now
+		}
 		h.mu.Unlock()
 		packet := make([]byte, len(header)+n)
 		copy(packet, header)

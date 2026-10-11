@@ -138,7 +138,7 @@ func writeSocksBytes(w io.Writer, b []byte) error {
 type socksUDPStream struct {
 	io.ReadWriteCloser
 	max int
-	mu  sync.Mutex // multiple destination readers share the reply stream
+	mu  sync.Mutex // IPv4 and IPv6 readers share the reply stream
 }
 
 func (s *socksUDPStream) readPacket() ([]byte, error) {
