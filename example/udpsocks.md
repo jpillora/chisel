@@ -172,4 +172,6 @@ Each association uses at most one outgoing socket per address family, retaining 
 
 Defaults are 100 associations per listener, 100 destinations per association, and a 15-second idle timeout for destination tracking. Expired destinations free capacity and are resolved again on the next packet; the outgoing sockets remain available until the association closes. Each association queues up to 16 outbound datagrams and drops overflow. Tune these with `CHISEL_UDP_MAX_CONNS`, `CHISEL_UDP_DEADLINE`, and `CHISEL_UDP_MAX_SIZE` on the relevant peers.
 
+Chisel caps SOCKS UDP packets at 65507 bytes, including the SOCKS header. The operating system can impose a smaller send limit: macOS defaults to 9216 bytes (`net.inet.udp.maxdgram`), which accommodates Chisel's 9012-byte default. Increasing `CHISEL_UDP_MAX_SIZE` does not increase the operating system's limit.
+
 SOCKS BIND, UDP fragmentation, and `stdio:udpsocks` are unsupported. UDP is best-effort: queue and resource limits can drop packets, and reconnecting does not replay them.

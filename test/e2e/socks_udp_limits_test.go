@@ -2,9 +2,12 @@ package e2e_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -117,6 +120,20 @@ func TestSocksUDPPacketSizeLimit(t *testing.T) {
 			{"clamped", "70000", "udp4", "127.0.0.1:0", 65507},
 		} {
 			t.Run(fmt.Sprintf("reverse=%t/%s", reverse, test.name), func(t *testing.T) {
+				if test.limit == 65507 {
+					// Probe the OS independently of Chisel. macOS defaults to a
+					// smaller UDP send limit; relay failures must still fail below.
+					probe := socksUDPClient(t, "127.0.0.1")
+					_, err := probe.WriteToUDP(make([]byte, test.limit), probe.LocalAddr().(*net.UDPAddr))
+					probe.Close()
+					if errors.Is(err, syscall.EMSGSIZE) ||
+						(runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10040))) {
+						t.Skipf("OS cannot send a %d-byte UDP datagram: %v", test.limit, err)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 				t.Setenv("CHISEL_UDP_MAX_SIZE", test.setting)
 				echo, observed := socksUDPLimitEcho(t, test.network, test.address, test.limit)
 				addr, _ := setupSocksUDP(t, reverse, availablePort())

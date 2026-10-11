@@ -3,9 +3,12 @@ package e2e_test
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"runtime"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -30,6 +33,10 @@ func TestSocksUDPTransferPort(t *testing.T) {
 					if err != nil {
 						if network == "udp6" {
 							t.Skipf("IPv6 unavailable: %v", err)
+						}
+						if host == "127.0.0.2" && (errors.Is(err, syscall.EADDRNOTAVAIL) ||
+							(runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10049)))) {
+							t.Skipf("alternate loopback unavailable: %v", err)
 						}
 						t.Fatal(err)
 					}

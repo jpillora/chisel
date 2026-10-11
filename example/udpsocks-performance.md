@@ -62,9 +62,9 @@ All three paths passed 20 probes from an unrelated client during the workload an
 | Associations per listener | Configured limit 2 and default 100, forward and reverse. The next association fails; existing UDP and CONNECT continue. Closing a control frees capacity. |
 | Destinations per association | Configured limit 2 and default 100, forward and reverse. Over-limit requests never reach the new destination. Other associations have independent capacity. |
 | Destination idle expiration | A 500 ms configured timeout frees capacity for a new destination without replacing its TCP control connection. Expiration keeps outgoing sockets and their source ports intact. |
-| Changed reply endpoint | Two-block TFTP exchanges switch server ports and preserve the client transfer ID, forward/reverse over IPv4/IPv6. A different reply source IP is also covered. Two simultaneous associations use separate exit sockets. |
+| Changed reply endpoint | Two-block TFTP exchanges switch server ports and preserve the client transfer ID, forward/reverse over IPv4/IPv6. A different reply source IP is also covered when the OS permits binding an alternate loopback address; that variant skips when the address is unavailable. Two simultaneous associations use separate exit sockets. |
 | Datagram size | Exact 64-byte and 9,012-byte SOCKS packets succeed. One extra byte is dropped before reaching the endpoint. IPv6 header overhead is included. |
-| Upper packet-size bound | Setting 70,000 clamps to 65,507. An exact 65,507-byte SOCKS datagram succeeds. The OS cannot send a larger IPv4 UDP datagram; oversized return packets are tested separately. |
+| Upper packet-size bound | Setting 70,000 clamps to 65,507. An exact 65,507-byte SOCKS datagram succeeds on Linux. This boundary case skips if an independent native UDP send reports a smaller OS limit, as macOS does by default. The setting clamp remains covered by unit tests on all platforms. Oversized return packets are tested separately. |
 | Oversized replies | Responses whose SOCKS header plus payload exceeds the limit are dropped; subsequent valid traffic still works. |
 | Shared-reader overflow | A full 16-packet association queue drops overflow and does not block another association. Covered deterministically by `TestSocksUDPSharedRoutingAndOverflow`. |
 | Invalid settings | Zero, negative, and malformed size/connection/deadline settings fall back to defaults; oversized size settings clamp. |
@@ -72,7 +72,7 @@ All three paths passed 20 probes from an unrelated client during the workload an
 
 The association and destination limits are per listener and per association respectively; they are not a process-wide socket or memory limit. Each association retains at most two outgoing sockets (IPv4 and IPv6) until it closes. Destination expiry releases tracking capacity; incoming replies do not create new tracking entries.
 
-Final validation passed: `CHISEL_UDP_STRESS=1 GOMAXPROCS=4 go test -race ./...`, `go vet ./...`, and `git diff --check`.
+Local Linux/ARM64 validation passed: `CHISEL_UDP_STRESS=1 GOMAXPROCS=4 go test -race ./...`, `go vet ./...`, and `git diff --check`.
 
 ## Reproduce
 

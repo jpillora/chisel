@@ -510,7 +510,7 @@ Less common knobs are environment variables, all read with a `CHISEL_` prefix (e
 | `CONFIG_TIMEOUT`| server      | `10s`              | wait for the client's config request               |
 | `SSH_WAIT`      | both        | `35s`              | how long new tunnels wait for an active connection |
 | `PING_TIMEOUT`  | both        | keepalive interval | keepalive ping reply timeout (no pings if `--keepalive 0`) |
-| `DIAL_TIMEOUT`  | both        | `30s`              | tcp target dial, SOCKS handshake, and SOCKS UDP DNS/dial timeout |
+| `DIAL_TIMEOUT`  | both        | `30s`              | tcp target dial, SOCKS handshake, and SOCKS UDP DNS timeout |
 | `WS_READ_LIMIT` | both        | `524288`           | max inbound websocket message bytes (0 = no limit; negative = default) |
 | `WS_BUFF_SIZE`  | both        | go default         | websocket read/write buffer sizes                  |
 | `UDP_MAX_SIZE`  | both        | `9012`             | max udp packet bytes (includes the SOCKS UDP header) |
@@ -520,7 +520,7 @@ Less common knobs are environment variables, all read with a `CHISEL_` prefix (e
 
 `HOST`, `PORT`, `AUTH`, and `CHISEL_KEY`/`CHISEL_KEY_FILE` are documented in the `--help` texts above.
 
-SOCKS UDP uses hard association and destination limits and drops packets beyond them. Each association queues up to 16 outbound datagrams; full queues drop packets without blocking other clients. For SOCKS UDP, nonpositive size/connection limits or idle deadlines use the defaults, and packet size is capped at 65507 bytes.
+SOCKS UDP uses hard association and destination limits and drops packets beyond them. Each association queues up to 16 outbound datagrams; full queues drop packets without blocking other clients. For SOCKS UDP, nonpositive size/connection limits or idle deadlines use the defaults, and packet size is capped at 65507 bytes. Operating systems can impose a smaller UDP send limit: macOS defaults to 9216 bytes (`net.inet.udp.maxdgram`). The default 9012-byte Chisel limit fits within that bound.
 
 #### Caveats
 
