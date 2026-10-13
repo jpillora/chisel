@@ -1,6 +1,6 @@
 module github.com/jpillora/chisel
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.27.0
 
@@ -15,7 +15,7 @@ require (
 	github.com/txthinking/socks5 v0.0.0-20260601051520-339b044ab0eb
 	golang.org/x/crypto v0.55.0
 	golang.org/x/net v0.57.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
