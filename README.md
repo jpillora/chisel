@@ -184,6 +184,10 @@ $ chisel server --help
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
+    --disable-forward, Refuse connections through forward (non-reverse)
+    remotes, including forward SOCKS5, UDP and stdio remotes. Reverse
+    remotes are not affected.
+
     --tls-key, Enables TLS and provides optional path to a PEM-encoded
     TLS private key. When this flag is set, you must also set --tls-cert,
     and you cannot set --tls-domain.

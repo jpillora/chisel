@@ -159,7 +159,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	tunnelConfig := tunnel.Config{
 		Logger:    l,
 		Inbound:   s.config.Reverse,
-		Outbound:  true, //server always accepts outbound
+		Outbound:  !s.config.NoForward,
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	}
