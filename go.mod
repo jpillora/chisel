@@ -12,6 +12,7 @@ require (
 	github.com/jpillora/opts v1.8.1
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
+	github.com/pires/go-proxyproto v0.8.0
 	github.com/txthinking/socks5 v0.0.0-20260601051520-339b044ab0eb
 	golang.org/x/crypto v0.55.0
 	golang.org/x/net v0.57.0

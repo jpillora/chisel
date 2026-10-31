@@ -254,6 +254,10 @@ $ chisel client --help
 
   which does reverse port forwarding, sharing <remote-host>:<remote-port>
   from the client to the server's <local-interface>:<local-port>.
+  additionally, P can be appended after the R flag to send a PROXY v2 header
+  which can be used to identify the original source of incoming connections:
+
+    RP:<local-interface>:<local-port>:<remote-host>:<remote-port>/<protocol>
 
     example remotes
 
@@ -266,6 +270,7 @@ $ chisel client --help
       udpsocks
       5000:udpsocks
       R:2222:localhost:22
+      RP:2222:localhost:22
       R:socks
       R:5000:socks
       R:5000:udpsocks
@@ -286,7 +291,9 @@ $ chisel client --help
     will be proxied through the client which specified the remote.
     Reverse remotes specifying "R:socks" will listen on the server's
     default socks port (1080) and terminate the connection at the
-    client's internal SOCKS5 proxy.
+    client's internal SOCKS5 proxy. Additionally, P can be appended after
+    the R prefix to have the chisel server pass a PROXY v2 header
+    which can be used to identify the original source of incoming connections.
 
     The "socks" remote supports TCP CONNECT only. Use "udpsocks"
     for TCP CONNECT and UDP ASSOCIATE, including "R:udpsocks".
