@@ -65,6 +65,17 @@ sudo dnf -y install chisel
 $ go install github.com/jpillora/chisel@latest
 ```
 
+### Sliver C2
+
+Chisel ships a [Sliver](https://github.com/BishopFox/sliver) client extension. Build and install it in one step from a Linux host (Kali included):
+
+```sh
+sudo apt install -y gcc gcc-multilib mingw-w64
+make sliver
+```
+
+`make sliver` builds `chisel.x64/x86.dll` and `chisel.x64/x86.so`, then installs them with `extension.json` into `~/.sliver-client/extensions/chisel`. Override the destination with `make sliver SLIVER_EXT=/path/to/extensions/chisel`. If you already have the binaries, `make extension` installs only.
+
 ## Demo
 
 You can run your own demo server in minutes (the old Heroku demo went away with Heroku's free tier). [`example/fly.toml`](example/fly.toml) deploys this `chisel server` to [fly.io](https://fly.io)'s free allowance:
