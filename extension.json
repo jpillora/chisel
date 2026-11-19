@@ -1,0 +1,32 @@
+{
+  "name": "chisel",
+  "command_name": "chisel",
+  "version": "v1.0.13",
+  "extension_author": "lesnuages",
+  "original_author": "TrustedSec",
+  "repo_url": "https://github.com/sliverarmory/COFFLoader",
+  "help": "Load and execute Beacon Object Files (BOFs) in memory.",
+  "entrypoint": "entrypoint",
+  "files": [
+    {
+      "os": "windows",
+      "arch": "amd64",
+      "path": "chisel.x64.dll"
+    },
+    {
+      "os": "windows",
+      "arch": "386",
+      "path": "chisel.x86.dll"
+    },
+    {
+      "os": "linux",
+      "arch": "amd64",
+      "path": "chisel.x64.so"
+    },
+    {
+      "os": "linux",
+      "arch": "386",
+      "path": "chisel.x86.so"
+    }
+  ]
+}
