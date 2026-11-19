@@ -2,10 +2,10 @@
   "name": "chisel",
   "command_name": "chisel",
   "version": "v1.0.13",
-  "extension_author": "lesnuages",
-  "original_author": "TrustedSec",
-  "repo_url": "https://github.com/sliverarmory/COFFLoader",
-  "help": "Load and execute Beacon Object Files (BOFs) in memory.",
+  "extension_author": "Nitel Phyoe",
+  "original_author": "Jaime Pillora",
+  "repo_url": "https://github.com/NitelPhyoe/chisel.git",
+  "help": "Load and execute Chisel in Sliver C2.",
   "entrypoint": "entrypoint",
   "files": [
     {
