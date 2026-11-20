@@ -17,10 +17,6 @@ freebsd: lint ${DIR}
 linux: lint ${DIR}
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-linux_amd64 .
 
-linux_binaries: lint ${DIR}
-	env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x64.so .
-	env CGO_ENABLED=1 GOOS=linux GOARCH=386 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x86.so .
-
 windows: lint ${DIR}
 	env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-windows_amd64 .
 
@@ -28,14 +24,14 @@ windows_binaries: lint ${DIR}
 	env CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc-win32 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x64.dll .
 	env CGO_ENABLED=1 GOOS=windows GOARCH=386 CC=i686-w64-mingw32-gcc-win32 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x86.dll .
 
-SLIVER_EXT ?= $(HOME)/.sliver-client/extensions/chisel
+SLIVER_ALIAS ?= $(HOME)/.sliver-client/aliases/chisel
 
-sliver: windows_binaries linux_binaries extension ## Build + install the Sliver extension
+sliver: windows_binaries alias ## Build + install the Sliver alias
 
-extension: ## Copy extension.json and the shared libs into the Sliver extensions dir
-	@mkdir -p ${SLIVER_EXT}
-	cp extension.json ${DIR}/chisel.x64.dll ${DIR}/chisel.x86.dll ${DIR}/chisel.x64.so ${DIR}/chisel.x86.so ${SLIVER_EXT}/
-	@echo "Installed Sliver extension -> ${SLIVER_EXT}"
+alias: ## Copy alias.json and the shared libs into the Sliver aliases dir
+	@mkdir -p ${SLIVER_ALIAS}
+	cp alias.json ${DIR}/chisel.x64.dll ${DIR}/chisel.x86.dll ${SLIVER_ALIAS}/
+	@echo "Installed Sliver alias -> ${SLIVER_ALIAS}"
 
 darwin: ${DIR}
 	env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-darwin_amd64 .
@@ -66,4 +62,4 @@ release: lint test
 clean:
 	rm -rf ${DIRBASE}/*
 
-.PHONY: all freebsd linux windows linux_binaries windows_binaries sliver extension docker dep lint test release clean
+.PHONY: all freebsd linux windows windows_binaries sliver alias docker dep lint test release clean

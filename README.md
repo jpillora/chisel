@@ -67,14 +67,22 @@ $ go install github.com/jpillora/chisel@latest
 
 ### Sliver C2
 
-Chisel ships a [Sliver](https://github.com/BishopFox/sliver) client extension. Build and install it in one step from a Linux host (Kali included):
+Chisel can be installed as a [Sliver](https://github.com/BishopFox/sliver) alias. Build and install it in one step from a Linux host (Kali included):
 
 ```sh
 sudo apt install -y gcc gcc-multilib mingw-w64
 make sliver
 ```
 
-`make sliver` builds `chisel.x64/x86.dll` and `chisel.x64/x86.so`, then installs them with `extension.json` into `~/.sliver-client/extensions/chisel`. Override the destination with `make sliver SLIVER_EXT=/path/to/extensions/chisel`. If you already have the binaries, `make extension` installs only.
+`make sliver` builds `chisel.x64.dll` and `chisel.x86.dll`, then installs them with `alias.json` into `~/.sliver-client/aliases/chisel`. Override the destination with `make sliver SLIVER_ALIAS=/path/to/aliases/chisel`. If you already have the DLLs, `make alias` installs only.
+
+From a Sliver session, arguments are passed through to chisel as-is:
+
+```sh
+chisel -- client -v 10.10.14.173:8080 R:1080:socks
+```
+
+An alias is only a manifest plus shared libraries, so chisel's source stays untouched and can track upstream.
 
 ## Demo
 
