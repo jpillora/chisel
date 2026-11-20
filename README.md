@@ -82,7 +82,7 @@ From a Sliver session, arguments are passed through to chisel as-is:
 chisel -- client -v 10.10.14.173:8080 R:1080:socks
 ```
 
-An alias is only a manifest plus shared libraries, so chisel's source stays untouched and can track upstream.
+An alias is only a manifest plus shared libraries, so chisel's source stays untouched apart from the small `sliver.go` cgo entrypoint, and can track upstream.
 
 ## Demo
 
