@@ -67,14 +67,14 @@ $ go install github.com/jpillora/chisel@latest
 
 ### Sliver C2
 
-Chisel can be installed as a [Sliver](https://github.com/BishopFox/sliver) alias. Build and install it in one step from a Linux host (Kali included):
+Chisel can be installed as a [Sliver](https://github.com/BishopFox/sliver) extension. Build and install it in one step from a Linux host (Kali included):
 
 ```sh
 sudo apt install -y gcc gcc-multilib mingw-w64
 make sliver
 ```
 
-`make sliver` builds `chisel.x64.dll` and `chisel.x86.dll`, then installs them with `alias.json` into `~/.sliver-client/aliases/chisel`. Override the destination with `make sliver SLIVER_ALIAS=/path/to/aliases/chisel`. If you already have the DLLs, `make alias` installs only.
+`make sliver` builds `chisel.x64.dll` and `chisel.x86.dll`, then installs them with `extension.json` into `~/.sliver-client/extensions/chisel`. Override the destination with `make sliver SLIVER_EXT=/path/to/extensions/chisel`. If you already have the DLLs, `make extension` installs only.
 
 From a Sliver session, arguments are passed through to chisel as-is:
 
@@ -82,7 +82,7 @@ From a Sliver session, arguments are passed through to chisel as-is:
 chisel -- client -v 10.10.14.173:8080 R:1080:socks
 ```
 
-An alias is only a manifest plus shared libraries, so chisel's source stays untouched apart from the small `sliver.go` cgo entrypoint, and can track upstream.
+The extension starts chisel inside the implant process and returns immediately, so the command reports success while the tunnel keeps running for the rest of the session. Only `sliver.go` (a cgo entrypoint) is added; the rest of chisel stays upstream-compatible.
 
 ## Demo
 

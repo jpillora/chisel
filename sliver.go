@@ -2,53 +2,97 @@
 
 package main
 
+/*
+#include <stdint.h>
+#include <stdlib.h>
+
+#if defined(_WIN32) && defined(__i386__)
+#define SLIVER_CALLBACK __attribute__((stdcall))
+#else
+#define SLIVER_CALLBACK
+#endif
+
+typedef int32_t (SLIVER_CALLBACK *sliver_callback_t)(char *, int32_t);
+
+static int32_t sliver_call_callback(sliver_callback_t cb, char *data, int32_t len) {
+	return cb(data, len);
+}
+*/
 import "C"
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
+	"sync"
+	"time"
+	"unsafe"
 )
 
-// Sliver loads aliases on Windows by wrapping the DLL in Donut, which calls the
-// manifest's entrypoint export as `void entrypoint(char *args)` — a single
-// command-line string, no callback. The arguments are the same ones you would
-// pass to the chisel binary.
+var sliverArgs sync.Mutex
+
+// entrypoint implements the Sliver native extension ABI:
+//
+//	int32_t entrypoint(char *buffer, uint32_t size, callback(char *, int32_t))
+//
+// chisel's tunnel runs until it is stopped, so it is started in the background
+// and the call returns immediately. The callback is only valid during this
+// call, hence the brief wait to report an immediate argument or connection
+// error.
 //
 //export entrypoint
-func entrypoint(args *C.char) {
-	argstring := ""
-	if args != nil {
-		argstring = C.GoString(args)
+func entrypoint(buffer *C.char, size C.uint32_t, callback C.sliver_callback_t) C.int32_t {
+	args := ""
+	if buffer != nil && size > 0 {
+		args = C.GoStringN(buffer, C.int(size))
 	}
-	// Sliver kills the host process as soon as this returns, so run the tunnel
-	// on this thread and only come back when chisel exits.
-	runFromSliver(strings.Fields(argstring))
+
+	errCh := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errCh <- fmt.Errorf("chisel panic: %v", r)
+			}
+		}()
+		errCh <- runFromSliver(strings.Fields(args))
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return respond(callback, "chisel error: "+err.Error(), 1)
+		}
+		return respond(callback, "chisel exited", 0)
+	case <-time.After(2 * time.Second):
+		return respond(callback, "chisel started: "+args, 0)
+	}
 }
 
-// runFromSliver runs chisel with the Sliver-supplied arguments. Unlike main()
-// it never calls os.Exit, so a bad command line or a dead tunnel cannot take
-// down the process the DLL is loaded into.
-func runFromSliver(args []string) {
+// runFromSliver runs the normal CLI with the Sliver-supplied arguments. Unlike
+// main() it returns errors instead of calling os.Exit, which would take down
+// the implant process the extension is loaded into.
+func runFromSliver(args []string) error {
+	sliverArgs.Lock()
 	os.Args = append([]string{"chisel"}, args...)
-
 	serverConfig := newServerOptions()
 	clientConfig := newClientOptions()
 	cli := newCLI(serverConfig, clientConfig)
-
 	parsed, err := cli.ParseArgsError(os.Args)
+	sliverArgs.Unlock()
 	if err != nil {
-		// Help and version are modelled as parse errors by opts; both are
-		// harmless here, as is a malformed command line.
-		fmt.Print(err)
-		return
+		return err
 	}
 	if !parsed.IsRunnable() {
-		fmt.Print(parsed.Help())
-		return
+		return fmt.Errorf("no command specified")
 	}
-	if err := parsed.Run(); err != nil {
-		log.Print(err)
+	return parsed.Run()
+}
+
+func respond(callback C.sliver_callback_t, msg string, rc C.int32_t) C.int32_t {
+	if callback != nil {
+		cs := C.CString(msg)
+		defer C.free(unsafe.Pointer(cs))
+		C.sliver_call_callback(callback, cs, C.int32_t(len(msg)))
 	}
+	return rc
 }
