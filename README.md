@@ -82,6 +82,13 @@ From a Sliver session, arguments are passed through to chisel as-is:
 chisel -- client -v 10.10.14.173:8080 R:1080:socks
 ```
 
+Tunnels run in the background; `list` shows them and `stop <taskId>` shuts one down:
+
+```sh
+chisel -- list
+chisel -- stop 1
+```
+
 The extension starts chisel inside the implant process and returns immediately, so the command reports success while the tunnel keeps running for the rest of the session. Only `sliver.go` (a cgo entrypoint) is added; the rest of chisel stays upstream-compatible.
 
 ## Demo
