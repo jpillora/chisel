@@ -1,0 +1,22 @@
+{
+  "name": "chisel",
+  "command_name": "chisel",
+  "version": "1.13.0",
+  "extension_author": "Nitel Phyoe",
+  "original_author": "Jaime Pillora",
+  "repo_url": "https://github.com/jpillora/chisel",
+  "help": "Fast TCP/UDP tunnel over HTTP, loaded as a Sliver extension.",
+  "entrypoint": "entrypoint",
+  "files": [
+    {
+      "os": "windows",
+      "arch": "amd64",
+      "path": "chisel.x64.dll"
+    },
+    {
+      "os": "windows",
+      "arch": "386",
+      "path": "chisel.x86.dll"
+    }
+  ]
+}

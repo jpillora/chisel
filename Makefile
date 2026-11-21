@@ -20,6 +20,19 @@ linux: lint ${DIR}
 windows: lint ${DIR}
 	env CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-windows_amd64 .
 
+windows_binaries: lint ${DIR}
+	env CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc-win32 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x64.dll .
+	env CGO_ENABLED=1 GOOS=windows GOARCH=386 CC=i686-w64-mingw32-gcc-win32 go build -buildmode=c-shared -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel.x86.dll .
+
+SLIVER_EXT ?= $(HOME)/.sliver-client/extensions/chisel
+
+sliver: windows_binaries extension ## Build + install the Sliver extension
+
+extension: ## Copy extension.json and the shared libs into the Sliver extensions dir
+	@mkdir -p ${SLIVER_EXT}
+	cp extension.json ${DIR}/chisel.x64.dll ${DIR}/chisel.x86.dll ${SLIVER_EXT}/
+	@echo "Installed Sliver extension -> ${SLIVER_EXT}"
+
 darwin: ${DIR}
 	env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath ${LDFLAGS} ${GCFLAGS} ${ASMFLAGS} -o ${DIR}/chisel-darwin_amd64 .
 
@@ -49,4 +62,4 @@ release: lint test
 clean:
 	rm -rf ${DIRBASE}/*
 
-.PHONY: all freebsd linux windows docker dep lint test release clean
+.PHONY: all freebsd linux windows windows_binaries sliver extension docker dep lint test release clean
